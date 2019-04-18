@@ -152,6 +152,10 @@ void AP_MotorsMatrix::output_to_motors()
                     _actuator[i] = 0.0f;
                 }
             }
+            rc_write_angle(AP_MOTORS_MOT_9, _yaw_radio_passthrough * 4500);
+            rc_write_angle(AP_MOTORS_MOT_10, _yaw_radio_passthrough * 4500);
+            rc_write_angle(AP_MOTORS_MOT_11, _yaw_radio_passthrough * 4500);
+            rc_write_angle(AP_MOTORS_MOT_12, _yaw_radio_passthrough * 4500);
             break;
         }
         case SpoolState::GROUND_IDLE:
@@ -171,6 +175,10 @@ void AP_MotorsMatrix::output_to_motors()
                     set_actuator_with_slew(_actuator[i], thrust_to_actuator(_thrust_rpyt_out[i]));
                 }
             }
+            rc_write_angle(AP_MOTORS_MOT_9, constrain_float(_wing_yaw, -1.0f, 1.0f) * 4500);
+            rc_write_angle(AP_MOTORS_MOT_10, constrain_float(_wing_yaw, -1.0f, 1.0f) * 4500);
+            rc_write_angle(AP_MOTORS_MOT_11, constrain_float(_wing_yaw, -1.0f, 1.0f) * 4500);
+            rc_write_angle(AP_MOTORS_MOT_12, constrain_float(_wing_yaw, -1.0f, 1.0f) * 4500);
             break;
     }
 
@@ -226,6 +234,9 @@ void AP_MotorsMatrix::output_armed_stabilizing()
 
     // If thrust boost is active then do not limit maximum thrust
     throttle_thrust_max = _thrust_boost_ratio + (1.0f - _thrust_boost_ratio) * _throttle_thrust_max * compensation_gain;
+
+    float wing_scale = constrain_float(get_throttle() / _throttle_hover, 1.0f, 4.0f);
+    _wing_yaw = _yaw_in_ff / safe_sqrt(wing_scale) + _yaw_in / wing_scale;
 
     // sanity check throttle is above zero and below current limited throttle
     if (throttle_thrust <= 0.0f) {
