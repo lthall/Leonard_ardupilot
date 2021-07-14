@@ -918,6 +918,17 @@ void AC_PosControl::update_pos_offset_z(float pos_offset_z)
         _pos_offset_z, _vel_offset_z, _accel_offset_z,
         0.0f, get_max_speed_down_cms(), get_max_speed_up_cms(),
         -get_max_accel_z_cmss(), get_max_accel_z_cmss(), _tc_z_s, _dt);
+
+    AP::logger().Write("TFZ",
+                       "TimeUS,O,P,V,A",
+                       "smmno",
+                       "F0000",
+                       "Qffff",
+                       AP_HAL::micros64(),
+                       double(pos_offset_z * 0.01f),
+                       double(_pos_offset_z * 0.01f),
+                       double(_vel_offset_z * 0.01f),
+                       double(_accel_offset_z * 0.01f));
 }
 
 // is_active_z - returns true if the z position controller has been run in the previous 5 loop times

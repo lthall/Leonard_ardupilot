@@ -495,6 +495,15 @@ bool AC_WPNav::advance_wp_target_along_track(float dt)
             }
         }
     }
+    AP::logger().Write("LEN",
+        "TimeUS,gts,ts,os",
+        "s---",
+        "F000",
+        "Qfff",
+          AP_HAL::micros64(),
+          (double)_track_scalar_dt,
+          (double)track_scaler_dt,
+          (double)offset_z_scaler);
 
     // successfully advanced along track
     return true;
