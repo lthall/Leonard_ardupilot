@@ -1162,7 +1162,7 @@ void GCS_MAVLINK_Copter::handleMessage(const mavlink_message_t &msg)
         float yaw_rate_cds = 0.0f;
         if (!yaw_ignore) {
             yaw_cd = ToDeg(packet.yaw) * 100.0f;
-            yaw_relative = packet.coordinate_frame == MAV_FRAME_BODY_NED || packet.coordinate_frame == MAV_FRAME_BODY_OFFSET_NED;
+            yaw_relative = packet.coordinate_frame == MAV_FRAME_BODY_OFFSET_NED;
         }
         if (!yaw_rate_ignore) {
             yaw_rate_cds = ToDeg(packet.yaw_rate) * 100.0f;
