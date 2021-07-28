@@ -592,7 +592,13 @@ void ModeGuided::angle_control_run()
     float roll_in = guided_angle_state.roll_cd;
     float pitch_in = guided_angle_state.pitch_cd;
     float total_in = norm(roll_in, pitch_in);
-    float angle_max = MIN(attitude_control->get_althold_lean_angle_max(), copter.aparm.angle_max);
+
+    float angle_max = copter.aparm.angle_max;
+    if (!guided_angle_state.use_thrust) {
+        // only apply _althold_lean_angle_max when using Alt Hold
+        angle_max = MIN(angle_max, attitude_control->get_althold_lean_angle_max());
+    }
+
     if (total_in > angle_max) {
         float ratio = angle_max / total_in;
         roll_in *= ratio;
@@ -652,7 +658,7 @@ void ModeGuided::angle_control_run()
 
     // call position controller
     if (guided_angle_state.use_thrust) {
-        attitude_control->set_throttle_out(guided_angle_state.thrust, true, copter.g.throttle_filt);
+        attitude_control->set_throttle_out(guided_angle_state.thrust, false, copter.g.throttle_filt);
     } else {
         pos_control->set_alt_target_from_climb_rate_ff(climb_rate_cms, G_Dt, false);
         pos_control->update_z_controller();
