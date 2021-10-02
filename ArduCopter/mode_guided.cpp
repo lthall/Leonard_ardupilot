@@ -20,6 +20,7 @@ static uint32_t vel_update_time_ms;         // system time of last target update
 
 struct {
     uint32_t update_time_ms;
+    Quaternion q;
     float roll_cd;
     float pitch_cd;
     float yaw_cd;
@@ -312,6 +313,7 @@ void ModeGuided::set_angle(const Quaternion &q, float climb_rate_cms_or_thrust, 
 
     // convert quaternion to euler angles
     q.to_euler(guided_angle_state.roll_cd, guided_angle_state.pitch_cd, guided_angle_state.yaw_cd);
+    guided_angle_state.q = q;
     guided_angle_state.roll_cd = ToDeg(guided_angle_state.roll_cd) * 100.0f;
     guided_angle_state.pitch_cd = ToDeg(guided_angle_state.pitch_cd) * 100.0f;
     guided_angle_state.yaw_cd = wrap_180_cd(ToDeg(guided_angle_state.yaw_cd) * 100.0f);
@@ -652,6 +654,8 @@ void ModeGuided::angle_control_run()
     // call attitude controller
     if (guided_angle_state.use_yaw_rate) {
         attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(roll_in, pitch_in, yaw_rate_in);
+    } else if (guided_angle_state.use_thrust) {
+        attitude_control->input_quaternion(guided_angle_state.q);
     } else {
         attitude_control->input_euler_angle_roll_pitch_yaw(roll_in, pitch_in, yaw_in, true);
     }
