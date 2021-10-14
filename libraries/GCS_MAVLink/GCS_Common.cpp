@@ -4111,9 +4111,7 @@ void GCS_MAVLINK::send_attitude_quaternion() const
 {
     const AP_AHRS &ahrs = AP::ahrs();
     Quaternion quat;
-    if (!ahrs.get_secondary_quaternion(quat)) {
-        return;
-    }
+    ahrs.get_quat_body_to_ned(quat);
     const Vector3f omega = ahrs.get_gyro();
     const float repr_offseq_q[] {0,0,0,0};  // unused, but probably should correspond to the AHRS view?
     mavlink_msg_attitude_quaternion_send(
