@@ -175,7 +175,7 @@ void AC_WPNav::wp_and_spline_init(float speed_cms)
 
     // calculate scurve jerk and jerk time
     if (!is_positive(_wp_jerk)) {
-        _wp_jerk = _wp_accel_cmss;
+        _wp_jerk = _wp_accel_cmss * 0.01;
     }
     calc_scurve_jerk_and_jerk_time();
 
