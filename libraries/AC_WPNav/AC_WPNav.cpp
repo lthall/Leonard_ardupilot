@@ -877,8 +877,12 @@ void AC_WPNav::calc_scurve_jerk_and_jerk_time()
     // lean to accelerate. This means the change in angle is equivalent to the change in acceleration
     const float jounce = MIN(_attitude_control.get_accel_roll_max_radss() * GRAVITY_MSS, _attitude_control.get_accel_pitch_max_radss() * GRAVITY_MSS);
     if (is_positive(jounce)) {
+    	// Ensure that the maximum jerk is realizable given the known maximum jounce
+    	_scurve_jerk = MIN(_scurve_jerk, safe_sqrt(jounce * 0.01 * MAX(_wp_accel_cmss, _wp_accel_z_cmss) / 2.0));
+    	// Set the Jerk time based on the maximum Jerk and Jounce
         _scurve_jerk_time = MAX(_attitude_control.get_input_tc(), 0.5f * _scurve_jerk * M_PI / jounce);
     } else {
+    	// We don't have a value for Jounce so default to the attitude time constant
         _scurve_jerk_time = MAX(_attitude_control.get_input_tc(), 0.1f);
     }
     _scurve_jerk_time *= 2.0f;
