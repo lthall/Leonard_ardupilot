@@ -1069,6 +1069,48 @@ void AP_MotorsMatrix::setup_motors(motor_frame_class frame_class, motor_frame_ty
                     break;
             }
             break;
+        case MOTOR_FRAME_COAXQUAD:
+            _mav_type = MAV_TYPE_OCTOROTOR;
+            _frame_class_string = "COAXQUAD";
+            switch (frame_type) {
+                case MOTOR_FRAME_TYPE_X: {
+                    _frame_type_string = "X";
+                    static const AP_MotorsMatrix::MotorDef motors[] {
+                        {   45, AP_MOTORS_MATRIX_YAW_FACTOR_CW,   1 },
+                        {  -45, AP_MOTORS_MATRIX_YAW_FACTOR_CCW,  7 },
+                        { -135, AP_MOTORS_MATRIX_YAW_FACTOR_CW,   5 },
+                        {  135, AP_MOTORS_MATRIX_YAW_FACTOR_CCW,  3 },
+                        {  -45, AP_MOTORS_MATRIX_YAW_FACTOR_CCW,  8 },
+                        {   45, AP_MOTORS_MATRIX_YAW_FACTOR_CW,   2 },
+                        {  135, AP_MOTORS_MATRIX_YAW_FACTOR_CCW,  4 },
+                        { -135, AP_MOTORS_MATRIX_YAW_FACTOR_CW,   6 },
+                    };
+                    add_motors(motors, ARRAY_SIZE(motors));
+                    break;
+                }
+                case MOTOR_FRAME_TYPE_H: {
+                    // H frame set-up - same as X but motors spin in opposite directions
+                    _frame_type_string = "H";
+                    static const AP_MotorsMatrix::MotorDef motors[] {
+                        {   45, AP_MOTORS_MATRIX_YAW_FACTOR_CCW,  1 },
+                        {  -45, AP_MOTORS_MATRIX_YAW_FACTOR_CW,   7 },
+                        { -135, AP_MOTORS_MATRIX_YAW_FACTOR_CCW,  5 },
+                        {  135, AP_MOTORS_MATRIX_YAW_FACTOR_CW,   3 },
+                        {  -45, AP_MOTORS_MATRIX_YAW_FACTOR_CW,   8 },
+                        {   45, AP_MOTORS_MATRIX_YAW_FACTOR_CCW,  2 },
+                        {  135, AP_MOTORS_MATRIX_YAW_FACTOR_CW,   4 },
+                        { -135, AP_MOTORS_MATRIX_YAW_FACTOR_CCW,  6 },
+                    };
+                    add_motors(motors, ARRAY_SIZE(motors));
+                    break;
+                }
+                default:
+                    // coaxquad frame class does not support this frame type
+                    _frame_type_string = "UNSUPPORTED";
+                    success = false;
+                    break;
+            }
+            break;
 #endif //AP_MOTORS_FRAME_OCTAQUAD_ENABLED
 #if AP_MOTORS_FRAME_DODECAHEXA_ENABLED
         case MOTOR_FRAME_DODECAHEXA: {
