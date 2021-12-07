@@ -3853,13 +3853,13 @@ class AutoTestCopter(AutoTest):
             raise NotAchievedException("Did not receive proper target position z: wanted=%f got=%f" % (z_up, -m.z))
 
     def test_guided_local_velocity_target(self, vx, vy, vz_up, timeout=3):
-        " Check local target velocity being received by vehicle "
+        """ Check local target velocity being received by vehicle """
         self.progress("Setting local NED velocity target: (%f, %f, %f)" % (vx, vy, -vz_up))
         self.progress("Setting POSITION_TARGET_LOCAL_NED message rate to 10Hz")
         self.set_message_rate_hz(mavutil.mavlink.MAVLINK_MSG_ID_POSITION_TARGET_LOCAL_NED, 10)
 
-        # mask specifying use only vx,vy,vz & accel. Even though we don't test acceltargets below currently
-        #  a velocity only mask returns a velocity & accel mask
+        # mask specifying use only vx,vy,vz & accel. Even though we don't test acceleration targets below currently
+        # velocity only mask returns a velocity & acceleration mask
         target_typemask = (MAV_POS_TARGET_TYPE_MASK.POS_IGNORE |
                            MAV_POS_TARGET_TYPE_MASK.YAW_IGNORE | MAV_POS_TARGET_TYPE_MASK.YAW_RATE_IGNORE)
 
@@ -3885,7 +3885,7 @@ class AutoTestCopter(AutoTest):
                 0, # yaw
                 0, # yawrate
             )
-            m = self.mav.recv_match(type='POSITION_TARGET_LOCAL_NED', blocking=True, timeout=1)
+            m = self.mav.recv_match(type="POSITION_TARGET_LOCAL_NED", blocking=True, timeout=1)
 
             if m is None:
                 raise NotAchievedException("Did not receive any message for 1 sec")
@@ -3907,6 +3907,182 @@ class AutoTestCopter(AutoTest):
             raise NotAchievedException("Did not receive proper target velocity vz: wanted=%f got=%f" % (vz_up, -m.vz))
 
         self.progress("Received proper target velocity commands")
+
+    def test_guided_local_acceleration_target(self, afx, afy, afz_up, timeout=3):
+        """ Check local target acceleration being received by vehicle """
+        self.progress("Setting local NED acceleration target: (%f, %f, %f)" % (afx, afy, -afz_up))
+        self.progress("Setting POSITION_TARGET_LOCAL_NED message rate to 10Hz")
+        self.set_message_rate_hz(mavutil.mavlink.MAVLINK_MSG_ID_POSITION_TARGET_LOCAL_NED, 10)
+
+        # mask specifying use only acceleration
+        target_typemask = (MAV_POS_TARGET_TYPE_MASK.POS_IGNORE | MAV_POS_TARGET_TYPE_MASK.VEL_IGNORE |
+                           MAV_POS_TARGET_TYPE_MASK.YAW_IGNORE | MAV_POS_TARGET_TYPE_MASK.YAW_RATE_IGNORE)
+
+        # Drain old messages and ignore the ramp-up to the required target acceleration
+        tstart = self.get_sim_time()
+        while self.get_sim_time_cached() - tstart < timeout:
+            # send acceleration-control command
+            self.mav.mav.set_position_target_local_ned_send(
+                0, # timestamp
+                1, # target system_id
+                1, # target component id
+                mavutil.mavlink.MAV_FRAME_LOCAL_NED,
+                target_typemask | MAV_POS_TARGET_TYPE_MASK.LAST_BYTE,
+                0, # x
+                0, # y
+                0, # z
+                0, # vx
+                0, # vy
+                0, # vz
+                afx, # afx
+                afy, # afy
+                -afz_up, # afz
+                0, # yaw
+                0, # yawrate
+            )
+            m = self.mav.recv_match(type="POSITION_TARGET_LOCAL_NED", blocking=True, timeout=1)
+
+            if m is None:
+                raise NotAchievedException("Did not receive any message for 1 second")
+
+            self.progress("Received local target: %s" % str(m))
+
+        # Check the last received message
+        if not (m.type_mask == (target_typemask | MAV_POS_TARGET_TYPE_MASK.LAST_BYTE) or m.type_mask == target_typemask):
+            raise NotAchievedException("Did not receive proper mask: expected=%u or %u, got=%u" %
+                  ((target_typemask | MAV_POS_TARGET_TYPE_MASK.LAST_BYTE), target_typemask, m.type_mask))
+
+        if afx - m.afx > 0.1:
+            raise NotAchievedException("Did not receive proper target acceleration afx: wanted=%f got=%f" %
+                                       (afx, m.afx))
+
+        if afy - m.afy > 0.1:
+            raise NotAchievedException("Did not receive proper target acceleration afy: wanted=%f got=%f" %
+                                       (afy, m.afy))
+
+        if afz_up - (-m.afz) > 0.1:
+            raise NotAchievedException("Did not receive proper target acceleration afz: wanted=%f got=%f" %
+                                       (afz_up, -m.afz))
+
+        self.progress("Received proper target acceleration commands")
+
+    def test_guided_local_posvelaccel_target(self, x, y, z_up, vx, vy, vz_up, afx, afy, afz_up, timeout=3):
+        """ Check local target posvelaccel being received by vehicle """
+        self.progress("Setting local NED position target: (%f, %f, %f)" % (x, y, -z_up))
+        self.progress("Setting local NED velocity target: (%f, %f, %f)" % (vx, vy, -vz_up))
+        self.progress("Setting local NED acceleration target: (%f, %f, %f)" % (afx, afy, -afz_up))
+        self.progress("Setting POSITION_TARGET_LOCAL_NED message rate to 10Hz")
+        self.set_message_rate_hz(mavutil.mavlink.MAVLINK_MSG_ID_POSITION_TARGET_LOCAL_NED, 10)
+
+        # mask specifying use posvelaccel
+        target_typemask = (MAV_POS_TARGET_TYPE_MASK.YAW_IGNORE | MAV_POS_TARGET_TYPE_MASK.YAW_RATE_IGNORE)
+
+        # Drain old messages and ignore the ramp-up to the required target acceleration
+        tstart = self.get_sim_time()
+        while self.get_sim_time_cached() - tstart < timeout:
+            # send acceleration-control command
+            self.mav.mav.set_position_target_local_ned_send(
+                0, # timestamp
+                1, # target system_id
+                1, # target component id
+                mavutil.mavlink.MAV_FRAME_LOCAL_NED,
+                target_typemask | MAV_POS_TARGET_TYPE_MASK.LAST_BYTE,
+                x, # x
+                y, # y
+                -z_up, # z
+                vx, # vx
+                vy, # vy
+                -vz_up, # vz
+                afx, # afx
+                afy, # afy
+                -afz_up, # afz
+                0, # yaw
+                0, # yawrate
+            )
+            m = self.mav.recv_match(type="POSITION_TARGET_LOCAL_NED", blocking=True, timeout=1)
+
+            if m is None:
+                raise NotAchievedException("Did not receive any message for 1 second")
+
+            self.progress("Received local target: %s" % str(m))
+
+        # Check the last received message
+        if not (m.type_mask == (target_typemask | MAV_POS_TARGET_TYPE_MASK.LAST_BYTE) or m.type_mask == target_typemask):
+            raise NotAchievedException("Did not receive proper mask: expected=%u or %u, got=%u" %
+                  ((target_typemask | MAV_POS_TARGET_TYPE_MASK.LAST_BYTE), target_typemask, m.type_mask))
+
+        if x - m.x > 0.1:
+            raise NotAchievedException("Did not receive proper target position x: wanted=%f got=%f" % (x, m.x))
+
+        if y - m.y > 0.1:
+            raise NotAchievedException("Did not receive proper target position y: wanted=%f got=%f" % (y, m.y))
+
+        if z_up - (-m.z) > 0.1:
+            raise NotAchievedException("Did not receive proper target position z: wanted=%f got=%f" % (z_up, -m.z))
+
+        if vx - m.vx > 0.1:
+            raise NotAchievedException("Did not receive proper target velocity vx: wanted=%f got=%f" % (vx, m.vx))
+
+        if vy - m.vy > 0.1:
+            raise NotAchievedException("Did not receive proper target velocity vy: wanted=%f got=%f" % (vy, m.vy))
+
+        if vz_up - (-m.vz) > 0.1:
+            raise NotAchievedException("Did not receive proper target velocity vz: wanted=%f got=%f" % (vz_up, -m.vz))
+
+        if afx - m.afx > 0.1:
+            raise NotAchievedException("Did not receive proper target acceleration afx: wanted=%f got=%f" %
+                                       (afx, m.afx))
+
+        if afy - m.afy > 0.1:
+            raise NotAchievedException("Did not receive proper target acceleration afy: wanted=%f got=%f" %
+                                       (afy, m.afy))
+
+        if afz_up - (-m.afz) > 0.1:
+            raise NotAchievedException("Did not receive proper target acceleration afz: wanted=%f got=%f" %
+                                       (afz_up, -m.afz))
+
+        self.progress("Received proper target posvelaccel commands")
+
+    def wait_for_local_velocity(self, vx, vy, vz_up, timeout=10):
+        """ Wait for local target velocity"""
+
+        # debug messages
+        self.progress("Waiting for local NED velocity target: (%f, %f, %f)" % (vx, vy, -vz_up))
+        self.progress("Setting LOCAL_POSITION_NED message rate to 10Hz")
+
+        # set position local ned message stream rate
+        self.set_message_rate_hz(mavutil.mavlink.MAVLINK_MSG_ID_LOCAL_POSITION_NED, 10)
+
+        # wait for position local ned message
+        tstart = self.get_sim_time()
+        while self.get_sim_time_cached() - tstart < timeout:
+
+            # get position target local ned message
+            m = self.mav.recv_match(type="LOCAL_POSITION_NED", blocking=True, timeout=1)
+
+            # could not be able to get a valid target local ned message within given time
+            if m is None:
+
+                # raise an error that did not receive a valid target local ned message within given time
+                raise NotAchievedException("Did not receive any position local ned message for 1 second!")
+
+            # got a valid target local ned message within given time
+            else:
+
+                # debug message
+                self.progress("Received local position ned message: %s" % str(m))
+
+                # check if velocity values are in range
+                if vx - m.vx <= 0.1 and vy - m.vy <= 0.1 and vz_up - (-m.vz) <= 0.1:
+
+                    # get out of function
+                    self.progress("Vehicle successfully reached to target velocity!")
+                    return
+
+        # raise an exception
+        error_message = "Did not receive target velocities vx, vy, vz_up, wanted=(%f, %f, %f) got=(%f, %f, %f)"
+        error_message = error_message % (vx, vy, vz_up, m.vx, m.vy, -m.vz)
+        raise NotAchievedException(error_message)
 
     def test_position_target_message_mode(self):
         " Ensure that POSITION_TARGET_LOCAL_NED messages are sent in Guided Mode only "
@@ -7664,39 +7840,257 @@ class AutoTestCopter(AutoTest):
         self.context_pop()
 
     def PAUSE_CONTINUE(self):
+
+        # load auto mission
         self.load_mission("copter_mission.txt", strict=False)
 
+        # start mission
         self.set_parameter("AUTO_OPTIONS", 3)
-        self.change_mode('AUTO')
+        self.change_mode("AUTO")
         self.wait_ready_to_arm()
         self.arm_vehicle()
 
-        self.wait_waypoint(4, 4)
-        self.run_cmd(mavutil.mavlink.MAV_CMD_DO_PAUSE_CONTINUE,
-                     0, # param1
-                     0, # param2
-                     0, # param3
-                     0, # param4
-                     0, # param5
-                     0, # param6
-                     0 # param7
-                     )
+        # wait for the waypoint
+        self.wait_current_waypoint(3, 500)
 
+        # send pause command
+        self.cmd_pause()
+
+        # wait vehicle to pause
         self.wait_groundspeed(0, 1, minimum_duration=5)
 
-        self.run_cmd(mavutil.mavlink.MAV_CMD_DO_PAUSE_CONTINUE,
-                     1, # param1
-                     0, # param2
-                     0, # param3
-                     0, # param4
-                     0, # param5
-                     0, # param6
-                     0 # param7
-                     )
+        # send resume command
+        self.cmd_resume()
 
-        self.wait_groundspeed(5, 100)
+        # wait for the waypoint
+        self.wait_current_waypoint(4, 500)
 
-        self.wait_disarmed()
+        # send pause command
+        self.cmd_pause()
+
+        # wait vehicle to pause
+        self.wait_groundspeed(0, 1, minimum_duration=5)
+
+        # send resume command
+        self.cmd_resume()
+
+        # wait for mission to end
+        self.wait_disarmed(timeout=500)
+
+    # test pause/continue in guided mode
+    def PAUSE_CONTINUE_GUIDED(self):
+
+        # start pause/continue subtest with location
+        self.start_subtest("Started test for Pause/Continue in GUIDED mode with LOCATION!")
+
+        # get ready for takeoff
+        self.change_mode("GUIDED")
+        self.wait_ready_to_arm()
+        self.arm_vehicle()
+        self.set_parameter("GUID_TIMEOUT", 120)
+
+        # takeoff
+        self.user_takeoff(alt_min=30)
+
+        # location to test
+        location = self.home_relative_loc_ne(300, 0)
+        location = mavutil.location(location.lat, location.lng, 30, 0)
+
+        # target typemask as pos only
+        target_typemask = MAV_POS_TARGET_TYPE_MASK.POS_ONLY
+
+        # move to a location
+        self.mav.mav.set_position_target_global_int_send(
+            0, # timestamp
+            1, # target system_id
+            1, # target component id
+            mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT_INT, # relative altitude frame
+            target_typemask | MAV_POS_TARGET_TYPE_MASK.LAST_BYTE, # target typemask as pos only
+            int(location.lat * 1e7), # lat
+            int(location.lng * 1e7), # lon
+            location.alt, # alt
+            0, # vx
+            0, # vy
+            0, # vz
+            0, # afx
+            0, # afy
+            0, # afz
+            0, # yaw
+            0) # yawrate
+
+        # wait vehicle to move away from home
+        self.delay_sim_time(seconds_to_wait=10)
+
+        # pause guided flight
+        self.cmd_pause()
+
+        # wait vehicle to pause
+        self.wait_groundspeed(0, 1, minimum_duration=5)
+
+        # continue guided flight
+        self.cmd_resume()
+
+        # wait vehicle to reach destination
+        self.wait_location(loc=location, timeout=120)
+
+        # end pause/continue subtest with location
+        self.end_subtest("Ended test for Pause/Continue in GUIDED mode with LOCATION!")
+
+        # start pause/continue subtest with destination
+        self.start_subtest("Started test for Pause/Continue in GUIDED mode with DESTINATION!")
+
+        # point to south
+        self.guided_achieve_heading(270)
+
+        # location to test
+        location = self.offset_location_ne(self.mav.location(), 0, -300)
+
+        # move vehicle on x direction
+        self.mav.mav.set_position_target_local_ned_send(
+            0, # system time in milliseconds
+            1, # target system
+            1, # target component
+            mavutil.mavlink.MAV_FRAME_BODY_NED, # coordinate frame MAV_FRAME_BODY_NED
+            MAV_POS_TARGET_TYPE_MASK.POS_ONLY, # type mask (pos only)
+            300, # position x
+            0, # position y
+            0, # position z
+            0, # velocity x
+            0, # velocity y
+            0, # velocity z
+            0, # accel x
+            0, # accel y
+            0, # accel z
+            0, # yaw
+            0) # yaw rate
+
+        # wait vehicle to move away from home
+        self.delay_sim_time(seconds_to_wait=10)
+
+        # pause guided flight
+        self.cmd_pause()
+
+        # wait vehicle to pause
+        self.wait_groundspeed(0, 1, minimum_duration=5)
+
+        # continue guided flight
+        self.cmd_resume()
+
+        # wait vehicle to reach destination
+        self.wait_location(loc=location, timeout=120)
+
+        # end pause/continue subtest with destination
+        self.end_subtest("Ended test for Pause/Continue in GUIDED mode with DESTINATION!")
+
+        # start pause/continue subtest with velocity
+        self.start_subtest("Started test for Pause/Continue in GUIDED mode with VELOCITY!")
+
+        # velocity targets
+        vx, vy, vz_up = (5, 5, 0)
+
+        # point to south
+        self.guided_achieve_heading(180)
+
+        # give some velocity
+        self.test_guided_local_velocity_target(vx, vy, vz_up, timeout=10)
+
+        # wait vehicle to reach target velocity
+        self.wait_for_local_velocity(vx, vy, vz_up, timeout=10)
+
+        # pause guided flight
+        self.cmd_pause()
+
+        # wait vehicle to pause
+        self.wait_for_local_velocity(0, 0, 0, timeout=10)
+
+        # continue guided flight
+        self.cmd_resume()
+
+        # wait vehicle to reach target velocity
+        self.wait_for_local_velocity(vx, vy, vz_up, timeout=10)
+
+        # stop the vehicle
+        self.test_guided_local_velocity_target(0, 0, 0, timeout=10)
+
+        # wait vehicle to stop
+        self.wait_for_local_velocity(0, 0, 0, timeout=10)
+
+        # end pause/continue subtest with velocity
+        self.end_subtest("Ended test for Pause/Continue in GUIDED mode with VELOCITY!")
+
+        # start pause/continue subtest with acceleration
+        self.start_subtest("Started test for Pause/Continue in GUIDED mode with ACCELERATION!")
+
+        # acceleration targets
+        ax, ay, az_up = (1, 1, 0)
+
+        # point to east
+        self.guided_achieve_heading(90)
+
+        # give some acceleration
+        self.test_guided_local_acceleration_target(ax, ay, az_up, timeout=10)
+
+        # wait vehicle to reach some velocity
+        self.wait_for_local_velocity(vx, vy, vz_up, timeout=10)
+
+        # pause guided flight
+        self.cmd_pause()
+
+        # wait vehicle to pause
+        self.wait_for_local_velocity(0, 0, 0, timeout=10)
+
+        # continue guided flight
+        self.cmd_resume()
+
+        # wait vehicle to reach some velocity
+        self.wait_for_local_velocity(vx, vy, vz_up, timeout=10)
+
+        # stop the vehicle
+        self.test_guided_local_velocity_target(0, 0, 0, timeout=10)
+
+        # wait vehicle to stop
+        self.wait_for_local_velocity(0, 0, 0, timeout=10)
+
+        # end pause/continue subtest with acceleration
+        self.end_subtest("Ended test for Pause/Continue in GUIDED mode with ACCELERATION!")
+
+        # start pause/continue subtest with posvelaccel
+        self.start_subtest("Started test for Pause/Continue in GUIDED mode with POSITION and VELOCITY and ACCELERATION!")
+
+        # targets
+        x, y, z_up = (-300, 0, 30)
+        vx, vy, vz_up = (0, 0, 0)
+        ax, ay, az_up = (0, 0, 0)
+
+        # point to north
+        self.guided_achieve_heading(0)
+
+        # give some posvelaccel
+        self.test_guided_local_posvelaccel_target(x, y, z_up, vx, vy, vz_up, ax, ay, az_up, timeout=10)
+
+        # wait some time to gain velocity and acceleration
+        self.delay_sim_time(5)
+
+        # pause guided flight
+        self.cmd_pause()
+
+        # wait vehicle to pause
+        self.wait_for_local_velocity(0, 0, 0, timeout=10)
+
+        # continue guided flight
+        self.cmd_resume()
+
+        # wait some time to gain velocity and acceleration
+        self.delay_sim_time(5)
+
+        # wait vehicle to reach the destination
+        self.wait_distance_to_local_position((x, y, -z_up), 0, 10, timeout=120)
+
+        # end pause/continue subtest with destination and velocity
+        self.end_subtest("Ended test for Pause/Continue in GUIDED mode with POSITION and VELOCITY and ACCELERATION!")
+
+        # land and disarm to finish the test
+        self.land_and_disarm()
 
     # a wrapper around all the 1A,1B,1C..etc tests for travis
     def tests1(self):
@@ -8245,8 +8639,12 @@ class AutoTestCopter(AutoTest):
              self.test_altitude_types),
 
             ("PAUSE_CONTINUE",
-             "Test MAV_CMD_PAUSE_CONTINUE",
+             "Test MAV_CMD_DO_PAUSE_CONTINUE in AUTO mode",
              self.PAUSE_CONTINUE),
+
+            ("PAUSE_CONTINUE_GUIDED",
+             "Test MAV_CMD_DO_PAUSE_CONTINUE in GUIDED mode",
+             self.PAUSE_CONTINUE_GUIDED),
 
             ("RichenPower",
              "Test RichenPower generator",
