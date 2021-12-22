@@ -1043,27 +1043,12 @@ float AC_WPNav::get_slow_down_speed(float dist_from_dest_cm, float accel_cmss)
 void AC_WPNav::wp_speed_update(float dt)
 {
     // return if speed has not changed
-    float curr_max_speed_xy_cms = _pos_control.get_max_speed_xy();
-    if (is_equal(_wp_desired_speed_xy_cms, curr_max_speed_xy_cms)) {
+    if (is_equal(_wp_desired_speed_xy_cms, _pos_control.get_max_speed_xy())) {
         return;
-    }
-    // calculate speed change
-    if (_wp_desired_speed_xy_cms > curr_max_speed_xy_cms) {
-        // speed up is requested so increase speed within limit set by WPNAV_ACCEL
-        curr_max_speed_xy_cms += _wp_accel_cmss * dt;
-        if (curr_max_speed_xy_cms > _wp_desired_speed_xy_cms) {
-            curr_max_speed_xy_cms = _wp_desired_speed_xy_cms;
-        }
-    } else if (_wp_desired_speed_xy_cms < curr_max_speed_xy_cms) {
-        // slow down is requested so reduce speed within limit set by WPNAV_ACCEL
-        curr_max_speed_xy_cms -= _wp_accel_cmss * dt;
-        if (curr_max_speed_xy_cms < _wp_desired_speed_xy_cms) {
-            curr_max_speed_xy_cms = _wp_desired_speed_xy_cms;
-        }
     }
 
     // update position controller speed
-    _pos_control.set_max_speed_xy(curr_max_speed_xy_cms);
+    _pos_control.set_max_speed_xy(_wp_desired_speed_xy_cms);
     
     // flag that wp leash must be recalculated
     _flags.recalc_wp_leash = true;
