@@ -27,6 +27,10 @@
 
 extern const AP_HAL::HAL& hal;
 
+#ifndef HAL_HEATER_GPIO_ON
+#define HAL_HEATER_GPIO_ON 1
+#endif
+
 void AP_BoardConfig::set_imu_temp(float current)
 {
     int8_t target = heater.imu_target_temperature.get();
@@ -35,7 +39,6 @@ void AP_BoardConfig::set_imu_temp(float current)
     hal.util->set_imu_temp(current);
 
     if (target == -1) {
-        // nothing to do
         return;
     }
 
@@ -54,7 +57,7 @@ void AP_BoardConfig::set_imu_temp(float current)
         // output as duty cycle to local pin. Use a random sequence to
         // prevent a periodic change to magnetic field
         bool heater_on = (get_random16() < uint32_t(heater.output) * 0xFFFFU / 100U);
-        hal.gpio->write(HAL_HEATER_GPIO_PIN, heater_on);
+        hal.gpio->write(HAL_HEATER_GPIO_PIN, heater_on?HAL_HEATER_GPIO_ON : !HAL_HEATER_GPIO_ON);
 #endif
         return;
     }
