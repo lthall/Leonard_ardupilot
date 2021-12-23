@@ -431,6 +431,33 @@ void Mode::get_pilot_desired_lean_angles(float &roll_out, float &pitch_out, floa
     // roll_out and pitch_out are returned
 }
 
+// get_pilot_vel_correction - transform pilot's roll or pitch input into a desired velocity
+Vector2f Mode::get_pilot_vel_correction(float vel_max) const
+{
+    Vector2f vel;
+
+    // throttle failsafe check
+    if (copter.failsafe.radio || !copter.ap.rc_receiver_present) {
+        return vel;
+    }
+    // fetch roll and pitch inputs
+    float roll_out = channel_roll->get_control_in();
+    float pitch_out = channel_pitch->get_control_in();
+
+    // scale roll and pitch inputs to ANGLE_MAX parameter range
+    float scaler = 1.0 / (float)ROLL_PITCH_YAW_INPUT_MAX;
+    roll_out *= scaler;
+    pitch_out *= scaler;
+
+    vel = Vector2f(pitch_out, roll_out);
+    if (vel.is_zero()) {
+        return vel;
+    }
+    Vector2f vel_scaler = vel / MAX(fabsf(vel.x), fabsf(vel.y));
+    vel *= vel_max / vel_scaler.length();
+    return vel;
+}
+
 bool Mode::_TakeOff::triggered(const float target_climb_rate) const
 {
     if (!copter.ap.land_complete) {
@@ -599,13 +626,12 @@ void Mode::land_run_vertical_control(bool pause_descent)
 
 void Mode::land_run_horizontal_control()
 {
-    float target_roll = 0.0f;
-    float target_pitch = 0.0f;
+    Vector2f vel_correction;;
     float target_yaw_rate = 0;
 
     // relax loiter target if we might be landed
     if (copter.ap.land_complete_maybe) {
-        loiter_nav->soften_for_landing();
+        pos_control->soften_for_landing_xy();
     }
 
     // process pilot inputs
@@ -622,11 +648,11 @@ void Mode::land_run_horizontal_control()
             // apply SIMPLE mode transform to pilot inputs
             update_simple_mode();
 
-            // convert pilot input to lean angles
-            get_pilot_desired_lean_angles(target_roll, target_pitch, loiter_nav->get_angle_max_cd(), attitude_control->get_althold_lean_angle_max_cd());
+            // convert pilot input to reposition velocity
+            vel_correction = get_pilot_vel_correction(wp_nav->get_wp_acceleration() * 0.5);
 
             // record if pilot has overridden roll or pitch
-            if (!is_zero(target_roll) || !is_zero(target_pitch)) {
+            if (!vel_correction.is_zero()) {
                 if (!copter.ap.land_repo_active) {
                     AP::logger().Write_Event(LogEvent::LAND_REPO_ACTIVE);
                 }
@@ -657,13 +683,11 @@ void Mode::land_run_horizontal_control()
     }
 #endif
 
-    // process roll, pitch inputs
-    loiter_nav->set_pilot_desired_acceleration(target_roll, target_pitch);
+    Vector2f accel;
+    pos_control->input_vel_accel_xy(vel_correction, accel);
+    pos_control->update_xy_controller();
 
-    // run loiter controller
-    loiter_nav->update();
-
-    Vector3f thrust_vector = loiter_nav->get_thrust_vector();
+    Vector3f thrust_vector = pos_control->get_thrust_vector();
 
     if (g2.wp_navalt_min > 0) {
         // user has requested an altitude below which navigation
