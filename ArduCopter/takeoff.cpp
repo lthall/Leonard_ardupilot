@@ -93,14 +93,13 @@ void Mode::_TakeOff::do_pilot_takeoff(float& pilot_climb_rate_cm)
     }
 }
 
-void Mode::auto_takeoff_run()
+bool Mode::auto_takeoff_run()
 {
     // if not armed set throttle to zero and exit immediately
     if (!motors->armed() || !copter.ap.auto_armed) {
         // do not spool down tradheli when on the ground with motor interlock enabled
         make_safe_ground_handling(copter.is_tradheli() && motors->get_interlock());
-        wp_nav->shift_wp_origin_and_destination_to_current_pos_xy();
-        return;
+        return false;
     }
 
     // set motors to full range
@@ -116,18 +115,19 @@ void Mode::auto_takeoff_run()
         }
     }
 
-    // aircraft stays in landed state until rotor speed runup has finished
+    // aircraft stays in landed state until rotor speed run up has finished
     if (motors->get_spool_state() == AP_Motors::SpoolState::THROTTLE_UNLIMITED) {
         set_land_complete(false);
     } else {
         // motors have not completed spool up yet so relax navigation and position controllers
-        wp_nav->shift_wp_origin_and_destination_to_current_pos_xy();
+        pos_control->relax_velocity_controller_xy();
+        pos_control->update_xy_controller();
         pos_control->relax_z_controller(0.0f);   // forces throttle output to decay to zero
         pos_control->update_z_controller();
         attitude_control->reset_yaw_target_and_rate();
         attitude_control->reset_rate_controller_I_terms();
-        attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(0.0f, 0.0f, 0.0f);
-        return;
+        attitude_control->input_thrust_vector_rate_heading(pos_control->get_thrust_vector(), auto_yaw.rate_cds());
+        return false;
     }
 
     // check if we are not navigating because of low altitude
@@ -135,45 +135,54 @@ void Mode::auto_takeoff_run()
         // check if vehicle has reached no_nav_alt threshold
         if (inertial_nav.get_position_z_up_cm() >= auto_takeoff_no_nav_alt_cm) {
             auto_takeoff_no_nav_active = false;
-            wp_nav->shift_wp_origin_and_destination_to_stopping_point_xy();
-        } else {
-            // shift the navigation target horizontally to our current position
-            wp_nav->shift_wp_origin_and_destination_to_current_pos_xy();
         }
-        // tell the position controller that we have limited roll/pitch demand to prevent integrator buildup
-        pos_control->set_externally_limited_xy();
+        pos_control->relax_velocity_controller_xy();
+    } else {
+        Vector2f vel;
+        Vector2f accel;
+        pos_control->input_vel_accel_xy(vel, accel);
     }
-
-    // run waypoint controller
-    copter.failsafe_terrain_set_status(wp_nav->update_wpnav());
-
-    Vector3f thrustvector{0, 0, -GRAVITY_MSS * 100.0f};
-    if (!auto_takeoff_no_nav_active) {
-        thrustvector = wp_nav->get_thrust_vector();
-    }
-
-    // WP_Nav has set the vertical position control targets
+    pos_control->update_xy_controller();
+    
+    // command the aircraft to the take off altitude
+    float pos_z = take_off_complete_alt_repeat;
+    float vel_z = 0.0;
+    copter.pos_control->input_pos_vel_accel_z(pos_z, vel_z, 0.0);
+    
     // run the vertical position controller and set output throttle
-    copter.pos_control->update_z_controller();
+    pos_control->update_z_controller();
 
     // call attitude controller
     if (auto_yaw.mode() == AUTO_YAW_HOLD) {
         // roll & pitch from position controller, yaw rate from pilot
-        attitude_control->input_thrust_vector_rate_heading(thrustvector, target_yaw_rate);
+        attitude_control->input_thrust_vector_rate_heading(pos_control->get_thrust_vector(), target_yaw_rate);
     } else if (auto_yaw.mode() == AUTO_YAW_RATE) {
         // roll & pitch from position controller, yaw rate from mavlink command or mission item
-        attitude_control->input_thrust_vector_rate_heading(thrustvector, auto_yaw.rate_cds());
+        attitude_control->input_thrust_vector_rate_heading(pos_control->get_thrust_vector(), auto_yaw.rate_cds());
     } else {
         // roll & pitch from position controller, yaw heading from GCS or auto_heading()
-        attitude_control->input_thrust_vector_heading(thrustvector, auto_yaw.yaw(), auto_yaw.rate_cds());
+        attitude_control->input_thrust_vector_heading(pos_control->get_thrust_vector(), auto_yaw.yaw(), auto_yaw.rate_cds());
     }
+    AP::logger().Write("TF",
+                    "TimeUS,TS,TNN,TC,TA",
+                    "smmmm",
+                    "F0000",
+                    "Qffff",
+                    AP_HAL::micros64(),
+                    double(take_off_start_alt_repeat * 0.01f),
+                    double(auto_takeoff_no_nav_alt_cm * 0.01f),
+                    double(take_off_complete_alt_repeat * 0.01f),
+                    double(copter.pos_control->get_pos_target_z_cm() * 0.01f));
+    return (take_off_complete_alt_repeat  - take_off_start_alt_repeat) * 0.999f < copter.pos_control->get_pos_target_z_cm() - take_off_start_alt_repeat;
 }
 
-void Mode::auto_takeoff_set_start_alt(void)
+void Mode::auto_takeoff_set_start_and_final_alt(float complete_alt)
 {
+    take_off_start_alt_repeat = inertial_nav.get_position_z_up_cm();
+    take_off_complete_alt_repeat = complete_alt; 
     if ((g2.wp_navalt_min > 0) && (is_disarmed_or_landed() || !motors->get_interlock())) {
         // we are not flying, climb with no navigation to current alt-above-ekf-origin + wp_navalt_min
-        auto_takeoff_no_nav_alt_cm = inertial_nav.get_position_z_up_cm() + g2.wp_navalt_min * 100;
+        auto_takeoff_no_nav_alt_cm = take_off_start_alt_repeat + g2.wp_navalt_min * 100;
         auto_takeoff_no_nav_active = true;
     } else {
         auto_takeoff_no_nav_active = false;
