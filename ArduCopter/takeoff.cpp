@@ -164,16 +164,17 @@ bool Mode::auto_takeoff_run()
         attitude_control->input_thrust_vector_heading(pos_control->get_thrust_vector(), auto_yaw.yaw(), auto_yaw.rate_cds());
     }
     AP::logger().Write("TF",
-                    "TimeUS,TS,TNN,TC,TA",
-                    "smmmm",
-                    "F0000",
-                    "Qffff",
+                    "TimeUS,TS,TNN,TC,TA,WP",
+                    "smmmm-",
+                    "F0000-",
+                    "Qfffff",
                     AP_HAL::micros64(),
                     double(take_off_start_alt_repeat * 0.01f),
                     double(auto_takeoff_no_nav_alt_cm * 0.01f),
                     double(take_off_complete_alt_repeat * 0.01f),
-                    double(copter.pos_control->get_pos_target_z_cm() * 0.01f));
-    return (take_off_complete_alt_repeat  - take_off_start_alt_repeat) * 0.999f < copter.pos_control->get_pos_target_z_cm() - take_off_start_alt_repeat;
+                    double(copter.pos_control->get_pos_target_z_cm() * 0.01f),
+                    double(copter.wp_nav->reached_wp_destination()));
+    return (take_off_complete_alt_repeat  - take_off_start_alt_repeat) * 0.9f < copter.pos_control->get_pos_target_z_cm() - take_off_start_alt_repeat;
 }
 
 void Mode::auto_takeoff_set_start_and_final_alt(float complete_alt)

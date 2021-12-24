@@ -849,15 +849,9 @@ void ModeAuto::takeoff_run()
         copter.set_auto_armed(true);
     }
     if (auto_takeoff_run()) {
+        wp_nav->shift_wp_origin_and_destination_to_stopping_point_xy();
         wp_nav->set_reached_wp_destination();
     }
-
-    // calculate stopping point
-    Vector3f stopping_point;
-    wp_nav->get_wp_stopping_point(stopping_point);
-
-    // initialise waypoint controller target to stopping point
-    wp_nav->set_wp_destination(stopping_point);
 }
 
 // auto_wp_run - runs the auto waypoint controller
