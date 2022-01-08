@@ -508,10 +508,7 @@ void AC_PosControl::init_xy()
     _vel_target.x = curr_vel.x;
     _vel_target.y = curr_vel.y;
 
-
-    const Vector3f &curr_accel = _ahrs.get_accel_ef_blended() * 100.0f;
-    _accel_desired.xy() = curr_accel.xy();
-    _accel_desired.xy().limit_length(_accel_max_xy_cmss);
+    _accel_desired.xy().zero();
 
     lean_angles_to_accel_xy(_accel_target.x, _accel_target.y);
 
