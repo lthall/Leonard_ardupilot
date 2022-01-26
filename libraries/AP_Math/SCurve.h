@@ -72,6 +72,9 @@ public:
     // set maximum velocity and re-calculate the path using these limits
     void set_speed_max(float speed_xy, float speed_up, float speed_down);
 
+    // set trajectory to come to a stop along track
+    void set_pause();
+
     // set the maximum vehicle speed at the origin
     // returns the expected speed at the origin which will always be equal or lower than speed
     float set_origin_speed_max(float speed);
@@ -93,6 +96,9 @@ public:
     bool finished() const WARN_IF_UNUSED;
 
 private:
+
+    // set maximum velocity and re-calculate the path using these limits
+    void setup_change_speed(float velocity_max, float position_max);
 
     // increment time and return the position, velocity and acceleration vectors relative to the origin
     void move_from_pos_vel_accel(float dt, Vector3f &pos, Vector3f &vel, Vector3f &accel);

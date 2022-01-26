@@ -220,6 +220,31 @@ void AC_WPNav::set_speed_xy(float speed_cms)
     }
 }
 
+/// set_pause - 
+void AC_WPNav::set_pause()
+{
+    // update this leg
+    if (_this_leg_is_spline) {
+        // _spline_this_leg.set_speed_accel(_pos_control.get_max_speed_xy_cms(), _pos_control.get_max_speed_up_cms(), _pos_control.get_max_speed_down_cms(),
+        //                                  _wp_accel_cmss, _wp_accel_z_cmss);
+    } else {
+        _scurve_this_leg.set_pause();
+    }
+
+    // update next leg
+    if (_next_leg_is_spline) {
+        // _spline_next_leg.set_speed_accel(_pos_control.get_max_speed_xy_cms(), _pos_control.get_max_speed_up_cms(), _pos_control.get_max_speed_down_cms(),
+        //                                  _wp_accel_cmss, _wp_accel_z_cmss);
+    } else {
+        _scurve_next_leg.set_pause();
+    }
+}
+
+/// set_continue - 
+void AC_WPNav::set_continue()
+{
+}
+
 /// set current target climb rate during wp navigation
 void AC_WPNav::set_speed_up(float speed_up_cms)
 {

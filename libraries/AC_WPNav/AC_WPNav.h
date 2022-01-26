@@ -56,6 +56,9 @@ public:
 
     /// set current target horizontal speed during wp navigation
     void set_speed_xy(float speed_cms);
+    /// set current target climb or descent rate during wp navigation
+    void set_pause();
+    void set_continue();
 
     /// set current target climb or descent rate during wp navigation
     void set_speed_up(float speed_up_cms);

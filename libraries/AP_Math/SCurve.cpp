@@ -148,108 +148,7 @@ void SCurve::set_speed_max(float speed_xy, float speed_up, float speed_down)
         return;
     }
 
-    if ((time >= segment[SEG_ACCEL_END].end_time) && (time <= segment[SEG_SPEED_CHANGE_END].end_time)) {
-        // in the speed change phase
-        // move speed change phase to acceleration phase to provide room for further speed adjustments
-
-        // set initial segment to last acceleration segment
-        segment[SEG_INIT].seg_type = SegmentType::CONSTANT_JERK;
-        segment[SEG_INIT].jerk_ref = 0.0f;
-        segment[SEG_INIT].end_time = segment[SEG_ACCEL_END].end_time;
-        segment[SEG_INIT].end_accel = segment[SEG_ACCEL_END].end_accel;
-        segment[SEG_INIT].end_vel = segment[SEG_ACCEL_END].end_vel;
-        segment[SEG_INIT].end_pos = segment[SEG_ACCEL_END].end_pos;
-
-        // move speed change segments to acceleration segments
-        for (uint8_t i = SEG_INIT+1; i <= SEG_ACCEL_END; i++) {
-            segment[i] = segment[i+7];
-        }
-
-        // set change segments to last acceleration speed
-        for (uint8_t i = SEG_ACCEL_END+1; i <= SEG_SPEED_CHANGE_END; i++) {
-            segment[i].seg_type = SegmentType::CONSTANT_JERK;
-            segment[i].jerk_ref = 0.0f;
-            segment[i].end_time = segment[SEG_ACCEL_END].end_time;
-            segment[i].end_accel = 0.0f;
-            segment[i].end_vel = segment[SEG_ACCEL_END].end_vel;
-            segment[i].end_pos = segment[SEG_ACCEL_END].end_pos;
-        }
-
-    } else if ((time > segment[SEG_SPEED_CHANGE_END].end_time) && (time <= segment[SEG_CONST].end_time)) {
-        // in the constant speed phase
-        // overwrite the acceleration and speed change phases with the current position and velocity
-
-        // set initial segment to last acceleration segment
-        segment[SEG_INIT].seg_type = SegmentType::CONSTANT_JERK;
-        segment[SEG_INIT].jerk_ref = 0.0f;
-        segment[SEG_INIT].end_time = segment[SEG_SPEED_CHANGE_END].end_time;
-        segment[SEG_INIT].end_accel = 0.0f;
-        segment[SEG_INIT].end_vel = segment[SEG_SPEED_CHANGE_END].end_vel;
-        segment[SEG_INIT].end_pos = segment[SEG_SPEED_CHANGE_END].end_pos;
-
-        // set acceleration and change segments to current constant speed
-        float Jt_out, At_out, Vt_out, Pt_out;
-        get_jerk_accel_vel_pos_at_time(time, Jt_out, At_out, Vt_out, Pt_out);
-        for (uint8_t i = SEG_INIT+1; i <= SEG_SPEED_CHANGE_END; i++) {
-            segment[i].seg_type = SegmentType::CONSTANT_JERK;
-            segment[i].jerk_ref = 0.0f;
-            segment[i].end_time = time;
-            segment[i].end_accel = 0.0f;
-            segment[i].end_vel = Vt_out;
-            segment[i].end_pos = Pt_out;
-        }
-    }
-
-    // adjust the INIT and ACCEL segments for new speed
-    if ((time <= segment[SEG_ACCEL_MAX].end_time) && is_positive(segment[SEG_ACCEL_MAX].end_time - segment[SEG_ACCEL_MAX-1].end_time) && (vel_max < segment[SEG_ACCEL_END].end_vel) && is_positive(segment[SEG_ACCEL_MAX].end_accel) ) {
-        // path has not finished constant positive acceleration segment
-        // reduce velocity as close to target velocity as possible
-
-        const float Vstart = segment[SEG_INIT].end_vel;
-
-        // minimum velocity that can be obtained by shortening SEG_ACCEL_MAX
-        const float Vmin = segment[SEG_ACCEL_END].end_vel - segment[SEG_ACCEL_MAX].end_accel * (segment[SEG_ACCEL_MAX].end_time - MAX(time, segment[SEG_ACCEL_MAX-1].end_time));
-
-        float Jm, t2, t4, t6;
-        calculate_path(jerk_time, jerk_max, Vstart, accel_max, MAX(Vmin, vel_max), Pend * 0.5f, Jm, t2, t4, t6);
-
-        uint8_t seg = SEG_INIT+1;
-        add_segments_jerk(seg, jerk_time, Jm, t2);
-        add_segment_const_jerk(seg, t4, 0.0f);
-        add_segments_jerk(seg, jerk_time, -Jm, t6);
-
-        // remove numerical errors
-        segment[SEG_ACCEL_END].end_accel = 0.0f;
-
-        // add empty speed adjust segments
-        for (uint8_t i = SEG_ACCEL_END+1; i <= SEG_CONST; i++) {
-            segment[i].seg_type = SegmentType::CONSTANT_JERK;
-            segment[i].jerk_ref = 0.0f;
-            segment[i].end_time = segment[SEG_ACCEL_END].end_time;
-            segment[i].end_accel = 0.0f;
-            segment[i].end_vel = segment[SEG_ACCEL_END].end_vel;
-            segment[i].end_pos = segment[SEG_ACCEL_END].end_pos;
-        }
-
-        calculate_path(jerk_time, jerk_max, 0.0f, accel_max, MAX(Vmin, vel_max), Pend * 0.5f, Jm, t2, t4, t6);
-
-        seg = SEG_CONST + 1;
-        add_segments_jerk(seg, jerk_time, -Jm, t6);
-        add_segment_const_jerk(seg, t4, 0.0f);
-        add_segments_jerk(seg, jerk_time, Jm, t2);
-
-        // remove numerical errors
-        segment[SEG_DECEL_END].end_accel = 0.0f;
-        segment[SEG_DECEL_END].end_vel = MAX(0.0f, segment[SEG_DECEL_END].end_vel);
-
-        // add to constant velocity segment to end at the correct position
-        const float dP = MAX(0.0f, Pend - segment[SEG_DECEL_END].end_pos);
-        const float t15 =  dP / segment[SEG_CONST].end_vel;
-        for (uint8_t i = SEG_CONST; i <= SEG_DECEL_END; i++) {
-            segment[i].end_time += t15;
-            segment[i].end_pos += dP;
-        }
-    }
+    setup_change_speed(vel_max, Pend);
 
     // adjust the speed change segments (8 to 14) for new speed
     // start with empty speed adjust segments
@@ -324,6 +223,63 @@ void SCurve::set_speed_max(float speed_xy, float speed_up, float speed_down)
     for (uint8_t i = SEG_CONST; i <= SEG_DECEL_END; i++) {
         segment[i].end_time += t15;
         segment[i].end_pos += dP;
+    }
+
+    // catch calculation errors
+    if (!valid()) {
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+        ::printf("SCurve::set_speed_max invalid path\n");
+        debug();
+#endif
+        INTERNAL_ERROR(AP_InternalError::error_t::invalid_arg_or_result);
+        init();
+    }
+}
+
+// set maximum velocity and re-calculate the path using these limits
+void SCurve::set_pause()
+{
+    // return immediately if zero length path
+    if (num_segs != segments_max) {
+        return;
+    }
+
+    if (time >= segment[SEG_CONST].end_time) {
+        return;
+    }
+
+    // re-calculate the s-curve path based on update speeds
+
+    const float Pend = segment[SEG_DECEL_END].end_pos;
+
+    if (is_zero(time)) {
+        // path has not started so we can pause here
+        return;
+    }
+
+    setup_change_speed(0.0, Pend);
+
+    // adjust the speed change segments (8 to 14) for zero speed
+    // we should always have sufficient time to stop
+    uint8_t seg = SEG_ACCEL_END + 1;
+    float Jm, t2, t4, t6;
+    calculate_path(jerk_time, jerk_max, 0.0, accel_max, segment[SEG_ACCEL_END].end_vel, Pend, Jm, t2, t4, t6);
+    add_segments_jerk(seg, jerk_time, -Jm, t6);
+    add_segment_const_jerk(seg, t4, 0.0f);
+    add_segments_jerk(seg, jerk_time, Jm, t2);
+
+    // remove numerical errors
+    segment[SEG_SPEED_CHANGE_END].end_accel = 0.0f;
+    segment[SEG_SPEED_CHANGE_END].end_vel = 0.0f;
+
+    // add to constant velocity segment to end at the correct position
+    for (uint8_t i = SEG_SPEED_CHANGE_END+1; i <= SEG_DECEL_END; i++) {
+        segment[i].seg_type = SegmentType::CONSTANT_JERK;
+        segment[i].jerk_ref = 0.0f;
+        segment[i].end_time = segment[SEG_SPEED_CHANGE_END].end_time;
+        segment[i].end_accel = 0.0f;
+        segment[i].end_vel = segment[SEG_SPEED_CHANGE_END].end_vel;
+        segment[i].end_pos = segment[SEG_SPEED_CHANGE_END].end_pos;
     }
 
     // catch calculation errors
@@ -512,6 +468,113 @@ bool SCurve::advance_target_along_track(SCurve &prev_leg, SCurve &next_leg, floa
 bool SCurve::finished() const
 {
     return ((time >= time_end()) || (position_sq >= track.length_squared()));
+}
+
+// set maximum velocity and re-calculate the path using these limits
+void SCurve::setup_change_speed(float velocity_max, float position_max)
+{
+    if ((time >= segment[SEG_ACCEL_END].end_time) && (time <= segment[SEG_SPEED_CHANGE_END].end_time)) {
+        // in the speed change phase
+        // move speed change phase to acceleration phase to provide room for further speed adjustments
+
+        // set initial segment to last acceleration segment
+        segment[SEG_INIT].seg_type = SegmentType::CONSTANT_JERK;
+        segment[SEG_INIT].jerk_ref = 0.0f;
+        segment[SEG_INIT].end_time = segment[SEG_ACCEL_END].end_time;
+        segment[SEG_INIT].end_accel = segment[SEG_ACCEL_END].end_accel;
+        segment[SEG_INIT].end_vel = segment[SEG_ACCEL_END].end_vel;
+        segment[SEG_INIT].end_pos = segment[SEG_ACCEL_END].end_pos;
+
+        // move speed change segments to acceleration segments
+        for (uint8_t i = SEG_INIT+1; i <= SEG_ACCEL_END; i++) {
+            segment[i] = segment[i+7];
+        }
+
+        // set speed change segments to last acceleration speed
+        for (uint8_t i = SEG_ACCEL_END+1; i <= SEG_SPEED_CHANGE_END; i++) {
+            segment[i].seg_type = SegmentType::CONSTANT_JERK;
+            segment[i].jerk_ref = 0.0f;
+            segment[i].end_time = segment[SEG_ACCEL_END].end_time;
+            segment[i].end_accel = 0.0f;
+            segment[i].end_vel = segment[SEG_ACCEL_END].end_vel;
+            segment[i].end_pos = segment[SEG_ACCEL_END].end_pos;
+        }
+
+    } else if ((time > segment[SEG_SPEED_CHANGE_END].end_time) && (time <= segment[SEG_CONST].end_time)) {
+        // in the constant speed phase
+        // overwrite the acceleration and speed change phases with the current position and velocity
+
+        // set initial segment to last acceleration segment
+        segment[SEG_INIT].seg_type = SegmentType::CONSTANT_JERK;
+        segment[SEG_INIT].jerk_ref = 0.0f;
+        segment[SEG_INIT].end_time = segment[SEG_SPEED_CHANGE_END].end_time;
+        segment[SEG_INIT].end_accel = 0.0f;
+        segment[SEG_INIT].end_vel = segment[SEG_SPEED_CHANGE_END].end_vel;
+        segment[SEG_INIT].end_pos = segment[SEG_SPEED_CHANGE_END].end_pos;
+
+        // set acceleration and change segments to current constant speed
+        float Jt_out, At_out, Vt_out, Pt_out;
+        get_jerk_accel_vel_pos_at_time(time, Jt_out, At_out, Vt_out, Pt_out);
+        for (uint8_t i = SEG_INIT+1; i <= SEG_SPEED_CHANGE_END; i++) {
+            segment[i].seg_type = SegmentType::CONSTANT_JERK;
+            segment[i].jerk_ref = 0.0f;
+            segment[i].end_time = time;
+            segment[i].end_accel = 0.0f;
+            segment[i].end_vel = Vt_out;
+            segment[i].end_pos = Pt_out;
+        }
+    }
+
+    // adjust the INIT and ACCEL segments for new speed
+    if ((time <= segment[SEG_ACCEL_MAX].end_time) && is_positive(segment[SEG_ACCEL_MAX].end_time - segment[SEG_ACCEL_MAX-1].end_time) && (velocity_max < segment[SEG_ACCEL_END].end_vel) && is_positive(segment[SEG_ACCEL_MAX].end_accel) ) {
+        // path has not finished constant positive acceleration segment
+        // reduce velocity as close to target velocity as possible
+
+        const float Vstart = segment[SEG_INIT].end_vel;
+
+        // minimum velocity that can be obtained by shortening SEG_ACCEL_MAX
+        const float Vmin = segment[SEG_ACCEL_END].end_vel - segment[SEG_ACCEL_MAX].end_accel * (segment[SEG_ACCEL_MAX].end_time - MAX(time, segment[SEG_ACCEL_MAX-1].end_time));
+
+        float Jm, t2, t4, t6;
+        calculate_path(jerk_time, jerk_max, Vstart, accel_max, MAX(Vmin, velocity_max), position_max * 0.5f, Jm, t2, t4, t6);
+
+        uint8_t seg = SEG_INIT+1;
+        add_segments_jerk(seg, jerk_time, Jm, t2);
+        add_segment_const_jerk(seg, t4, 0.0f);
+        add_segments_jerk(seg, jerk_time, -Jm, t6);
+
+        // remove numerical errors
+        segment[SEG_ACCEL_END].end_accel = 0.0f;
+
+        // add empty speed adjust segments
+        for (uint8_t i = SEG_ACCEL_END+1; i <= SEG_CONST; i++) {
+            segment[i].seg_type = SegmentType::CONSTANT_JERK;
+            segment[i].jerk_ref = 0.0f;
+            segment[i].end_time = segment[SEG_ACCEL_END].end_time;
+            segment[i].end_accel = 0.0f;
+            segment[i].end_vel = segment[SEG_ACCEL_END].end_vel;
+            segment[i].end_pos = segment[SEG_ACCEL_END].end_pos;
+        }
+
+        calculate_path(jerk_time, jerk_max, 0.0f, accel_max, MAX(Vmin, velocity_max), position_max * 0.5f, Jm, t2, t4, t6);
+
+        seg = SEG_CONST + 1;
+        add_segments_jerk(seg, jerk_time, -Jm, t6);
+        add_segment_const_jerk(seg, t4, 0.0f);
+        add_segments_jerk(seg, jerk_time, Jm, t2);
+
+        // remove numerical errors
+        segment[SEG_DECEL_END].end_accel = 0.0f;
+        segment[SEG_DECEL_END].end_vel = MAX(0.0f, segment[SEG_DECEL_END].end_vel);
+
+        // add to constant velocity segment to end at the correct position
+        const float dP = MAX(0.0f, position_max - segment[SEG_DECEL_END].end_pos);
+        const float t15 =  dP / segment[SEG_CONST].end_vel;
+        for (uint8_t i = SEG_CONST; i <= SEG_DECEL_END; i++) {
+            segment[i].end_time += t15;
+            segment[i].end_pos += dP;
+        }
+    }
 }
 
 // increment time pointer and return the position, velocity and acceleration vectors relative to the origin
