@@ -195,6 +195,7 @@ private:
     float vel_max;      // maximum velocity magnitude
     float time;         // time that defines position on the path
     float position_sq;  // position (squared) on the path at the last time step (used to detect finish)
+    bool pause;         // true when progress along track is paused
 
     // segment 0 is the initial segment and holds the vehicle's initial position and velocity
     // segments 1 to 7 are the acceleration segments

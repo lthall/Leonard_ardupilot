@@ -239,6 +239,7 @@ void SCurve::set_speed_max(float speed_xy, float speed_up, float speed_down)
 // set maximum velocity and re-calculate the path using these limits
 void SCurve::set_pause()
 {
+    pause = true;
     // return immediately if zero length path
     if (num_segs != segments_max) {
         return;
@@ -249,7 +250,6 @@ void SCurve::set_pause()
     }
 
     // re-calculate the s-curve path based on update speeds
-
     const float Pend = segment[SEG_DECEL_END].end_pos;
 
     if (is_zero(time)) {
@@ -467,7 +467,7 @@ bool SCurve::advance_target_along_track(SCurve &prev_leg, SCurve &next_leg, floa
 // time has reached the end of the sequence
 bool SCurve::finished() const
 {
-    return ((time >= time_end()) || (position_sq >= track.length_squared()));
+    return (!pause && ((time >= time_end()) || (position_sq >= track.length_squared())));
 }
 
 // set maximum velocity and re-calculate the path using these limits
@@ -654,6 +654,15 @@ bool SCurve::braking() const
 // increment the internal time
 void SCurve::advance_time(float dt)
 {
+    if (pause) {
+        if (is_zero(get_time_elapsed())) {
+            // time is not progressed when paused and path has not started 
+            return;
+        } else if (time <= segment[SEG_SPEED_CHANGE_END].end_time) {
+            time = MIN(time+dt, segment[SEG_SPEED_CHANGE_END].end_time);
+            return;
+        }
+    }
     time = MIN(time+dt, time_end());
 }
 
