@@ -44,6 +44,7 @@ void SCurve::init()
     jerk_max = 0.0f;
     accel_max = 0.0f;
     vel_max = 0.0f;
+    vel_end = 0.0f;
     time = 0.0f;
     num_segs = SEG_INIT;
     add_segment(num_segs, 0.0f, SegmentType::CONSTANT_JERK, 0.0f, 0.0f, 0.0f, 0.0f);
@@ -239,7 +240,74 @@ void SCurve::set_speed_max(float speed_xy, float speed_up, float speed_down)
 // set maximum velocity and re-calculate the path using these limits
 void SCurve::set_pause()
 {
+    // return immediately if paused
+    if (pause) {
+        return;
+    }
     pause = true;
+
+    // return immediately if zero length path
+    if (num_segs != segments_max) {
+        return;
+    }
+
+    if (time >= segment[SEG_CONST].end_time) {
+        return;
+    }
+
+    // re-calculate the s-curve path based on update speeds
+    const float Pend = segment[SEG_DECEL_END].end_pos;
+
+    if (is_zero(time)) {
+        // path has not started so we can pause here
+        return;
+    }
+
+    setup_change_speed(0.0, Pend);
+
+    // adjust the speed change segments (8 to 14) for zero speed
+    // we should always have sufficient time to stop
+    uint8_t seg = SEG_ACCEL_END + 1;
+    float Jm, t2, t4, t6;
+    calculate_path(jerk_time, jerk_max, 0.0, accel_max, segment[SEG_ACCEL_END].end_vel, Pend, Jm, t2, t4, t6);
+    add_segments_jerk(seg, jerk_time, -Jm, t6);
+    add_segment_const_jerk(seg, t4, 0.0f);
+    add_segments_jerk(seg, jerk_time, Jm, t2);
+
+    // remove numerical errors
+    segment[SEG_SPEED_CHANGE_END].end_accel = 0.0f;
+    segment[SEG_SPEED_CHANGE_END].end_vel = 0.0f;
+
+    // add to constant velocity segment to end at the correct position
+    for (uint8_t i = SEG_SPEED_CHANGE_END+1; i <= SEG_DECEL_END; i++) {
+        segment[i].seg_type = SegmentType::CONSTANT_JERK;
+        segment[i].jerk_ref = 0.0f;
+        segment[i].end_time = segment[SEG_SPEED_CHANGE_END].end_time;
+        segment[i].end_accel = 0.0f;
+        segment[i].end_vel = segment[SEG_SPEED_CHANGE_END].end_vel;
+        segment[i].end_pos = segment[SEG_SPEED_CHANGE_END].end_pos;
+    }
+
+    // catch calculation errors
+    if (!valid()) {
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+        ::printf("SCurve::set_speed_max invalid path\n");
+        debug();
+#endif
+        INTERNAL_ERROR(AP_InternalError::error_t::invalid_arg_or_result);
+        init();
+    }
+}
+
+// set maximum velocity and re-calculate the path using these limits
+void SCurve::set_continue()
+{
+    // return immediately if paused
+    if (!pause) {
+        return;
+    }
+    pause = false;
+
     // return immediately if zero length path
     if (num_segs != segments_max) {
         return;
@@ -391,10 +459,10 @@ void SCurve::set_destination_speed_max(float speed)
 
     const float Vm = segment[SEG_CONST].end_vel;
     const float track_length = track.length();
-    speed = MIN(speed, Vm);
+    vel_end = MIN(speed, Vm);
 
     float Jm, t2, t4, t6;
-    calculate_path(jerk_time, jerk_max, speed, accel_max, Vm, track_length * 0.5f, Jm, t2, t4, t6);
+    calculate_path(jerk_time, jerk_max, vel_end, accel_max, Vm, track_length * 0.5f, Jm, t2, t4, t6);
 
     uint8_t seg = SEG_CONST;
     add_segment_const_jerk(seg, 0.0f, 0.0f);

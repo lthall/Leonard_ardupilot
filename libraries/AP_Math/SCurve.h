@@ -74,6 +74,8 @@ public:
 
     // set trajectory to come to a stop along track
     void set_pause();
+    // set trajectory to continue along track
+    void set_continue();
 
     // set the maximum vehicle speed at the origin
     // returns the expected speed at the origin which will always be equal or lower than speed
@@ -193,6 +195,8 @@ private:
     float jerk_max;     // maximum jerk magnitude
     float accel_max;    // maximum acceleration magnitude
     float vel_max;      // maximum velocity magnitude
+    float vel_end;
+    float track_length;
     float time;         // time that defines position on the path
     float position_sq;  // position (squared) on the path at the last time step (used to detect finish)
     bool pause;         // true when progress along track is paused
