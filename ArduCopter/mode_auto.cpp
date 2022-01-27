@@ -609,18 +609,6 @@ void ModeAuto::exit_mission()
     }
 }
 
-// pause_mission - Prevent aircraft from progressing along the track
-void ModeAuto::pause_mission()
-{
-        wp_nav->set_pause();
-}
-
-// continue_mission - Allow aircraft to progress along the track
-void ModeAuto::continue_mission()
-{
-        wp_nav->set_continue();
-}
-
 // do_guided - start guided mode
 bool ModeAuto::do_guided(const AP_Mission::Mission_Command& cmd)
 {
@@ -1980,6 +1968,24 @@ bool ModeAuto::verify_nav_delay(const AP_Mission::Mission_Command& cmd)
         return true;
     }
     return false;
+}
+
+/********************************************************************************/
+// Pause and continue auto mode
+/********************************************************************************/
+
+// pause_mission - Prevent aircraft from progressing along the track
+bool ModeAuto::pause()
+{
+    wp_nav->set_pause();
+    return true;
+}
+
+// continue_mission - Allow aircraft to progress along the track
+bool ModeAuto::resume()
+{
+    wp_nav->set_continue();
+    return true;
 }
 
 #endif
