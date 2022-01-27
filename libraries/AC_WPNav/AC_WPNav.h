@@ -56,6 +56,9 @@ public:
 
     /// set current target horizontal speed during wp navigation
     void set_speed_xy(float speed_cms);
+    /// set current target climb or descent rate during wp navigation
+    void set_pause(){_offset_scalar = 0.0;}
+    void set_continue(){_offset_scalar = 1.0;}
 
     /// set current target climb or descent rate during wp navigation
     void set_speed_up(float speed_up_cms);
@@ -257,8 +260,9 @@ protected:
     Vector3f    _origin;                // starting point of trip to next waypoint in cm from ekf origin
     Vector3f    _destination;           // target destination in cm from ekf origin
     float       _track_scalar_dt;       // time compression multiplier to slow the progress along the track
-    float       _terrain_vel;            // maximum horizontal velocity used to ensure the aircraft can maintain height above terrain
-    float       _terrain_accel;          // acceleration value used to change _terrain_vel
+    float       _offset_vel;            // horizontal velocity reference used to slow the aircraft for pause and to ensure the aircraft can maintain height above terrain
+    float       _offset_accel;          // horizontal acceleration reference used to slow the aircraft for pause and to ensure the aircraft can maintain height above terrain
+    float       _offset_scalar;         // target ratio of _offset_vel / _wp_desired_speed_xy_cms
 
     // terrain following variables
     bool        _terrain_alt;   // true if origin and destination.z are alt-above-terrain, false if alt-above-ekf-origin
