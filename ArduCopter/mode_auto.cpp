@@ -277,7 +277,7 @@ void ModeAuto::takeoff_start(const Location& dest_loc)
     set_throttle_takeoff();
 
     // get initial alt for WP_NAVALT_MIN
-    auto_takeoff_set_start_alt();
+    auto_takeoff_set_start_and_final_alt(alt_target);
 }
 
 // auto_wp_start - initialises waypoint controller to implement flying to a particular destination
@@ -802,7 +802,10 @@ void ModeAuto::takeoff_run()
     if ((copter.g2.auto_options & (int32_t)Options::AllowTakeOffWithoutRaisingThrottle) != 0) {
         copter.set_auto_armed(true);
     }
-    auto_takeoff_run();
+    if (auto_takeoff_run()) {
+        wp_nav->shift_wp_origin_and_destination_to_stopping_point_xy();
+        wp_nav->set_reached_wp_destination();
+    }
 }
 
 // auto_wp_run - runs the auto waypoint controller

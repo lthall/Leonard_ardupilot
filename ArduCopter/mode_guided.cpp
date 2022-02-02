@@ -131,7 +131,7 @@ bool ModeGuided::do_user_takeoff_start(float takeoff_alt_cm)
     set_throttle_takeoff();
 
     // get initial alt for WP_NAVALT_MIN
-    auto_takeoff_set_start_alt();
+    auto_takeoff_set_start_and_final_alt(takeoff_alt_cm);
 
     // record takeoff has not completed
     takeoff_complete = false;
@@ -628,8 +628,7 @@ void ModeGuided::set_angle(const Quaternion &attitude_quat, const Vector3f &ang_
 //      called by guided_run at 100hz or more
 void ModeGuided::takeoff_run()
 {
-    auto_takeoff_run();
-    if (!takeoff_complete && wp_nav->reached_wp_destination()) {
+    if (auto_takeoff_run() && !takeoff_complete) {
         takeoff_complete = true;
 #if LANDING_GEAR_ENABLED == ENABLED
         // optionally retract landing gear
