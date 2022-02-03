@@ -4,6 +4,10 @@ Mode::_TakeOff Mode::takeoff;
 
 bool Mode::auto_takeoff_no_nav_active = false;
 float Mode::auto_takeoff_no_nav_alt_cm = 0;
+float Mode::auto_take_off_start_alt_cm = 0;
+float Mode::auto_take_off_complete_alt_cm = 0;
+bool Mode::auto_takeoff_terrain_alt = false;
+bool Mode::auto_takeoff_complete = false;
 
 // This file contains the high-level takeoff logic for Loiter, PosHold, AltHold, Sport modes.
 //   The take-off can be initiated from a GCS NAV_TAKEOFF command which includes a takeoff altitude
@@ -94,14 +98,21 @@ void Mode::_TakeOff::do_pilot_takeoff(float& pilot_climb_rate_cm)
 }
 
 // auto_takeoff_run - controls the vertical position controller during the process of taking off in auto modes
-//  returns true when target altitude is within 10% of the take off altitude and less than 50% max climb rate
-bool Mode::auto_takeoff_run()
+// auto_takeoff_complete set to true when target altitude is within 10% of the take off altitude and less than 50% max climb rate
+void Mode::auto_takeoff_run()
 {
     // if not armed set throttle to zero and exit immediately
     if (!motors->armed() || !copter.ap.auto_armed) {
         // do not spool down tradheli when on the ground with motor interlock enabled
         make_safe_ground_handling(copter.is_tradheli() && motors->get_interlock());
-        return false;
+        return;
+    }
+
+    // get terrain offset
+    float terr_offset = 0.0f;
+    if (auto_takeoff_terrain_alt && !wp_nav->get_terrain_offset(terr_offset)) {
+        gcs().send_text(MAV_SEVERITY_CRITICAL, "auto takeoff: failed to get terrain offset");
+        return;
     }
 
     // set motors to full range
@@ -129,7 +140,7 @@ bool Mode::auto_takeoff_run()
         attitude_control->reset_yaw_target_and_rate();
         attitude_control->reset_rate_controller_I_terms();
         attitude_control->input_thrust_vector_rate_heading(pos_control->get_thrust_vector(), auto_yaw.rate_cds());
-        return false;
+        return;
     }
 
     // check if we are not navigating because of low altitude
@@ -147,7 +158,7 @@ bool Mode::auto_takeoff_run()
     pos_control->update_xy_controller();
 
     // command the aircraft to the take off altitude
-    float pos_z = take_off_complete_alt_repeat;
+    float pos_z = auto_take_off_complete_alt_cm + terr_offset;
     float vel_z = 0.0;
     copter.pos_control->input_pos_vel_accel_z(pos_z, vel_z, 0.0);
     
@@ -165,18 +176,20 @@ bool Mode::auto_takeoff_run()
         // roll & pitch from position controller, yaw heading from GCS or auto_heading()
         attitude_control->input_thrust_vector_heading(pos_control->get_thrust_vector(), auto_yaw.yaw(), auto_yaw.rate_cds());
     }
-    bool reached_altitude = (take_off_complete_alt_repeat  - take_off_start_alt_repeat) * 0.9 < copter.pos_control->get_pos_target_z_cm() - take_off_start_alt_repeat;
-    bool reached_climb_rate = copter.pos_control->get_vel_desired_cms().z< copter.pos_control->get_max_speed_up_cms() * 0.5;
-    return reached_altitude && reached_climb_rate;
+    //bool reached_altitude = (copter.pos_control->get_pos_target_z_cm() - auto_take_off_start_alt_cm) >= ((auto_take_off_complete_alt_cm  - auto_take_off_start_alt_cm) * 0.99);
+    //bool reached_climb_rate = copter.pos_control->get_vel_desired_cms().z < copter.pos_control->get_max_speed_up_cms() * 0.5;
+    //auto_takeoff_complete = reached_altitude && reached_climb_rate;
 }
 
-void Mode::auto_takeoff_set_start_and_final_alt(float complete_alt)
+void Mode::auto_takeoff_start(float complete_alt_cm, bool terrain_alt)
 {
-    take_off_start_alt_repeat = inertial_nav.get_position_z_up_cm();
-    take_off_complete_alt_repeat = complete_alt; 
+    auto_take_off_start_alt_cm = inertial_nav.get_position_z_up_cm();
+    auto_take_off_complete_alt_cm = complete_alt_cm;
+    auto_takeoff_terrain_alt = terrain_alt;
+    auto_takeoff_complete = false;
     if ((g2.wp_navalt_min > 0) && (is_disarmed_or_landed() || !motors->get_interlock())) {
         // we are not flying, climb with no navigation to current alt-above-ekf-origin + wp_navalt_min
-        auto_takeoff_no_nav_alt_cm = take_off_start_alt_repeat + g2.wp_navalt_min * 100;
+        auto_takeoff_no_nav_alt_cm = auto_take_off_start_alt_cm + g2.wp_navalt_min * 100;
         auto_takeoff_no_nav_active = true;
     } else {
         auto_takeoff_no_nav_active = false;
