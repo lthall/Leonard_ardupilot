@@ -145,7 +145,7 @@ bool Mode::auto_takeoff_run()
         pos_control->input_vel_accel_xy(vel, accel);
     }
     pos_control->update_xy_controller();
-    
+
     // command the aircraft to the take off altitude
     float pos_z = take_off_complete_alt_repeat;
     float vel_z = 0.0;
