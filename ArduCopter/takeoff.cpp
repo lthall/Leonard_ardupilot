@@ -176,9 +176,9 @@ void Mode::auto_takeoff_run()
         // roll & pitch from position controller, yaw heading from GCS or auto_heading()
         attitude_control->input_thrust_vector_heading(pos_control->get_thrust_vector(), auto_yaw.yaw(), auto_yaw.rate_cds());
     }
-    //bool reached_altitude = (copter.pos_control->get_pos_target_z_cm() - auto_take_off_start_alt_cm) >= ((auto_take_off_complete_alt_cm  - auto_take_off_start_alt_cm) * 0.99);
-    //bool reached_climb_rate = copter.pos_control->get_vel_desired_cms().z < copter.pos_control->get_max_speed_up_cms() * 0.5;
-    //auto_takeoff_complete = reached_altitude && reached_climb_rate;
+    bool reached_altitude = (copter.pos_control->get_pos_target_z_cm() - auto_take_off_start_alt_cm) >= ((auto_take_off_complete_alt_cm  - auto_take_off_start_alt_cm) * 0.90);
+    bool reached_climb_rate = copter.pos_control->get_vel_desired_cms().z < copter.pos_control->get_max_speed_up_cms() * 0.5;
+    auto_takeoff_complete = reached_altitude && reached_climb_rate;
 }
 
 void Mode::auto_takeoff_start(float complete_alt_cm, bool terrain_alt)
