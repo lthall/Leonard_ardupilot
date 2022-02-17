@@ -59,6 +59,8 @@ public:
     /// set current target climb or descent rate during wp navigation
     void set_pause() { _paused = true; }
     void set_continue() { _paused = false; }
+    // get_pause_success returns true when paused and waypoint maximum speed drops to less than 5% of _wp_desired_speed_xy_cms
+    bool get_pause_success() { return (_paused == true && _offset_vel < 0.05 * _wp_desired_speed_xy_cms); }
 
     /// set current target climb or descent rate during wp navigation
     void set_speed_up(float speed_up_cms);
