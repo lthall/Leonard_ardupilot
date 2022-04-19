@@ -409,7 +409,9 @@ void Mode::get_pilot_desired_lean_angles(float &roll_out_cd, float &pitch_out_cd
     //transform pilot's normalised roll or pitch stick input into a roll and pitch euler angle command
     float roll_out_deg;
     float pitch_out_deg;
-    rc_input_to_roll_pitch(roll_out_deg, pitch_out_deg, channel_roll->get_control_in()*(1.0/ROLL_PITCH_YAW_INPUT_MAX), channel_pitch->get_control_in()*(1.0/ROLL_PITCH_YAW_INPUT_MAX), angle_max_cd * 0.01,  angle_limit_cd * 0.01);
+    float roll_in = channel_roll->get_control_in()*(1.0/ROLL_PITCH_YAW_INPUT_MAX);
+    float pitch_in = channel_pitch->get_control_in()*(1.0/ROLL_PITCH_YAW_INPUT_MAX);
+    rc_input_to_roll_pitch(roll_in, pitch_in, angle_max_cd * 0.01,  angle_limit_cd * 0.01, roll_out_deg, pitch_out_deg);
 
     // Convert to centi-degrees
     roll_out_cd = roll_out_deg * 100.0;
