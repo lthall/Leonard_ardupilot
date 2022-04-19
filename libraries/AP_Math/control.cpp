@@ -520,33 +520,58 @@ float accel_to_angle(float accel)
     return degrees(atanf((accel/GRAVITY_MSS)));
 }
 
+void axisAngle2rollPitch(Vector3f k, float angle, float &roll_rad, float & pitch_rad) {
+        float a = cosf(angle);
+        float sa = sinf(angle);
+        float zva = k.z * (1 - a);
+
+        // 3rd column of corresponding rotation matrix
+        float r31 = k.x * zva - k.y * sa;
+        float r32 = k.y * zva + k.x * sa;
+        float r33 = k.z * zva + a;
+
+        pitch_rad = -asinf(r31);
+        roll_rad = atan2f(r32, r33);
+}
+
 // rc_input_to_roll_pitch - transform pilot's normalised roll or pitch stick input into a roll and pitch euler angle command
 // roll_in_unit and pitch_in_unit - are normalised roll and pitch stick input
 // angle_max_deg - maximum lean angle from the z axis
 // angle_limit_deg - provides the ability to reduce the maximum output lean angle to less than angle_max_deg
 // returns roll and pitch angle in degrees
-void rc_input_to_roll_pitch(float &roll_out_deg, float &pitch_out_deg, float roll_in_unit, float pitch_in_unit, float angle_max_deg, float angle_limit_deg)
+void rc_input_to_roll_pitch(float roll_in_unit, float pitch_in_unit, 
+                            float angle_max_deg, float angle_limit_deg, 
+                            float &roll_out_deg, float &pitch_out_deg)
 {
-    angle_max_deg = MIN(angle_max_deg, 85.0);
-    float rc_2_rad = radians(angle_max_deg);
+    float angle_max = radians(MIN(angle_max_deg, 89.999));
 
-    // fetch roll and pitch stick positions and convert them to normalised horizontal thrust
-    Vector2f thrust;
-    thrust.x = - tanf(rc_2_rad * pitch_in_unit);
-    thrust.y = tanf(rc_2_rad * roll_in_unit);
+    float roll_rad = roll_in_unit * angle_max;
+    float pitch_rad = pitch_in_unit * angle_max;
 
-    // calculate the horizontal thrust limit based on the angle limit
-    angle_limit_deg = constrain_float(angle_limit_deg, 10.0f, angle_max_deg);
-    float thrust_limit = tanf(radians(angle_limit_deg));
+    // tilt direction
+    float theta = atan2f(sinf(pitch_rad), -sinf(roll_rad));
 
-    // apply horizontal thrust limit
-    thrust.limit_length(thrust_limit);
+    // tilt angle
+    float tilt = sqrtf(pitch_rad*pitch_rad + roll_rad*roll_rad);
 
-    // Conversion from angular thrust vector to euler angles.
-    float pitch_rad = - atanf(thrust.x);
-    float roll_rad = atanf(cosf(pitch_rad) * thrust.y);
+    roll_out_deg = 0;
+    pitch_out_deg = 0;
+    if (!is_zero(tilt)) {
+        // limit tilt
+        tilt = constrain_float(tilt, 0, radians(angle_limit_deg));
 
-    // Convert to centi-degrees
+        // get axis for axis-angle rotation
+        float rx = -cosf(theta);
+        float ry =  sinf(theta);
+
+        // axis-angle rotation: tilt * (rx, ry, 0).normalized()
+        Vector3f k = Vector3f(rx, ry, 0);
+        k.normalize();
+
+        // convert axis-angle to Euler roll, pitch
+        axisAngle2rollPitch(k, tilt, roll_rad, pitch_rad);
+    }
+    // Convert to degrees
     roll_out_deg = degrees(roll_rad);
     pitch_out_deg = degrees(pitch_rad);
 }

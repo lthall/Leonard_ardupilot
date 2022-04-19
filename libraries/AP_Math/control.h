@@ -157,4 +157,6 @@ float accel_to_angle(float accel);
 // angle_max_deg - maximum lean angle from the z axis
 // angle_limit_deg - provides the ability to reduce the maximum output lean angle to less than angle_max_deg
 // returns roll and pitch euler angles in degrees
-void rc_input_to_roll_pitch(float &roll_out_deg, float &pitch_out_deg, float roll_in_unit, float pitch_in_unit, float angle_max_deg, float angle_limit_deg);
+void rc_input_to_roll_pitch(float roll_in_unit, float pitch_in_unit, float angle_max_deg, float angle_limit_deg, float &roll_out_deg, float &pitch_out_deg);
+
+void axisAngle2rollPitch(Vector3f k, float angle, float &roll_rad, float & pitch_rad);
