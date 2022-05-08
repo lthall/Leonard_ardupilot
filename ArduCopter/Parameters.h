@@ -667,6 +667,13 @@ public:
     AP_Float                pilot_y_rate;
     AP_Float                pilot_y_expo;
     AP_Int8                 surftrak_mode;
+
+#if MODE_SHIP_OPS_ENABLED == ENABLED
+    // Ship Operations parameters
+    AP_Float ship_perch_angle;
+    AP_Float ship_perch_radius;
+    AP_Float ship_perch_altitude;
+#endif
 };
 
 extern const AP_Param::Info        var_info[];

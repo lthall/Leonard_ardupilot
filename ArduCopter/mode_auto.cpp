@@ -344,6 +344,10 @@ void ModeAuto::wp_start(const Location& dest_loc)
 // auto_land_start - initialises controller to implement a landing
 void ModeAuto::land_start()
 {
+    if (set_mode(Mode::Number::SHIP_OPS, ModeReason::MISSION_END)) {
+        return;
+    }
+
     _mode = SubMode::LAND;
 
     // set horizontal speed and acceleration limits
