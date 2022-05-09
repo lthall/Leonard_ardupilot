@@ -36,6 +36,8 @@ bool ModeShipOperation::init(const bool ignore_checks)
         gcs().send_text(MAV_SEVERITY_WARNING, "Beacon distance larger than FOLL_DIST_MAX");
         return false;
     }
+    const Vector3f &curr_pos = inertial_nav.get_position_neu_cm();
+    pos_with_ofs = curr_pos + pos_with_ofs * 100.0f;
 
     // initialise horizontal speed, acceleration
     pos_control->set_max_speed_accel_xy(wp_nav->get_default_speed_xy(), wp_nav->get_wp_acceleration());
@@ -65,6 +67,7 @@ bool ModeShipOperation::init(const bool ignore_checks)
     }
 
     offset.zero();
+    offset.xy() = curr_pos.xy() - pos_with_ofs.xy();
 
     return true;
 }
@@ -100,10 +103,10 @@ void ModeShipOperation::run()
     Vector3f vel_ned;  // velocity of lead vehicle
     Vector3f accel_ned;  // accel of lead vehicle
     bool ship_availible = g2.follow.get_target_dist_and_vel_ned(posit, pos_with_ofs, vel_ned);
+    const Vector3f &curr_pos = inertial_nav.get_position_neu_cm();
     if (ship_availible) {
         // g2.follow.get_target_pos_and_vel_ned(pos_with_ofs, vel_ned);
-        const Vector3f &curr_pos = inertial_nav.get_position_neu_cm();
-        pos_with_ofs = curr_pos + posit * 100.0f;
+        pos_with_ofs = curr_pos + pos_with_ofs * 100.0f;
         vel_ned *= 100.0f;
     } else {
         _state = SubMode::CLIMB_TO_RTL;
@@ -121,6 +124,8 @@ void ModeShipOperation::run()
         attitude_control->reset_rate_controller_I_terms();
         pos_control->init_xy_controller();   // forces attitude target to decay to zero
         pos_control->relax_z_controller(0.0f);   // forces throttle output to decay to zero
+        offset.zero();
+        offset.xy() = curr_pos.xy() - pos_with_ofs.xy();
         break;
 
     case AltHold_Takeoff:
@@ -134,6 +139,8 @@ void ModeShipOperation::run()
             }
             // initialise takeoff variables
             takeoff.start(constrain_float(g.pilot_takeoff_alt, 0.0f, 1000.0f));
+            offset.zero();
+            offset.xy() = curr_pos.xy() - pos_with_ofs.xy();
         }
 
         // set position controller targets adjusted for pilot input
