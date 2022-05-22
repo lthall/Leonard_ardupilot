@@ -38,6 +38,7 @@ bool ModeShipOperation::init(const bool ignore_checks)
     }
     const Vector3f &curr_pos = inertial_nav.get_position_neu_cm();
     pos_with_ofs = curr_pos + pos_with_ofs * 100.0f;
+// use landing offsets provided in ship parameters
 
     // initialise horizontal speed, acceleration
     pos_control->set_max_speed_accel_xy(wp_nav->get_default_speed_xy(), wp_nav->get_wp_acceleration());
@@ -78,6 +79,7 @@ void ModeShipOperation::run()
     float yaw_rate = 0.0f;
 
     Vector2f perch_offset = Vector2f(g2.ship_perch_radius * 100.0, 0.0f);
+// don't rotate perch offset
     perch_offset.rotate(radians(g2.ship_perch_angle));
     float perch_height = g2.ship_perch_altitude * 100.0;
 
@@ -102,6 +104,7 @@ void ModeShipOperation::run()
     Vector3f pos_with_ofs;  // vector to lead vehicle + offset
     Vector3f vel_ned;  // velocity of lead vehicle
     Vector3f accel_ned;  // accel of lead vehicle
+// input shape position target
     bool ship_availible = g2.follow.get_target_dist_and_vel_ned(posit, pos_with_ofs, vel_ned);
     const Vector3f &curr_pos = inertial_nav.get_position_neu_cm();
     if (ship_availible) {
@@ -173,6 +176,7 @@ void ModeShipOperation::run()
         // define target location
         float target_heading_deg = 0.0f;
         if (g2.follow.get_target_heading_deg(target_heading_deg)) {
+// provide yaw rate using input shaping
             perch_offset.rotate(radians(target_heading_deg));
         }
 
@@ -180,6 +184,7 @@ void ModeShipOperation::run()
         switch (_state) {
         case SubMode::CLIMB_TO_RTL:
             // climb to RTL altitude
+// use maximum of current altitude and RTL altitude
             offset.z = -(float)g.rtl_altitude;
             break;
         case SubMode::RETURN_TO_PERCH:
@@ -210,6 +215,7 @@ void ModeShipOperation::run()
                 Vector2f vel_correction = get_pilot_desired_velocity(wp_nav->get_wp_acceleration() * 0.5);
                 // set reposition state
                 copter.ap.land_repo_active = !vel_correction.is_zero();
+// rotate vel_correction
                 // this should use direct velocity control with shaped follow input to remove integration errors.
                 offset.xy() += vel_correction * G_Dt;
             }
@@ -233,6 +239,7 @@ void ModeShipOperation::run()
             // FALLTHROUGH
         case SubMode::LAUNCH_RECOVERY:
             // move to target position and velocity
+// use .xy
             Vector3p pos = pos_with_ofs.topostype();
             pos += offset.topostype();
             Vector2f zero;
@@ -253,16 +260,21 @@ void ModeShipOperation::run()
         case SubMode::PERCH:
             // FALLTHROUGH
         case SubMode::OVER_SPOT:
+// include vertical offseet
             pos_control->set_alt_target_with_slew(-offset.z);
             break;
         case SubMode::LAUNCH_RECOVERY:
             if( is_positive(target_climb_rate) ) {
                 // move to directly to perch altitude
+// use vertical rate
+// need to add rate limit to stop at -offset.z
                 pos_control->set_alt_target_with_slew(-offset.z);
             } else {
                 // decend at pilots commanded rate constrained by landing speed limits
                 float max_land_descent_velocity;
                 if (g.land_speed_high > 0) {
+// and less than land height
+// probably need to use square root controller and combine the two
                     max_land_descent_velocity = -g.land_speed_high;
                 } else {
                     max_land_descent_velocity = pos_control->get_max_speed_down_cms();

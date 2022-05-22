@@ -254,6 +254,7 @@ void ModeAuto::rtl_start()
     _mode = SubMode::RTL;
 
     // call regular rtl flight mode initialisation and ask it to ignore checks
+// change to ship landing
     copter.mode_rtl.init(true);
 }
 
@@ -469,6 +470,7 @@ void ModeAuto::nav_guided_start()
 
 bool ModeAuto::is_landing() const
 {
+// change to ship landing
     switch(_mode) {
     case SubMode::LAND:
         return true;
