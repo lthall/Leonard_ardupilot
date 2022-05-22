@@ -109,6 +109,8 @@ void ModeShipOperation::run()
     const Vector3f &curr_pos = inertial_nav.get_position_neu_cm();
     if (ship_availible) {
         // g2.follow.get_target_pos_and_vel_ned(pos_with_ofs, vel_ned);
+        // change NED to NEU
+        pos_with_ofs.z = - pos_with_ofs.z;
         pos_with_ofs = curr_pos + pos_with_ofs * 100.0f;
         vel_ned *= 100.0f;
     } else {
@@ -279,7 +281,7 @@ void ModeShipOperation::run()
                 } else {
                     max_land_descent_velocity = pos_control->get_max_speed_down_cms();
                 }
-                float alt_above_deck = MAX(0.0f, -pos_with_ofs.z - pos_control->get_pos_target_cm().z);
+                float alt_above_deck = MAX(0.0f, pos_control->get_pos_target_cm().z - pos_with_ofs.z);
                 if (copter.rangefinder_alt_ok()) {
                     // check if range finder detects the deck is closer than expected
                     alt_above_deck = MIN(alt_above_deck, copter.rangefinder_state.alt_cm_filt.get());
