@@ -1,5 +1,6 @@
 #include <AP_HAL/AP_HAL.h>
 #include "AC_WPNav.h"
+#include <AP_Logger/AP_Logger.h>
 
 extern const AP_HAL::HAL& hal;
 
@@ -464,13 +465,42 @@ bool AC_WPNav::advance_wp_target_along_track(float dt)
     curr_target_vel.z -= _pos_control.get_vel_offset_z_cms();
 
     float track_scaler_dt = 1.0f;
+    Vector3f track_direction;
+    float track_error;
+    float track_velocity;
     // check target velocity is non-zero
     if (is_positive(curr_target_vel.length())) {
-        Vector3f track_direction = curr_target_vel.normalized();
-        const float track_error = _pos_control.get_pos_error_cm().dot(track_direction);
-        const float track_velocity = _inav.get_velocity().dot(track_direction);
+        track_direction = curr_target_vel.normalized();
+        track_error = _pos_control.get_pos_error_cm().dot(track_direction);
+        track_velocity = _inav.get_velocity().dot(track_direction);
         // set time scaler to be consistent with the achievable aircraft speed with a 5% buffer for short term variation.
         track_scaler_dt = constrain_float(0.05f + (track_velocity - _pos_control.get_pos_xy_p().kP() * track_error) / curr_target_vel.length(), 0.1f, 1.0f);
+    }
+
+    // change s-curve time speed with a time constant of maximum acceleration / maximum jerk
+    float track_scaler_tc = 1.0f;
+    if (!is_zero(_wp_jerk)) {
+        track_scaler_tc = 0.01f * _wp_accel_cmss/_wp_jerk;
+    }
+    _track_scalar_dt += (track_scaler_dt - _track_scalar_dt) * (dt / track_scaler_tc);
+
+    uint32_t now = AP_HAL::millis();
+    if (now - _last_log_ms >= 100) {
+        AP::logger().Write("WPT",
+                            "TimeUS,Dx,Dy,Dz,Te,Tv,Cv,St,Ft",
+                            "smmmmnn--",
+                            "F00000000",
+                            "Qffffffff",
+                            AP_HAL::micros64(),
+                            double(track_direction.x),
+                            double(track_direction.y),
+                            double(track_direction.z),
+                            double(track_error * 0.01f),
+                            double(track_velocity * 0.01f),
+                            double(curr_target_vel.length() * 0.01f),
+                            double(track_scaler_dt),
+                            double(_track_scalar_dt));
+        _last_log_ms = now;
     }
 
     float vel_time_scalar = 1.0;
@@ -481,13 +511,6 @@ bool AC_WPNav::advance_wp_target_along_track(float dt)
             -_wp_accel_cmss, _wp_accel_cmss, _pos_control.get_shaping_jerk_xy_cmsss(), dt, true);
         vel_time_scalar = _terrain_vel / _wp_desired_speed_xy_cms;
     }
-
-    // change s-curve time speed with a time constant of maximum acceleration / maximum jerk
-    float track_scaler_tc = 1.0f;
-    if (!is_zero(_wp_jerk)) {
-        track_scaler_tc = 0.01f * _wp_accel_cmss/_wp_jerk;
-    }
-    _track_scalar_dt += (track_scaler_dt - _track_scalar_dt) * (dt / track_scaler_tc);
 
     // target position, velocity and acceleration from straight line or spline calculators
     Vector3f target_pos, target_vel, target_accel;

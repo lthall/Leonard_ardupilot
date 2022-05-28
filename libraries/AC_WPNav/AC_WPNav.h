@@ -258,6 +258,8 @@ protected:
     float       _track_scalar_dt;       // time compression multiplier to slow the progress along the track
     float       _terrain_vel;            // maximum horizontal velocity used to ensure the aircraft can maintain height above terrain
     float       _terrain_accel;          // acceleration value used to change _terrain_vel
+    
+    uint32_t    _last_log_ms;            // debug logging
 
     // terrain following variables
     bool        _terrain_alt;   // true if origin and destination.z are alt-above-terrain, false if alt-above-ekf-origin
