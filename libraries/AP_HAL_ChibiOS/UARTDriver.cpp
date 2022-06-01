@@ -944,10 +944,10 @@ void UARTDriver::write_pending_bytes_DMA(uint32_t n)
             /*
             someone else is using this same DMA channel. To reduce
             latency we will drop the TX size with DMA on this UART to
-            keep TX times below 250us. This can still suffer from long
+            keep TX times below 800us. This can still suffer from long
             times due to CTS blockage
             */
-            uint32_t max_tx_bytes = 1 + (_baudrate * 250UL / 1000000UL);
+            uint32_t max_tx_bytes = 1 + (_baudrate * 800UL / 10000000UL);
             if (tx_len > max_tx_bytes) {
                 tx_len = max_tx_bytes;
             }

@@ -34,7 +34,7 @@
 #define AC_ATTITUDE_CONTROL_RATE_BF_FF_DEFAULT          1       // body-frame rate feedforward enabled by default
 
 #define AC_ATTITUDE_CONTROL_ANGLE_LIMIT_TC_DEFAULT      1.0f    // Time constant used to limit lean angle so that vehicle does not lose altitude
-#define AC_ATTITUDE_CONTROL_ANGLE_LIMIT_THROTTLE_MAX    0.8f    // Max throttle used to limit lean angle so that vehicle does not lose altitude
+#define AC_ATTITUDE_CONTROL_ANGLE_LIMIT_THROTTLE_MAX    0.95f    // Max throttle used to limit lean angle so that vehicle does not lose altitude
 #define AC_ATTITUDE_CONTROL_ANGLE_LIMIT_MIN             10.0f   // Min lean angle so that vehicle can maintain limited control
 
 #define AC_ATTITUDE_CONTROL_MIN_DEFAULT                 0.1f    // minimum throttle mix default
@@ -384,12 +384,15 @@ protected:
 
     // Maximum rotation acceleration for earth-frame roll axis
     AP_Float            _accel_roll_max;
+    AP_Float            _ang_a_roll_max;
 
     // Maximum rotation acceleration for earth-frame pitch axis
     AP_Float            _accel_pitch_max;
+    AP_Float            _ang_a_pitch_max;
 
     // Maximum rotation acceleration for earth-frame yaw axis
     AP_Float            _accel_yaw_max;
+    AP_Float            _ang_a_yaw_max;
 
     // Enable/Disable body frame rate feed forward
     AP_Int8             _rate_bf_ff_enabled;

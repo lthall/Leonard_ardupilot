@@ -499,11 +499,11 @@ void NavEKF2_core::CovarianceInit()
     // Z delta velocity bias
     P[15][15] = sq(INIT_ACCEL_BIAS_UNCERTAINTY * dtEkfAvg);
     // earth magnetic field
-    P[16][16] = 0.0f;
+    P[16][16] = sq(frontend->_magNoise);
     P[17][17] = P[16][16];
     P[18][18] = P[16][16];
     // body magnetic field
-    P[19][19] = 0.0f;
+    P[19][19] = sq(frontend->_magNoise);
     P[20][20] = P[19][19];
     P[21][21] = P[19][19];
     // wind velocities

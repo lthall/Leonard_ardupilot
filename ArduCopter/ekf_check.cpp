@@ -8,7 +8,7 @@
  */
 
 #ifndef EKF_CHECK_ITERATIONS_MAX
- # define EKF_CHECK_ITERATIONS_MAX          10      // 1 second (ie. 10 iterations at 10hz) of bad variances signals a failure
+ # define EKF_CHECK_ITERATIONS_MAX          50      // 1 second (ie. 10 iterations at 10hz) of bad variances signals a failure
 #endif
 
 #ifndef EKF_CHECK_WARNING_TIME

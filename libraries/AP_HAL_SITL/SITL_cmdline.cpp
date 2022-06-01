@@ -36,6 +36,7 @@
 #include <SITL/SIM_Webots.h>
 #include <SITL/SIM_JSON.h>
 #include <SITL/SIM_Blimp.h>
+#include <SITL/SIM_agentsim.h>
 #include <AP_Filesystem/AP_Filesystem.h>
 
 #include <signal.h>
@@ -141,6 +142,7 @@ static const struct {
     { "y6",                 MultiCopter::create },
     { "deca",               MultiCopter::create },
     { "deca-cwx",           MultiCopter::create },
+    { "agentsim",           agentsim::create },
     { "heli",               Helicopter::create },
     { "heli-dual",          Helicopter::create },
     { "heli-compound",      Helicopter::create },

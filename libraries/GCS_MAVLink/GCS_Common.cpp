@@ -4282,11 +4282,11 @@ void GCS_MAVLINK::convert_COMMAND_LONG_to_COMMAND_INT(const mavlink_command_long
     out.param3 = in.param3;
     out.param4 = in.param4;
     if (command_long_stores_location((MAV_CMD)in.command)) {
-        out.x = in.param5 *1e7;
-        out.y = in.param6 *1e7;
+        out.x = !isnan(in.param5) ? in.param5 *1e7 : 0;
+        out.y = !isnan(in.param6) ? in.param6 *1e7 : 0;
     } else {
-        out.x = in.param5;
-        out.y = in.param6;
+        out.x = !isnan(in.param5) ? in.param5 : 0;
+        out.y = !isnan(in.param6) ? in.param6 : 0;
     }
     out.z = in.param7;
 }
@@ -4612,7 +4612,7 @@ void GCS_MAVLINK::send_sys_status()
         control_sensors_enabled,
         control_sensors_health,
         static_cast<uint16_t>(AP::scheduler().load_average() * 1000),
-        battery.voltage() * 1000,  // mV
+        battery.voltage_resting_estimate() * 1000,  // mV
         battery_current,        // in 10mA units
         battery_remaining,      // in %
         0,  // comm drops %,

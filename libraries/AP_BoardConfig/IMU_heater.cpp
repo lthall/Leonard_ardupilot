@@ -72,6 +72,11 @@ void AP_BoardConfig::set_imu_temp(float current)
     } else {
         heater.output = heater.pi_controller.update(avg, target, dt);
         heater.output = constrain_float(heater.output, 0, 100);
+
+        // Having the heater in between 0 and 100% duty cycle induces switching noise in the magnetometer.
+        // Round off the temperature controller's output to make this a bang-bang controller and avoid
+        // the switching noise.
+        heater.output = (heater.output >= 50) ? 100 : 0;
     }
 
     if (now - heater.last_log_ms >= 1000) {
