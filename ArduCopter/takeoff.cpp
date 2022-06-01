@@ -159,13 +159,13 @@ void Mode::auto_takeoff_run()
     // call attitude controller
     if (auto_yaw.mode() == AUTO_YAW_HOLD) {
         // roll & pitch from position controller, yaw rate from pilot
-        attitude_control->input_thrust_vector_rate_heading(thrustvector, target_yaw_rate);
+        attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(wp_nav->get_roll(), wp_nav->get_pitch(), target_yaw_rate);
     } else if (auto_yaw.mode() == AUTO_YAW_RATE) {
         // roll & pitch from position controller, yaw rate from mavlink command or mission item
-        attitude_control->input_thrust_vector_rate_heading(thrustvector, auto_yaw.rate_cds());
+        attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(wp_nav->get_roll(), wp_nav->get_pitch(), auto_yaw.rate_cds());
     } else {
         // roll & pitch from position controller, yaw heading from GCS or auto_heading()
-        attitude_control->input_thrust_vector_heading(thrustvector, auto_yaw.yaw(), auto_yaw.rate_cds());
+        attitude_control->input_euler_angle_roll_pitch_yaw(wp_nav->get_roll(), wp_nav->get_pitch(), auto_yaw.yaw(), true);
     }
 }
 
