@@ -40,8 +40,6 @@
 #define AC_ATTITUDE_CONTROL_MIN_DEFAULT                 0.1f    // minimum throttle mix default
 #define AC_ATTITUDE_CONTROL_MAN_DEFAULT                 0.1f    // manual throttle mix default
 #define AC_ATTITUDE_CONTROL_MAX_DEFAULT                 0.5f    // maximum throttle mix default
-#define AC_ATTITUDE_CONTROL_MIN_LIMIT                   0.5f    // min throttle mix upper limit
-#define AC_ATTITUDE_CONTROL_MAN_LIMIT                   4.0f    // man throttle mix upper limit
 #define AC_ATTITUDE_CONTROL_MAX                         5.0f    // maximum throttle mix default
 
 #define AC_ATTITUDE_CONTROL_THR_MIX_DEFAULT             0.5f  // ratio controlling the max throttle output during competing requests of low throttle from the pilot (or autopilot) and higher throttle for attitude control.  Higher favours Attitude over pilot input
@@ -146,44 +144,49 @@ public:
     // If reset_rate is false rates are not reset to allow the rate controllers to run
     void reset_yaw_target_and_rate(bool reset_rate = true);
 
+    // Sets attitude target to vehicle attitude
+    void set_attitude_target_to_current_attitude() { _ahrs.get_quat_body_to_ned(_attitude_target_quat); }
+
+    // Sets yaw target to vehicle heading
+    void set_yaw_target_to_current_heading() { shift_ef_yaw_target(degrees(_ahrs.yaw - _attitude_target_euler_angle.z) * 100.0f); }
+
+    // Shifts earth frame yaw target by yaw_shift_cd. yaw_shift_cd should be in centidegrees and is added to the current target heading
+    void shift_ef_yaw_target(float yaw_shift_cd);
+
     // handle reset of attitude from EKF since the last iteration
     void inertial_frame_reset();
 
     // Command a Quaternion attitude with feedforward and smoothing
-    virtual void input_quaternion(Quaternion attitude_desired_quat);
+    void input_quaternion(Quaternion attitude_desired_quat);
 
     // Command an euler roll and pitch angle and an euler yaw rate with angular velocity feedforward and smoothing
     virtual void input_euler_angle_roll_pitch_euler_rate_yaw(float euler_roll_angle_cd, float euler_pitch_angle_cd, float euler_yaw_rate_cds);
+
     // Command an euler roll, pitch and yaw angle with angular velocity feedforward and smoothing
     virtual void input_euler_angle_roll_pitch_yaw(float euler_roll_angle_cd, float euler_pitch_angle_cd, float euler_yaw_angle_cd, bool slew_yaw);
 
-    // Command euler yaw rate and pitch angle with roll angle specified in body frame
-    // (implemented only in AC_AttitudeControl_TS for tailsitter quadplanes)
-    virtual void input_euler_rate_yaw_euler_angle_pitch_bf_roll(bool plane_controls, float euler_roll_angle_cd, 
-        float euler_pitch_angle_cd, float euler_yaw_rate_cds) {}
+    // Command euler yaw rate and pitch angle with roll angle specified in body frame with multicopter style controls
+    // (used only by tailsitter quadplanes)
+    virtual void input_euler_rate_yaw_euler_angle_pitch_bf_roll_m(float euler_roll_angle_cd, float euler_pitch_angle_cd, float euler_yaw_rate_cds);
+
+    // Command euler yaw rate and pitch angle with roll angle specified in body frame with plane style controls
+    // (used only by tailsitter quadplanes)
+    virtual void input_euler_rate_yaw_euler_angle_pitch_bf_roll_p(float euler_roll_angle_cd, float euler_pitch_angle_cd, float euler_yaw_rate_cds);
 
     // Command an euler roll, pitch, and yaw rate with angular velocity feedforward and smoothing
-    virtual void input_euler_rate_roll_pitch_yaw(float euler_roll_rate_cds, float euler_pitch_rate_cds, float euler_yaw_rate_cds);
+    void input_euler_rate_roll_pitch_yaw(float euler_roll_rate_cds, float euler_pitch_rate_cds, float euler_yaw_rate_cds);
 
     // Command an angular velocity with angular velocity feedforward and smoothing
     virtual void input_rate_bf_roll_pitch_yaw(float roll_rate_bf_cds, float pitch_rate_bf_cds, float yaw_rate_bf_cds);
 
     // Command an angular velocity with angular velocity feedforward and smoothing
-    virtual void input_rate_bf_roll_pitch_yaw_2(float roll_rate_bf_cds, float pitch_rate_bf_cds, float yaw_rate_bf_cds);
+    void input_rate_bf_roll_pitch_yaw_2(float roll_rate_bf_cds, float pitch_rate_bf_cds, float yaw_rate_bf_cds);
 
     // Command an angular velocity with angular velocity smoothing using rate loops only with integrated rate error stabilization
-    virtual void input_rate_bf_roll_pitch_yaw_3(float roll_rate_bf_cds, float pitch_rate_bf_cds, float yaw_rate_bf_cds);
+    void input_rate_bf_roll_pitch_yaw_3(float roll_rate_bf_cds, float pitch_rate_bf_cds, float yaw_rate_bf_cds);
 
     // Command an angular step (i.e change) in body frame angle
     virtual void input_angle_step_bf_roll_pitch_yaw(float roll_angle_step_bf_cd, float pitch_angle_step_bf_cd, float yaw_angle_step_bf_cd);
-
-    // Command a thrust vector in the earth frame and a heading angle and/or rate
-    virtual void input_thrust_vector_rate_heading(const Vector3f& thrust_vector, float heading_rate_cds);
-    virtual void input_thrust_vector_heading(const Vector3f& thrust_vector, float heading_angle_cd, float heading_rate_cds);
-    void input_thrust_vector_heading(const Vector3f& thrust_vector, float heading_cd) {input_thrust_vector_heading(thrust_vector, heading_cd, 0.0f);}
-
-    // Converts thrust vector and heading angle to quaternion rotation in the earth frame
-    Quaternion attitude_from_thrust_vector(Vector3f thrust_vector, float heading_angle) const;
 
     // Run angular velocity controller and send outputs to the motors
     virtual void rate_controller_run() = 0;
@@ -203,32 +206,32 @@ public:
     // attitude controller's target attitude.
     // **NOTE** Using vector3f*deg(100) is more efficient than deg(vector3f)*100 or deg(vector3d*100) because it gives the
     // same result with the fewest multiplications. Even though it may look like a bug, it is intentional. See issue 4895.
-    Vector3f get_att_target_euler_cd() const { return _euler_angle_target * degrees(100.0f); }
-    const Vector3f & get_att_target_euler_rad() const { return _euler_angle_target; }
+    Vector3f get_att_target_euler_cd() const { return _attitude_target_euler_angle * degrees(100.0f); }
+    const Vector3f & get_att_target_euler_rad() const { return _attitude_target_euler_angle; }
 
     // Return the body-to-NED target attitude used by the quadplane-specific attitude control input methods
-    Quaternion get_attitude_target_quat() const { return _attitude_target; }
+    Quaternion get_attitude_target_quat() const { return _attitude_target_quat; }
 
     // Return the angle between the target thrust vector and the current thrust vector.
     float get_att_error_angle_deg() const { return degrees(_thrust_error_angle); }
 
     // Set x-axis angular velocity in centidegrees/s
-    void rate_bf_roll_target(float rate_cds) { _ang_vel_body.x = radians(rate_cds * 0.01f); }
+    void rate_bf_roll_target(float rate_cds) { _rate_target_ang_vel.x = radians(rate_cds * 0.01f); }
 
     // Set y-axis angular velocity in centidegrees/s
-    void rate_bf_pitch_target(float rate_cds) { _ang_vel_body.y = radians(rate_cds * 0.01f); }
+    void rate_bf_pitch_target(float rate_cds) { _rate_target_ang_vel.y = radians(rate_cds * 0.01f); }
 
     // Set z-axis angular velocity in centidegrees/s
-    void rate_bf_yaw_target(float rate_cds) { _ang_vel_body.z = radians(rate_cds * 0.01f); }
+    void rate_bf_yaw_target(float rate_cds) { _rate_target_ang_vel.z = radians(rate_cds * 0.01f); }
 
     // Set x-axis system identification angular velocity in degrees/s
-    void rate_bf_roll_sysid(float rate) { _sysid_ang_vel_body.x = rate; }
+    void rate_bf_roll_sysid(float rate) { _rate_sysid_ang_vel.x = rate; }
 
     // Set y-axis system identification angular velocity in degrees/s
-    void rate_bf_pitch_sysid(float rate) { _sysid_ang_vel_body.y = rate; }
+    void rate_bf_pitch_sysid(float rate) { _rate_sysid_ang_vel.y = rate; }
 
     // Set z-axis system identification angular velocity in degrees/s
-    void rate_bf_yaw_sysid(float rate) { _sysid_ang_vel_body.z = rate; }
+    void rate_bf_yaw_sysid(float rate) { _rate_sysid_ang_vel.z = rate; }
 
     // Set x-axis system identification actuator
     void actuator_roll_sysid(float command) { _actuator_sysid.x = command; }
@@ -258,7 +261,7 @@ public:
     float max_angle_step_bf_yaw() { return max_rate_step_bf_yaw() / _p_angle_yaw.kP(); }
 
     // Return angular velocity in radians used in the angular velocity controller
-    Vector3f rate_bf_targets() const { return _ang_vel_body + _sysid_ang_vel_body; }
+    Vector3f rate_bf_targets() const { return _rate_target_ang_vel + _rate_sysid_ang_vel; }
 
     // Enable or disable body-frame feed forward
     void bf_feedforward(bool enable_or_disable) { _rate_bf_ff_enabled = enable_or_disable; }
@@ -285,7 +288,7 @@ public:
     float angle_boost() const { return _angle_boost; }
 
     // Return tilt angle limit for pilot input that prioritises altitude hold over lean angle
-    virtual float get_althold_lean_angle_max() const;
+    float get_althold_lean_angle_max() const;
 
     // Return configured tilt angle limit in centidegrees
     float lean_angle_max() const { return _aparm.angle_max; }
@@ -293,10 +296,15 @@ public:
     // Return tilt angle in degrees
     float lean_angle() const { return degrees(_thrust_angle); }
 
+    // Proportional controller with piecewise sqrt sections to constrain second derivative
+    static float sqrt_controller(float error, float p, float second_ord_lim, float dt);
+
+    // Inverse proportional controller with piecewise sqrt sections to constrain second derivative
+    static float stopping_point(float first_ord_mag, float p, float second_ord_lim);
+
     // calculates the velocity correction from an angle error. The angular velocity has acceleration and
     // deceleration limits including basic jerk limiting using smoothing_gain
-    static float input_shaping_angle(float error_angle, float input_tc, float accel_max, float target_ang_vel, float desired_ang_vel, float max_ang_vel, float dt);
-    static float input_shaping_angle(float error_angle, float smoothing_gain, float accel_max, float target_ang_vel, float dt){ return input_shaping_angle(error_angle,  smoothing_gain,  accel_max,  target_ang_vel,  0.0f,  0.0f,  dt); }
+    static float input_shaping_angle(float error_angle, float smoothing_gain, float accel_max, float target_ang_vel, float dt);
 
     // limits the acceleration and deceleration of a velocity request
     static float input_shaping_ang_vel(float target_ang_vel, float desired_ang_vel, float accel_max, float dt);
@@ -311,16 +319,12 @@ public:
     // translates body frame acceleration limits to the euler axis
     Vector3f euler_accel_limit(const Vector3f &euler_rad, const Vector3f &euler_accel);
 
+    // thrust_heading_rotation_angles - calculates two ordered rotations to move the att_from_quat quaternion to the att_to_quat quaternion.
+    // The first rotation corrects the thrust vector and the second rotation corrects the heading vector.
+    void thrust_heading_rotation_angles(Quaternion& att_to_quat, const Quaternion& att_from_quat, Vector3f& att_diff_angle, float& thrust_vec_dot);
+
     // Calculates the body frame angular velocities to follow the target attitude
     void attitude_controller_run_quat();
-
-    // thrust_heading_rotation_angles - calculates two ordered rotations to move the attitude_body quaternion to the attitude_target quaternion.
-    // The maximum error in the yaw axis is limited based on the angle yaw P value and acceleration.
-    void thrust_heading_rotation_angles(Quaternion& attitude_target, const Quaternion& attitude_body, Vector3f& attitude_error, float& thrust_angle, float& thrust_error_angle) const;
-
-    // thrust_vector_rotation_angles - calculates two ordered rotations to move the attitude_body quaternion to the attitude_target quaternion.
-    // The first rotation corrects the thrust vector and the second rotation corrects the heading vector.
-    void thrust_vector_rotation_angles(const Quaternion& attitude_target, const Quaternion& attitude_body, Quaternion& thrust_vector_correction, Vector3f& attitude_error, float& thrust_angle, float& thrust_error_angle) const;
 
     // sanity check parameters.  should be called once before take-off
     virtual void parameter_sanity_check() {}
@@ -416,30 +420,30 @@ protected:
 
     // This represents a 321-intrinsic rotation in NED frame to the target (setpoint)
     // attitude used in the attitude controller, in radians.
-    Vector3f            _euler_angle_target;
+    Vector3f            _attitude_target_euler_angle;
 
     // This represents the angular velocity of the target (setpoint) attitude used in
     // the attitude controller as 321-intrinsic euler angle derivatives, in radians per
     // second.
-    Vector3f            _euler_rate_target;
+    Vector3f            _attitude_target_euler_rate;
 
     // This represents a quaternion rotation in NED frame to the target (setpoint)
     // attitude used in the attitude controller.
-    Quaternion          _attitude_target;
+    Quaternion          _attitude_target_quat;
 
     // This represents the angular velocity of the target (setpoint) attitude used in
     // the attitude controller as an angular velocity vector, in radians per second in
     // the target attitude frame.
-    Vector3f            _ang_vel_target;
+    Vector3f            _attitude_target_ang_vel;
 
     // This represents the angular velocity in radians per second in the body frame, used in the angular
     // velocity controller.
-    Vector3f            _ang_vel_body;
+    Vector3f            _rate_target_ang_vel;
 
     // This is the the angular velocity in radians per second in the body frame, added to the output angular
     // attitude controller by the System Identification Mode.
     // It is reset to zero immediately after it is used.
-    Vector3f            _sysid_ang_vel_body;
+    Vector3f            _rate_sysid_ang_vel;
 
     // This is the the unitless value added to the output of the PID by the System Identification Mode.
     // It is reset to zero immediately after it is used.
@@ -514,3 +518,6 @@ public:
     float control_monitor_rms_output_pitch(void) const;
     float control_monitor_rms_output_yaw(void) const;
 };
+
+#define AC_ATTITUDE_CONTROL_LOG_FORMAT(msg) { msg, sizeof(AC_AttitudeControl::log_Attitude),	\
+                            "ATT", "cccccCC",      "RollIn,Roll,PitchIn,Pitch,YawIn,Yaw,NavYaw" }
