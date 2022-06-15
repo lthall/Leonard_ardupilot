@@ -4,6 +4,8 @@ Mode::_TakeOff Mode::takeoff;
 
 bool Mode::auto_takeoff_no_nav_active = false;
 float Mode::auto_takeoff_no_nav_alt_cm = 0;
+float Mode::auto_takeoff_roll = 0.0;
+float Mode::auto_takeoff_pitch = 0.0;
 
 // This file contains the high-level takeoff logic for Loiter, PosHold, AltHold, Sport modes.
 //   The take-off can be initiated from a GCS NAV_TAKEOFF command which includes a takeoff altitude
@@ -157,7 +159,10 @@ void Mode::auto_takeoff_run()
     copter.pos_control->update_z_controller();
 
     // call attitude controller
-    if (auto_yaw.mode() == AUTO_YAW_HOLD) {
+    if (auto_takeoff_no_nav_active) {
+        // zero roll & pitch and yaw rate
+        attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(auto_takeoff_roll, auto_takeoff_pitch, 0.0);
+    } else if (auto_yaw.mode() == AUTO_YAW_HOLD) {
         // roll & pitch from position controller, yaw rate from pilot
         attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(wp_nav->get_roll(), wp_nav->get_pitch(), target_yaw_rate);
     } else if (auto_yaw.mode() == AUTO_YAW_RATE) {
@@ -175,6 +180,8 @@ void Mode::auto_takeoff_set_start_alt(void)
         // we are not flying, climb with no navigation to current alt-above-ekf-origin + wp_navalt_min
         auto_takeoff_no_nav_alt_cm = inertial_nav.get_altitude() + g2.wp_navalt_min * 100;
         auto_takeoff_no_nav_active = true;
+        auto_takeoff_roll = ahrs.roll_sensor;
+        auto_takeoff_pitch = ahrs.pitch_sensor;
     } else {
         auto_takeoff_no_nav_active = false;
     }
