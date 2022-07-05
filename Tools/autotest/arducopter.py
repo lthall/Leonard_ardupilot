@@ -6248,9 +6248,9 @@ class AutoTestCopter(AutoTest):
             })
             self.reboot_sitl()
             self.set_parameters({
-                "EK3_DRAG_BCOEF_X": 361.000000,
-                "EK3_DRAG_BCOEF_Y": 361.000000,
-                "EK3_DRAG_MCOEF": 0.082000,
+                "EK3_DRAG_BCOEF_X": 91.2220,
+                "EK3_DRAG_BCOEF_Y": 91.2220,
+                "EK3_DRAG_MCOEF": 0.0760,
                 "BARO1_WCF_FWD": -0.300000,
                 "BARO1_WCF_BCK": -0.300000,
                 "BARO1_WCF_RGT": 0.300000,
