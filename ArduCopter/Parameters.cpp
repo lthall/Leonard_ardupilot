@@ -1132,6 +1132,48 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     // @Range: 0 1
     // @User: Advanced
     AP_GROUPINFO("SHIP_PCH_ALT", 54, ParametersG2, ship_perch_altitude, 25.0f),
+
+    // @Param: SHIP_ACCELXY
+    // @DisplayName: Acceleration limit for the horizontal kinematic input shaping
+    // @Description: Acceleration limit of the horizontal kinematic path generation used to determine how quickly the ship varies in velocity
+    // @Range: 0 1
+    // @User: Advanced
+    AP_GROUPINFO("SHIP_ACCELXY", 55, ParametersG2, ship_accel_xy, 2.5f),
+
+    // @Param: SHIP_JERKXY
+    // @DisplayName: Jerk limit for the horizontal kinematic input shaping
+    // @Description: Jerk limit of the horizontal kinematic path generation used to determine how quickly the ship varies in acceleration
+    // @Range: 0 1
+    // @User: Advanced
+    AP_GROUPINFO("SHIP_JERKXY", 56, ParametersG2, ship_jerk_xy, 5.0f),
+
+    // @Param: SHIP_ACCELZ
+    // @DisplayName: Acceleration limit for the vertical kinematic input shaping
+    // @Description: Acceleration limit of the vertical kinematic path generation used to determine how quickly the ship varies in velocity
+    // @Range: 0 1
+    // @User: Advanced
+    AP_GROUPINFO("SHIP_ACCELZ", 57, ParametersG2, ship_accel_z, 2.5f),
+
+    // @Param: SHIP_JERKZ
+    // @DisplayName: Jerk limit for the vertical kinematic input shaping
+    // @Description: Jerk limit of the vertical kinematic path generation used to determine how quickly the ship varies in acceleration
+    // @Range: 0 1
+    // @User: Advanced
+    AP_GROUPINFO("SHIP_JERKZ", 58, ParametersG2, ship_jerk_z, 5.0f),
+
+    // @Param: SHIP_ACCELH
+    // @DisplayName: Angular acceleration limit for the heading kinematic input shaping
+    // @Description: Angular acceleration limit of the heading kinematic path generation used to determine how quickly the ship varies in angular velocity
+    // @Range: 0 1
+    // @User: Advanced
+    AP_GROUPINFO("SHIP_ACCELH", 59, ParametersG2, ship_accel_h, 90.0f),
+
+    // @Param: SHIP_JERKH
+    // @DisplayName: Angular jerk limit for the heading kinematic input shaping
+    // @Description: Angular jerk limit of the heading kinematic path generation used to determine how quickly the ship varies in angular acceleration
+    // @Range: 0 1
+    // @User: Advanced
+    AP_GROUPINFO("SHIP_JERKH", 60, ParametersG2, ship_jerk_h, 360.0f),
 #endif
 
     AP_GROUPEND

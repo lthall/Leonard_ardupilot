@@ -673,6 +673,12 @@ public:
     AP_Float ship_perch_angle;
     AP_Float ship_perch_radius;
     AP_Float ship_perch_altitude;
+    AP_Float ship_accel_xy;
+    AP_Float ship_jerk_xy;
+    AP_Float ship_accel_z;
+    AP_Float ship_jerk_z;
+    AP_Float ship_accel_h;
+    AP_Float ship_jerk_h;
 #endif
 };
 
