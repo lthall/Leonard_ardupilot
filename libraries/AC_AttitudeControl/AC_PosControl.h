@@ -208,8 +208,8 @@ public:
 
     /// land_at_climb_rate_cm - adjusts target up or down using a commanded climb rate in cm/s
     ///     using the default position control kinematic path.
-    ///     ignore_descent_limit turns off output saturation handling to aid in landing detection. ignore_descent_limit should be true unless landing.
-    void land_at_climb_rate_cm(float vel, bool ignore_descent_limit);
+    ///     enforce_descent_limit controls output saturation handling to aid in landing detection. enforce_descent_limit should be true unless landing.
+    void land_at_climb_rate_cm(float vel, bool enforce_descent_limit);
 
     /// input_pos_vel_accel_z - calculate a jerk limited path from the current position, velocity and acceleration to an input position velocity and acceleration.
     ///     The function takes the current position, velocity, and acceleration and calculates the required jerk limited adjustment to the acceleration for the next time dt.
