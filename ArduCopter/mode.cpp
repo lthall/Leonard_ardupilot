@@ -576,11 +576,11 @@ int32_t Mode::get_alt_above_ground_cm(void)
 void Mode::land_run_vertical_control(bool pause_descent)
 {
     float cmb_rate = 0;
-    bool ignore_descent_limit = false;
+    bool enforce_descent_limit = true;
     if (!pause_descent) {
 
         // do not ignore limits until we have slowed down for landing
-        ignore_descent_limit = (MAX(g2.land_alt_low,100) > get_alt_above_ground_cm()) || copter.ap.land_complete_maybe;
+        enforce_descent_limit = (MAX(g2.land_alt_low,100) > get_alt_above_ground_cm()) && !copter.ap.land_complete_maybe;
 
         float max_land_descent_velocity;
         if (g.land_speed_high > 0) {
@@ -631,7 +631,7 @@ void Mode::land_run_vertical_control(bool pause_descent)
     }
 
     // update altitude target and call position controller
-    pos_control->land_at_climb_rate_cm(cmb_rate, ignore_descent_limit);
+    pos_control->land_at_climb_rate_cm(cmb_rate, enforce_descent_limit);
     pos_control->update_z_controller();
 }
 
