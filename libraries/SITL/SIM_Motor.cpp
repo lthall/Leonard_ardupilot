@@ -33,7 +33,7 @@ void Motor::calculate_forces(const struct sitl_input &input,
                              float voltage)
 {
     // fudge factors
-    const float yaw_scale = radians(40);
+    const float yaw_scale = 0.1;
 
     const float pwm = input.servos[motor_offset+servo];
     float command = pwm_to_command(pwm);
@@ -57,14 +57,14 @@ void Motor::calculate_forces(const struct sitl_input &input,
     last_calc_us = now_us;
     last_command = command;
 
-    // the yaw torque of the motor
-    Vector3f rotor_torque(0, 0, yaw_factor * command * yaw_scale * voltage_scale);
-
     // calculate velocity into prop, clipping at zero, assumes zero roll/pitch
     float velocity_in = MAX(0, -velocity_air_bf.z);
 
     // get thrust for untilted motor
     float motor_thrust = calc_thrust(command, air_density, effective_prop_area, velocity_in, velocity_max * voltage_scale);
+
+    // the yaw torque of the motor
+    Vector3f rotor_torque(0, 0, yaw_factor * 0.5 * diagonal_size * yaw_scale * motor_thrust);
 
     // thrust in NED
     thrust = {0, 0, -motor_thrust};
