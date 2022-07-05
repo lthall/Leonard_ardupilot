@@ -52,9 +52,9 @@ const AP_Param::GroupInfo AP_Gripper::var_info[] = {
 
     // @Param: REGRAB
     // @DisplayName: Gripper Regrab interval
-    // @Description: Time in seconds that gripper will regrab the cargo to ensure grip has not weakened; 0 to disable
+    // @Description: Time in seconds that gripper will regrab the cargo; 0 to disable
     // @User: Advanced
-    // @Range: 0 255
+    // @Range: 0.25 255
     // @Units: s
     AP_GROUPINFO("REGRAB",  5, AP_Gripper, config.regrab_interval, GRIPPER_REGRAB_DEFAULT),
 

@@ -114,8 +114,8 @@ void AP_Gripper_EPM::update_gripper()
 
     // re-grab the cargo intermittently
     if (config.state == AP_Gripper::STATE_GRABBED &&
-        (config.regrab_interval > 0) &&
-        (AP_HAL::millis() - _last_grab_or_release > ((uint32_t)config.regrab_interval * 1000))) {
+        (is_positive(config.regrab_interval)) &&
+        (AP_HAL::millis() - _last_grab_or_release > (config.regrab_interval * 1000.0))) {
         grab();
     }
 }
