@@ -147,6 +147,23 @@ const AP_Param::GroupInfo AP_BattMonitor_Params::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("OPTIONS", 21, AP_BattMonitor_Params, _options, 0),
 
+    // @Param: OVER_AMP
+    // @DisplayName: Current level used to trigger a over current failsafe
+    // @Description: The current that triggers a low battery failsafe. Set to 0 to disable. If the battery voltage drops below this voltage continuously for more then the period specified by the @PREFIX@LOW_TIMER parameter then the vehicle will perform the failsafe specified by the @PREFIX@FS_LOW_ACT parameter.
+    // @Units: V
+    // @Increment: 0.1
+    // @User: Standard
+    AP_GROUPINFO("OVER_AMP", 22, AP_BattMonitor_Params, _over_current, 100.0f),
+
+    // @Param: OVER_TMR
+    // @DisplayName: Timeout in seconds before a low voltage event will be triggered
+    // @Description: This is the timeout in seconds before a low voltage event will be triggered. For aircraft with low C batteries it may be necessary to raise this in order to cope with low voltage on long takeoffs. A value of zero disables low voltage errors.
+    // @Units: s
+    // @Increment: 1
+    // @Range: 0 120
+    // @User: Advanced
+    AP_GROUPINFO("OVER_TMR", 23, AP_BattMonitor_Params, _over_current_timeout, 4),
+
     AP_GROUPEND
 
 };
