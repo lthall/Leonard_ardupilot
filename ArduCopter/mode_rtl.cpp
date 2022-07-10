@@ -65,6 +65,32 @@ void ModeRTL::run(bool disarm_on_land)
         return;
     }
 
+    if (_state_complete) {
+        switch (_state) {
+        case SubMode::STARTING:
+            break;
+        case SubMode::INITIAL_CLIMB:
+            if (g2.gripper.enabled() && g2.gripper.grabbed()){
+                g2.gripper.release();
+                gcs().send_text(MAV_SEVERITY_INFO, "Gripper Released");
+            }
+            break;
+        case SubMode::RETURN_HOME:
+            break;
+        case SubMode::LOITER_AT_HOME:
+            break;
+        case SubMode::FINAL_DESCENT:
+            // do nothing
+            break;
+        case SubMode::LAND:
+            if (g2.gripper.enabled() && g2.gripper.released()){
+                g2.gripper.grab();
+                gcs().send_text(MAV_SEVERITY_INFO, "Gripper Grabbed");
+            }
+            break;
+        }
+    }
+    
     // check if we need to move to next state
     if (_state_complete) {
         switch (_state) {
