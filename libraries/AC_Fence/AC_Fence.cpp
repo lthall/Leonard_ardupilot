@@ -141,6 +141,15 @@ const AP_Param::GroupInfo AC_Fence::var_info[] = {
     // @User: Standard
     AP_GROUPINFO_FRAME("OPTIONS", 11, AC_Fence, _options, static_cast<uint16_t>(OPTIONS::DISABLE_MODE_CHANGE), AP_PARAM_FRAME_PLANE),
 
+    // @Param{Copter}: AMIN_RAD
+    // @DisplayName: Fence Minimum Altitude Radius
+    // @Description: Radius from home above which minimum altitude geofence can be triggered
+    // @Units: m
+    // @Range: 0 100
+    // @Increment: 1
+    // @User: Standard
+    AP_GROUPINFO_FRAME("AMIN_RAD",     12,  AC_Fence,   _alt_min_rad,      30.0, AP_PARAM_FRAME_COPTER | AP_PARAM_FRAME_TRICOPTER | AP_PARAM_FRAME_HELI),
+
     AP_GROUPEND
 };
 
@@ -429,6 +438,12 @@ bool AC_Fence::check_fence_alt_min()
     // altitude fence check
     if (!(_enabled_fences & AC_FENCE_TYPE_ALT_MIN)) {
         // not enabled; no breach
+        return false;
+    }
+
+    Vector2f curr_pos_NE;
+    if (AP::ahrs().get_relative_position_NE_home(curr_pos_NE) && curr_pos_NE.length_squared() < sq(_alt_min_rad)) {
+        // inside AMIN_RAD
         return false;
     }
 
