@@ -27,7 +27,7 @@ extern const AP_HAL::HAL& hal;
 
 // default boundaries
 #define AC_FENCE_ALT_MAX_DEFAULT                    100.0f  // default max altitude is 100m
-#define AC_FENCE_ALT_MIN_DEFAULT                    -10.0f  // default maximum depth in meters
+#define AC_FENCE_ALT_MIN_DEFAULT                    15.0f   // default maximum depth in meters
 #define AC_FENCE_CIRCLE_RADIUS_DEFAULT              300.0f  // default circular fence radius is 300m
 #define AC_FENCE_ALT_MAX_BACKUP_DISTANCE            20.0f   // after fence is broken we recreate the fence 20m further up
 #define AC_FENCE_ALT_MIN_BACKUP_DISTANCE            20.0f   // after fence is broken we recreate the fence 20m further down
