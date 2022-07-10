@@ -135,6 +135,7 @@ public:
         uint32_t    last_time_micros;          // time when voltage and current was last read in microseconds
         uint32_t    low_voltage_start_ms;      // time when voltage dropped below the minimum in milliseconds
         uint32_t    critical_voltage_start_ms; // critical voltage failsafe start timer in milliseconds
+        uint32_t    critical_current_start_ms; // critical current failsafe start timer in milliseconds
         float       temperature;               // battery temperature in degrees Celsius
 #if AP_TEMPERATURE_SENSOR_ENABLED
         bool        temperature_external_use;
