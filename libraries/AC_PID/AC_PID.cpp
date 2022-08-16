@@ -64,6 +64,27 @@ const AP_Param::GroupInfo AC_PID::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("SMAX", 12, AC_PID, _slew_rate_max, 0),
 
+    // @Param: NCF
+    // @DisplayName: Notch center frequency in Hz
+    // @Description: 
+    // @Range: 0.0 200.0
+    // @User: Advanced
+    AP_GROUPINFO("NCF", 13, AC_PID, _notch_center_freq, 0.0),
+
+    // @Param: NBW
+    // @DisplayName: Notch bandwidth in Hz
+    // @Description: 
+    // @Range: 0.0 200.0
+    // @User: Advanced
+    AP_GROUPINFO("NBW", 14, AC_PID, _notch_bandwidth, 0.0),
+
+    // @Param: NA
+    // @DisplayName: Notch attenuation in dB
+    // @Description: 
+    // @Range: 0.0 200.0
+    // @User: Advanced
+    AP_GROUPINFO("NA", 15, AC_PID, _notch_attenuation, 0.0),
+
     AP_GROUPEND
 };
 
@@ -138,9 +159,13 @@ float AC_PID::update_all(float target, float measurement, bool limit)
         return 0.0f;
     }
 
+    target = _target_notch.apply(target);
+
     // reset input filter to value received
     if (_flags._reset_filter) {
         _flags._reset_filter = false;
+        _target_notch.init(1.0 / _dt, _notch_center_freq, _notch_bandwidth, _notch_attenuation);
+        _target_notch.reset();
         _target = target;
         _error = _target - measurement;
         _derivative = 0.0f;
@@ -196,6 +221,8 @@ float AC_PID::update_error(float error, bool limit)
     // reset input filter to value received
     if (_flags._reset_filter) {
         _flags._reset_filter = false;
+        _target_notch.init(1.0 / _dt, _notch_center_freq, _notch_bandwidth, _notch_attenuation);
+        _target_notch.reset();
         _error = error;
         _derivative = 0.0f;
     } else {

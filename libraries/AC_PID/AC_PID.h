@@ -9,6 +9,7 @@
 #include <cmath>
 #include <AP_Logger/AP_Logger.h>
 #include <Filter/SlewLimiter.h>
+#include <Filter/NotchFilter.h>
 
 #define AC_PID_TFILT_HZ_DEFAULT  0.0f   // default input filter frequency
 #define AC_PID_EFILT_HZ_DEFAULT  0.0f   // default input filter frequency
@@ -22,7 +23,7 @@ public:
 
     // Constructor for PID
     AC_PID(float initial_p, float initial_i, float initial_d, float initial_ff, float initial_imax, float initial_filt_T_hz, float initial_filt_E_hz, float initial_filt_D_hz,
-           float dt, float initial_srmax=0, float initial_srtau=1.0);
+           float dt, float initial_srmax = 0, float initial_srtau = 1.0);
 
     CLASS_NO_COPY(AC_PID);
 
@@ -139,8 +140,12 @@ protected:
     AP_Float _filt_E_hz;         // PID error filter frequency in Hz
     AP_Float _filt_D_hz;         // PID derivative filter frequency in Hz
     AP_Float _slew_rate_max;
+    AP_Float _notch_center_freq;
+    AP_Float _notch_bandwidth;
+    AP_Float _notch_attenuation;
 
     SlewLimiter _slew_limiter{_slew_rate_max, _slew_rate_tau};
+    NotchFilterFloat _target_notch;
 
     // flags
     struct ac_pid_flags {
@@ -154,6 +159,7 @@ protected:
     float _error;             // error value to enable filtering
     float _derivative;        // derivative value to enable filtering
     int8_t _slew_limit_scale;
+
 
     AP_Logger::PID_Info _pid_info;
 };
