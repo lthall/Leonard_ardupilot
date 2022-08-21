@@ -1765,7 +1765,7 @@ bool ModeAuto::verify_payload_place()
 {
     const uint16_t hover_throttle_calibrate_time = 2000; // milliseconds
     const uint16_t descend_throttle_calibrate_time = 2000; // milliseconds
-    const float hover_throttle_placed_fraction = 0.7; // i.e. if throttle is less than 70% of hover we have placed
+    const float hover_throttle_placed_fraction = 0.5; // i.e. if throttle is less than 50% of hover we have placed
     const float descent_throttle_placed_fraction = 0.9; // i.e. if throttle is less than 90% of descent throttle we have placed
     const uint16_t placed_time = 500; // how long we have to be below a throttle threshold before considering placed
 
