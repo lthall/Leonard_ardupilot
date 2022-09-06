@@ -258,6 +258,8 @@ public:
 
         bool fixed_yaw_slew_finished() { return is_zero(_fixed_yaw_offset_cd); }
 
+        AC_AttitudeControl::HeadingCommand get_heading();
+
     private:
 
         float look_ahead_yaw();
@@ -282,8 +284,7 @@ public:
         float _look_ahead_yaw;
 
         // turn rate (in cds) when auto_yaw_mode is set to AUTO_YAW_RATE
-        float _yaw_angle_cd;
-        float _yaw_rate_cds;
+        AC_AttitudeControl::HeadingCommand _heading;
     };
     static AutoYaw auto_yaw;
 
@@ -762,7 +763,6 @@ protected:
 private:
 
     // Circle
-    bool pilot_yaw_override = false; // true if pilot is overriding yaw
     bool speed_changing = false;     // true when the roll stick is being held to facilitate stopping at 0 rate
 };
 

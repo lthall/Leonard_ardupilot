@@ -91,7 +91,7 @@ void Mode::AutoYaw::set_mode(autopilot_yaw_mode yaw_mode)
 
     case AUTO_YAW_RATE:
         // initialise target yaw rate to zero
-        _yaw_rate_cds = 0.0f;
+        _heading.yaw_rate_cds = 0.0f;
         break;
 
     case AUTO_YAW_CIRCLE:
@@ -105,15 +105,15 @@ void Mode::AutoYaw::set_fixed_yaw(float angle_deg, float turn_rate_ds, int8_t di
 {
     _last_update_ms = millis();
 
-    _yaw_angle_cd = copter.attitude_control->get_att_target_euler_cd().z;
-    _yaw_rate_cds = 0.0;
+    _heading.yaw_angle_cd = copter.attitude_control->get_att_target_euler_cd().z;
+    _heading.yaw_rate_cds = 0.0;
 
     // calculate final angle as relative to vehicle heading or absolute
     if (relative_angle) {
         _fixed_yaw_offset_cd = angle_deg * 100.0 * (direction >= 0 ? 1.0 : -1.0);
     } else {
         // absolute angle
-        _fixed_yaw_offset_cd = wrap_180_cd(angle_deg * 100.0 - _yaw_angle_cd);
+        _fixed_yaw_offset_cd = wrap_180_cd(angle_deg * 100.0 - _heading.yaw_angle_cd);
         if ( direction < 0 && is_positive(_fixed_yaw_offset_cd) ) {
             _fixed_yaw_offset_cd -= 36000.0;
         } else if ( direction > 0 && is_negative(_fixed_yaw_offset_cd) ) {
@@ -138,8 +138,8 @@ void Mode::AutoYaw::set_yaw_angle_rate(float yaw_angle_d, float yaw_rate_ds)
 {
     _last_update_ms = millis();
 
-    _yaw_angle_cd = yaw_angle_d * 100.0;
-    _yaw_rate_cds = yaw_rate_ds * 100.0;
+    _heading.yaw_angle_cd = yaw_angle_d * 100.0;
+    _heading.yaw_rate_cds = yaw_rate_ds * 100.0;
 
     // set yaw mode
     set_mode(AUTO_YAW_ANGLE_RATE);
@@ -188,7 +188,7 @@ void Mode::AutoYaw::set_roi(const Location &roi_location)
 void Mode::AutoYaw::set_rate(float turn_rate_cds)
 {
     set_mode(AUTO_YAW_RATE);
-    _yaw_rate_cds = turn_rate_cds;
+    _heading.yaw_rate_cds = turn_rate_cds;
 }
 
 // yaw - returns target heading depending upon auto_yaw.mode()
@@ -208,8 +208,8 @@ float Mode::AutoYaw::yaw()
         _last_update_ms = now_ms;
         float yaw_angle_step = constrain_float(_fixed_yaw_offset_cd, - dt * _fixed_yaw_slewrate_cds, dt * _fixed_yaw_slewrate_cds);
         _fixed_yaw_offset_cd -= yaw_angle_step;
-        _yaw_angle_cd += yaw_angle_step;
-        return _yaw_angle_cd;
+        _heading.yaw_angle_cd += yaw_angle_step;
+        return _heading.yaw_angle_cd;
     }
 
     case AUTO_YAW_LOOK_AHEAD:
@@ -233,8 +233,8 @@ float Mode::AutoYaw::yaw()
         const uint32_t now_ms = millis();
         float dt = (now_ms - _last_update_ms) * 0.001;
         _last_update_ms = now_ms;
-        _yaw_angle_cd += _yaw_rate_cds * dt;
-        return _yaw_angle_cd;
+        _heading.yaw_angle_cd += _heading.yaw_rate_cds * dt;
+        return _heading.yaw_angle_cd;
     }
 
     case AUTO_YAW_LOOK_AT_NEXT_WP:
@@ -261,7 +261,7 @@ float Mode::AutoYaw::rate_cds() const
 
     case AUTO_YAW_ANGLE_RATE:
     case AUTO_YAW_RATE:
-        return _yaw_rate_cds;
+        return _heading.yaw_rate_cds;
 
     case AUTO_YAW_LOOK_AT_NEXT_WP:
         return copter.pos_control->get_yaw_rate_cds();
@@ -269,4 +269,34 @@ float Mode::AutoYaw::rate_cds() const
 
     // return zero turn rate (this should never happen)
     return 0.0f;
+}
+
+AC_AttitudeControl::HeadingCommand Mode::AutoYaw::get_heading()
+{
+    // any loop updates could be done here
+
+    // target_yaw_rate could be an internal state
+    // process pilot's yaw input
+    float target_yaw_rate = 0;
+    if (!copter.failsafe.radio && copter.flightmode->use_pilot_yaw()) {
+        // get pilot's desired yaw rate
+        target_yaw_rate = copter.flightmode->get_pilot_desired_yaw_rate(copter.channel_yaw->norm_input_dz());
+        if (!is_zero(target_yaw_rate)) {
+            auto_yaw.set_mode(AUTO_YAW_HOLD);
+        }
+    }
+
+    // call attitude controller
+    if (auto_yaw.mode() == AUTO_YAW_HOLD) {
+        // roll & pitch from position controller, yaw rate from pilot
+        _heading.heading_mode = AC_AttitudeControl::HeadingMode::Rate_Only;
+        _heading.yaw_rate_cds = target_yaw_rate;
+    } else if (auto_yaw.mode() == AUTO_YAW_RATE) {
+        _heading.heading_mode = AC_AttitudeControl::HeadingMode::Rate_Only;
+    } else {
+        // roll & pitch from position controller, yaw heading from GCS or auto_heading()
+        _heading.heading_mode = AC_AttitudeControl::HeadingMode::Angle_And_Rate;
+    }
+
+    return _heading;
 }
