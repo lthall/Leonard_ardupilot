@@ -144,6 +144,7 @@ void ModeLand::nogps_run()
     }
 
     // call attitude controller
+// yaw controller update
     attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(target_roll, target_pitch, target_yaw_rate);
 }
 

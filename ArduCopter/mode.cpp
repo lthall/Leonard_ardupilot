@@ -727,6 +727,7 @@ void Mode::land_run_horizontal_control()
         }
     }
 
+// yaw controller update
     // call attitude controller
     if (auto_yaw.mode() == AUTO_YAW_HOLD) {
         // roll & pitch from waypoint controller, yaw rate from pilot
@@ -806,6 +807,7 @@ void Mode::precland_retry_position(const Vector3f &retry_pos)
 
     const Vector3f thrust_vector{pos_control->get_thrust_vector()};
 
+// yaw controller update
     // call attitude controller
     if (auto_yaw.mode() == AUTO_YAW_HOLD) {
         // roll & pitch from waypoint controller, yaw rate from pilot
