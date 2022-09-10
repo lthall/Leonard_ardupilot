@@ -157,6 +157,12 @@ public:
     // Run arming checks
     bool arming_checks(size_t buflen, char *buffer) const override;
 
+    // get_fwd_flt_coll - used for compound heli only
+    virtual float get_fwd_flt_coll() { return 0.0f; }
+
+    // get_transition_speed - used for compound heli only
+    virtual float get_transition_speed() { return 0.0f; }
+
     // var_info for holding Parameter information
     static const struct AP_Param::GroupInfo var_info[];
 

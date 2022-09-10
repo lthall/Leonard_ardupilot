@@ -95,6 +95,12 @@ public:
     // parameter_check - returns true if helicopter specific parameters are sensible, used for pre-arm check
     bool parameter_check(bool display_msg) const override;
 
+    // get_fwd_flt_coll
+    float get_fwd_flt_coll() override { return _coll_fwd_flt_pct; }
+
+    // get_transition_speed
+    float get_transition_speed() override { return _transition_speed; }
+
     // var_info
     static const struct AP_Param::GroupInfo var_info[];
 
@@ -139,7 +145,7 @@ protected:
     float _servo4_out = 0.0f;                   // output value sent to motor
     float _servo5_out = 0.0f;                   // output value sent to motor
     float _servo6_out = 0.0f;                   // output value sent to motor
-    float _boost_in;
+    float _coll_fwd_flt_pct;
 
     // parameters
     AP_Int16        _tail_type;                 // Tail type used: Servo, Servo with external gyro, direct drive variable pitch or direct drive fixed pitch
@@ -149,7 +155,9 @@ protected:
     AP_Int8         _flybar_mode;               // Flybar present or not.  Affects attitude controller used during ACRO flight mode
     AP_Int16        _direct_drive_tailspeed;    // Direct Drive VarPitch Tail ESC speed (0 ~ 1000)
     AP_Float        _yaw_offset;                // constant offset instead of mechanically adjusting for yaw in hover
-    AP_Float        _boost_flat_pitch;          // flat pitch point for propellers
+    AP_Float        _forward_flat_pitch;          // flat pitch point for propellers
+    AP_Float        _coll_fwd_flt_deg;          // collective setting for forward flight
+    AP_Float        _transition_speed;               // speed in m/s for control transition
 
     bool            _acro_tail = false;
 };

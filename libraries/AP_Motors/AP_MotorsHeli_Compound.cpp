@@ -138,20 +138,36 @@ const AP_Param::GroupInfo AP_MotorsHeli_Compound::var_info[] = {
     // @Param: YAW_OFFSET
     // @DisplayName: Yaw Offset
     // @Description: Allows for a constant input in yaw for hover yaw input
-    // @Range: 0 3000
-    // @Units: Centi-degrees
-    // @Increment: 1
-    // @User: Advanced
+    // @Range: -1 1
+    // @Increment: 0.01
+    // @User: Standard
     AP_GROUPINFO("YAW_OFFSET", 19, AP_MotorsHeli_Compound, _yaw_offset, 0.055),
 
     // @Param: FLAT_PITCH
-    // @DisplayName: BOOST FLAT PITCH
-    // @Description: Allow user to set point for flat pitch
-    // @Range: 0 4500
-    // @Units: Centi-degrees
+    // @DisplayName: PROPELLER FLAT PITCH
+    // @Description: Allow user to set point for flat pitch of forward facing propellers
+    // @Range: 0 1
+    // @Increment: 0.01
+    // @User: Standard
+    AP_GROUPINFO("FLAT_PITCH", 20, AP_MotorsHeli_Compound, _forward_flat_pitch, 0.44),
+
+    // @Param: TRANS_SPEED
+    // @DisplayName: Transition Speed
+    // @Description: Speed in m/s in which controls change
+    // @Range: 5 30
+    // @Units: m/s
     // @Increment: 1
-    // @User: Advanced
-    AP_GROUPINFO("FLAT_PITCH", 20, AP_MotorsHeli_Compound, _boost_flat_pitch, 0.44),
+    // @User: Standard
+    AP_GROUPINFO("TRANS_SPEED", 21, AP_MotorsHeli_Compound, _transition_speed, 8.0f),
+
+    // @Param: COLL_FWD_FLT
+    // @DisplayName: Collective Position in Forward Flight
+    // @Description: Speed in m/s in which controls change
+    // @Range: -4 2
+    // @Units: m/s
+    // @Increment: 1
+    // @User: Standard
+    AP_GROUPINFO("COLL_FWD_FLT", 22, AP_MotorsHeli_Compound, _coll_fwd_flt_deg, 0.0f),
 
     AP_GROUPEND
 };
@@ -235,6 +251,9 @@ bool AP_MotorsHeli_Compound::init_outputs()
     // yaw servo is an angle from -4500 to 4500
     SRV_Channels::set_angle(SRV_Channel::k_motor4, YAW_SERVO_MAX_ANGLE);
     SRV_Channels::set_angle(SRV_Channel::k_motor5, YAW_SERVO_MAX_ANGLE);
+
+    // initialize propeller pitch
+    _forward_in = _forward_flat_pitch;
 
     set_initialised_ok(_frame_class == MOTOR_FRAME_HELI_COMPOUND);
 
@@ -334,7 +353,6 @@ void AP_MotorsHeli_Compound::calculate_armed_scalars()
             _tail_rotor.set_autorotation_flag(_heliflags.in_autorotation);
         }
     }
-
 }
 
 // calculate_scalars - recalculates various scalers used.
@@ -350,12 +368,17 @@ void AP_MotorsHeli_Compound::calculate_scalars()
 
     _collective_land_min_deg.set(constrain_float(_collective_land_min_deg, _collective_min_deg, _collective_max_deg));
 
+    _coll_fwd_flt_deg.set(constrain_float(_coll_fwd_flt_deg, _collective_min_deg, _collective_max_deg));
+
     if (!is_equal((float)_collective_max_deg, (float)_collective_min_deg)) {
         // calculate collective zero thrust point as a number from 0 to 1
         _collective_zero_thrust_pct = (_collective_zero_thrust_deg-_collective_min_deg)/(_collective_max_deg-_collective_min_deg);
 
         // calculate collective land min point as a number from 0 to 1
         _collective_land_min_pct = (_collective_land_min_deg-_collective_min_deg)/(_collective_max_deg-_collective_min_deg);
+
+        // calculate collective forward flight point as a number from 0 to 1
+        _coll_fwd_flt_pct = (_coll_fwd_flt_deg-_collective_min_deg)/(_collective_max_deg-_collective_min_deg);
     } else {
         _collective_zero_thrust_pct = 0.0f;
         _collective_land_min_pct = 0.0f;
@@ -441,7 +464,6 @@ void AP_MotorsHeli_Compound::update_motor_control(RotorControlState state)
 void AP_MotorsHeli_Compound::move_actuators(float roll_out, float pitch_out, float coll_in, float yaw_out)
 {
     float yaw_offset = 0.0f;
-    _boost_in = 0.0f;
 
     // initialize limits flag
     limit.throttle_lower = false;
@@ -532,7 +554,7 @@ void AP_MotorsHeli_Compound::move_actuators(float roll_out, float pitch_out, flo
 // move_yaw
 void AP_MotorsHeli_Compound::move_yaw(float yaw_out)
 {
-    float boost_out;
+    float forward_out;
 
     // sanity check yaw_out
     if (yaw_out < -1.0f) {
@@ -544,10 +566,10 @@ void AP_MotorsHeli_Compound::move_yaw(float yaw_out)
         limit.yaw = true;
     }
 
-    boost_out = (2.0f - _boost_flat_pitch) * constrain_float(_boost_in, 0.0f, 1.0f);
+    forward_out = (2.0f - _forward_flat_pitch) * constrain_float(_forward_in, 0.0f, 1.0f);
 
-    _servo4_out = boost_out - 1.0f + _boost_flat_pitch + _yaw_offset + yaw_out;
-    _servo5_out = boost_out - 1.0f + _boost_flat_pitch - _yaw_offset - yaw_out;
+    _servo4_out = forward_out - 1.0f + _forward_flat_pitch + _yaw_offset + yaw_out;
+    _servo5_out = forward_out - 1.0f + _forward_flat_pitch - _yaw_offset - yaw_out;
 }
 
 void AP_MotorsHeli_Compound::output_to_motors()
