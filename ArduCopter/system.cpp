@@ -426,6 +426,12 @@ void Copter::allocate_motors(void)
             AP_Param::set_frame_type_flags(AP_PARAM_FRAME_HELI);
             break;
             
+        case AP_Motors::MOTOR_FRAME_HELI_COMPOUND:
+            motors = new AP_MotorsHeli_Compound(copter.scheduler.get_loop_rate_hz());
+            motors_var_info = AP_MotorsHeli_Compound::var_info;
+            AP_Param::set_frame_type_flags(AP_PARAM_FRAME_HELI);
+            break;
+
         case AP_Motors::MOTOR_FRAME_HELI:
         default:
             motors = new AP_MotorsHeli_Single(copter.scheduler.get_loop_rate_hz());
