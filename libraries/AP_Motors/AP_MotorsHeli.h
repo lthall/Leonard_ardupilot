@@ -163,6 +163,8 @@ public:
     // get_transition_speed - used for compound heli only
     virtual float get_transition_speed() { return 0.0f; }
 
+    const char* _get_frame() const { return _get_frame_string(); }
+
     // var_info for holding Parameter information
     static const struct AP_Param::GroupInfo var_info[];
 
