@@ -311,9 +311,6 @@ void ModeGuided::angle_control_start()
     guided_angle_state.climb_rate_cms = 0.0f;
     guided_angle_state.yaw_rate_cds = 0.0f;
     guided_angle_state.use_yaw_rate = false;
-
-    // pilot always controls yaw
-    auto_yaw.set_mode(AutoYaw::Mode::HOLD);
 }
 
 // set_destination - sets guided mode's target destination
@@ -835,6 +832,7 @@ void ModeGuided::pause_control_run()
 
     // call attitude controller
     attitude_control->input_thrust_vector_rate_heading(pos_control->get_thrust_vector(), 0.0);
+    attitude_control->input_thrust_vector_heading(pos_control->get_thrust_vector(), auto_yaw.get_heading());
 }
 
 // posvelaccel_control_run - runs the guided position, velocity and acceleration controller

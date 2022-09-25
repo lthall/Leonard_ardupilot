@@ -263,7 +263,6 @@ void ModeRTL::descent_start()
 void ModeRTL::descent_run()
 {
     Vector2f vel_correction;
-    float target_yaw_rate = 0.0f;
 
     // if not armed set throttle to zero and exit immediately
     if (is_disarmed_or_landed()) {
@@ -296,11 +295,6 @@ void ModeRTL::descent_run()
                 copter.ap.land_repo_active = true;
             }
         }
-
-        if (g.land_repositioning || use_pilot_yaw()) {
-            // get pilot's desired yaw rate
-            target_yaw_rate = get_pilot_desired_yaw_rate(channel_yaw->norm_input_dz());
-        }
     }
 
     // set motors to full range
@@ -316,7 +310,7 @@ void ModeRTL::descent_run()
     pos_control->update_z_controller();
 
     // roll & pitch from waypoint controller, yaw rate from pilot
-    attitude_control->input_thrust_vector_rate_heading(pos_control->get_thrust_vector(), target_yaw_rate);
+    attitude_control->input_thrust_vector_heading(pos_control->get_thrust_vector(), auto_yaw.get_heading());
 
     // check if we've reached within 20cm of final altitude
     _state_complete = labs(rtl_path.descent_target.alt - copter.current_loc.alt) < 20;

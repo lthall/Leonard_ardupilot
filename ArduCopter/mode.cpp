@@ -722,7 +722,6 @@ void Mode::land_run_horizontal_control()
 
     // call attitude controller
     attitude_control->input_thrust_vector_heading(thrust_vector, auto_yaw.get_heading());
-
 }
 
 // run normal or precision landing (if enabled)
@@ -786,10 +785,8 @@ void Mode::precland_retry_position(const Vector3f &retry_pos)
     pos_control->update_xy_controller();
     pos_control->update_z_controller();
 
-    const Vector3f thrust_vector{pos_control->get_thrust_vector()};
-
     // call attitude controller
-    attitude_control->input_thrust_vector_heading(thrust_vector, auto_yaw.get_heading());
+    attitude_control->input_thrust_vector_heading(pos_control->get_thrust_vector(), auto_yaw.get_heading());
 
 }
 
