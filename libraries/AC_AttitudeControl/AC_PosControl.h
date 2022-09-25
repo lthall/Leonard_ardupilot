@@ -231,7 +231,12 @@ public:
     ///     Kinematically consistent target position and desired velocity and accelerations should be provided before calling this function
     void update_z_controller();
 
+    ///
+    /// Vehicle specific force output
+    ///
 
+// this needs to be replaced with a generic attitude
+    void set_thrust_vector_rate_heading(float heading_rate_cds) const {_attitude_control.input_thrust_vector_rate_heading(get_thrust_vector(), heading_rate_cds, false); }
 
     ///
     /// Accessors
