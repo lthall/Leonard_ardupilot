@@ -189,10 +189,10 @@ void ModeRTL::climb_return_run()
     // call attitude controller
     if (auto_yaw.mode() == AUTO_YAW_HOLD) {
         // roll & pitch from waypoint controller, yaw rate from pilot
-        attitude_control->input_thrust_vector_rate_heading(wp_nav->get_thrust_vector(), target_yaw_rate);
+        attitude_control->input_thrust_vector_rate_heading(pos_control->get_thrust_vector(), target_yaw_rate);
     } else {
         // roll, pitch from waypoint controller, yaw heading from auto_heading()
-        attitude_control->input_thrust_vector_heading(wp_nav->get_thrust_vector(), auto_yaw.yaw());
+        attitude_control->input_thrust_vector_heading(pos_control->get_thrust_vector(), auto_yaw.yaw());
     }
 
     // check if we've completed this stage of RTL
@@ -247,10 +247,10 @@ void ModeRTL::loiterathome_run()
     // call attitude controller
     if (auto_yaw.mode() == AUTO_YAW_HOLD) {
         // roll & pitch from waypoint controller, yaw rate from pilot
-        attitude_control->input_thrust_vector_rate_heading(wp_nav->get_thrust_vector(), target_yaw_rate);
+        attitude_control->input_thrust_vector_rate_heading(pos_control->get_thrust_vector(), target_yaw_rate);
     } else {
         // roll, pitch from waypoint controller, yaw heading from auto_heading()
-        attitude_control->input_thrust_vector_heading(wp_nav->get_thrust_vector(), auto_yaw.yaw());
+        attitude_control->input_thrust_vector_heading(pos_control->get_thrust_vector(), auto_yaw.yaw());
     }
 
     // check if we've completed this stage of RTL
