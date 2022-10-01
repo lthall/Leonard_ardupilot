@@ -9,7 +9,7 @@ public:
     /// Constructor
     AC_PosControl_Multi_6DoF(AP_AHRS_View& ahrs,
                        const AP_InertialNav& inav,
-                       AP_Motors& motors,
+                       AP_MotorsMulticopter& motors,
                        AC_AttitudeControl& attitude_control,
                        float dt):
         AC_PosControl_Multi(ahrs,inav,motors,attitude_control,dt)
