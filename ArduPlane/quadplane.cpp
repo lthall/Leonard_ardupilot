@@ -749,6 +749,7 @@ bool QuadPlane::setup(void)
     motors->update_throttle_range();
     motors->set_update_rate(rc_speed);
     attitude_control->parameter_sanity_check();
+    pos_control->parameter_sanity_check();
 
     // Try to convert mot PWM params, if still invalid force conversion
     AP_Param::convert_old_parameters(&mot_pwm_conversion_table[0], ARRAY_SIZE(mot_pwm_conversion_table));
@@ -939,7 +940,7 @@ void QuadPlane::hold_stabilize(float throttle_in)
 
     if ((throttle_in <= 0) && !air_mode_active()) {
         set_desired_spool_state(AP_Motors::DesiredSpoolState::GROUND_IDLE);
-        attitude_control->set_throttle_out(0, true, 0);
+        pos_control->set_throttle_out(0, true, 0);
         relax_attitude_control();
     } else {
         set_desired_spool_state(AP_Motors::DesiredSpoolState::THROTTLE_UNLIMITED);
@@ -948,7 +949,7 @@ void QuadPlane::hold_stabilize(float throttle_in)
             // tailsitters in forward flight should not use angle boost
             should_boost = false;
         }
-        attitude_control->set_throttle_out(throttle_in, should_boost, 0);
+        pos_control->set_throttle_out(throttle_in, should_boost, 0);
     }
 }
 
@@ -3374,7 +3375,7 @@ void QuadPlane::Log_Write_QControl_Tuning()
     struct log_QControl_Tuning pkt = {
         LOG_PACKET_HEADER_INIT(LOG_QTUN_MSG),
         time_us             : AP_HAL::micros64(),
-        throttle_in         : attitude_control->get_throttle_in(),
+        throttle_in         : pos_control->get_throttle_in(),
         angle_boost         : attitude_control->angle_boost(),
         throttle_out        : motors->get_throttle(),
         throttle_hover      : motors->get_throttle_hover(),

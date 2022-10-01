@@ -66,7 +66,7 @@ void ModeAcro::run()
     }
 
     // output pilot's throttle without angle boost
-    attitude_control->set_throttle_out(pilot_desired_throttle, false, copter.g.throttle_filt);
+    pos_control->set_throttle_out(pilot_desired_throttle, false, copter.g.throttle_filt);
 }
 
 bool ModeAcro::init(bool ignore_checks)

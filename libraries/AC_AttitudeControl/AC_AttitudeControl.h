@@ -33,17 +33,12 @@
 
 #define AC_ATTITUDE_CONTROL_RATE_BF_FF_DEFAULT          1       // body-frame rate feedforward enabled by default
 
-#define AC_ATTITUDE_CONTROL_ANGLE_LIMIT_TC_DEFAULT      1.0f    // Time constant used to limit lean angle so that vehicle does not lose altitude
-#define AC_ATTITUDE_CONTROL_ANGLE_LIMIT_THROTTLE_MAX    0.8f    // Max throttle used to limit lean angle so that vehicle does not lose altitude
-
 #define AC_ATTITUDE_CONTROL_MIN_DEFAULT                 0.1f    // minimum throttle mix default
 #define AC_ATTITUDE_CONTROL_MAN_DEFAULT                 0.1f    // manual throttle mix default
 #define AC_ATTITUDE_CONTROL_MAX_DEFAULT                 0.5f    // maximum throttle mix default
 #define AC_ATTITUDE_CONTROL_MIN_LIMIT                   0.5f    // min throttle mix upper limit
 #define AC_ATTITUDE_CONTROL_MAN_LIMIT                   4.0f    // man throttle mix upper limit
 #define AC_ATTITUDE_CONTROL_MAX                         5.0f    // maximum throttle mix default
-
-#define AC_ATTITUDE_CONTROL_THR_MIX_DEFAULT             0.5f  // ratio controlling the max throttle output during competing requests of low throttle from the pilot (or autopilot) and higher throttle for attitude control.  Higher favours Attitude over pilot input
 
 class AC_AttitudeControl {
 public:
@@ -55,10 +50,7 @@ public:
         _p_angle_pitch(AC_ATTITUDE_CONTROL_ANGLE_P),
         _p_angle_yaw(AC_ATTITUDE_CONTROL_ANGLE_P),
         _dt(dt),
-        _angle_boost(0),
         _use_sqrt_controller(true),
-        _throttle_rpy_mix_desired(AC_ATTITUDE_CONTROL_THR_MIX_DEFAULT),
-        _throttle_rpy_mix(AC_ATTITUDE_CONTROL_THR_MIX_DEFAULT),
         _ahrs(ahrs),
         _aparm(aparm),
         _motors(motors)
@@ -280,25 +272,11 @@ public:
     // Enable or disable body-frame feed forward
     void accel_limiting(bool enable_or_disable);
 
-    // Update Alt_Hold angle maximum
-    virtual void update_althold_lean_angle_max(float throttle_in) = 0;
-
-    // Set output throttle
-    virtual void set_throttle_out(float throttle_in, bool apply_angle_boost, float filt_cutoff) = 0;
-
-    // get throttle passed into attitude controller (i.e. throttle_in provided to set_throttle_out)
-    float get_throttle_in() const { return _throttle_in; }
-
-    // Return throttle increase applied for tilt compensation
-    float angle_boost() const { return _angle_boost; }
-
-    // Return tilt angle limit for pilot input that prioritises altitude hold over lean angle
-    virtual float get_althold_lean_angle_max_cd() const;
-
     // Return configured tilt angle limit in centidegrees
     float lean_angle_max_cd() const { return _aparm.angle_max; }
 
-    // Return tilt angle in degrees
+    // Return tilt angle
+    float lean_angle_rad() const { return _thrust_angle; }
     float lean_angle_deg() const { return degrees(_thrust_angle); }
 
     // calculates the velocity correction from an angle error. The angular velocity has acceleration and
@@ -332,16 +310,6 @@ public:
 
     // sanity check parameters.  should be called once before take-off
     virtual void parameter_sanity_check() {}
-
-    // return true if the rpy mix is at lowest value
-    virtual bool is_throttle_mix_min() const { return true; }
-
-    // control rpy throttle mix
-    virtual void set_throttle_mix_min() {}
-    virtual void set_throttle_mix_man() {}
-    virtual void set_throttle_mix_max(float ratio) {}
-    virtual void set_throttle_mix_value(float value) {}
-    virtual float get_throttle_mix(void) const { return 0; }
 
     // enable use of flybass passthrough on heli
     virtual void use_flybar_passthrough(bool passthrough, bool tail_passthrough) {}
@@ -411,16 +379,10 @@ protected:
     // Enable/Disable body frame rate feed forward
     AP_Int8             _rate_bf_ff_enabled;
 
-    // Enable/Disable angle boost
-    AP_Int8             _angle_boost_enabled;
-
     // angle controller P objects
     AC_P                _p_angle_roll;
     AC_P                _p_angle_pitch;
     AC_P                _p_angle_yaw;
-
-    // Angle limit time constant (to maintain altitude)
-    AP_Float            _angle_limit_tc;
 
     // rate controller input smoothing time constant
     AP_Float            _input_tc;
@@ -468,25 +430,9 @@ protected:
     // The angle between the target thrust vector and the current thrust vector.
     float               _thrust_error_angle;
 
-    // throttle provided as input to attitude controller.  This does not include angle boost.
-    float               _throttle_in = 0.0f;
-
-    // This represents the throttle increase applied for tilt compensation.
-    // Used only for logging.
-    float               _angle_boost;
-
     // Specifies whether the attitude controller should use the square root controller in the attitude correction.
     // This is used during Autotune to ensure the P term is tuned without being influenced by the acceleration limit of the square root controller.
     bool                _use_sqrt_controller;
-
-    // Filtered Alt_Hold lean angle max - used to limit lean angle when throttle is saturated using Alt_Hold
-    float               _althold_lean_angle_max = 0.0f;
-
-    // desired throttle_low_comp value, actual throttle_low_comp is slewed towards this value over 1~2 seconds
-    float               _throttle_rpy_mix_desired;
-
-    // mix between throttle and hover throttle for 0 to 1 and ratio above hover throttle for >1
-    float               _throttle_rpy_mix;
 
     // Yaw feed forward percent to allow zero yaw actuator output during extreme roll and pitch corrections
     float               _feedforward_scalar = 1.0f;

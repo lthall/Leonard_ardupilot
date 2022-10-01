@@ -315,7 +315,7 @@ void Tailsitter::output(void)
 
                 // keep attitude control throttle level upto date, this value should never be output to motors
                 // it is used to re-set the accel Z integrator term allowing for a smooth transfer of control
-                quadplane.attitude_control->set_throttle_out(throttle, false, 0);
+                quadplane.pos_control->set_throttle_out(throttle, false, 0);
 
                 // convert the hover throttle to the same output that would result if used via AP_Motors
                 // apply expo, battery scaling and SPIN min/max.
@@ -801,7 +801,7 @@ void Tailsitter_Transition::update()
                                                                       plane.nav_pitch_cd,
                                                                       0);
         // set throttle at either hover throttle or current throttle, whichever is higher, through the transition
-        quadplane.attitude_control->set_throttle_out(MAX(motors->get_throttle_hover(),quadplane.attitude_control->get_throttle_in()), true, 0);
+        quadplane.pos_control->pos_control(MAX(motors->get_throttle_hover(),quadplane.pos_control->get_throttle_in()), true, 0);
         quadplane.motors_output();
         break;
     }

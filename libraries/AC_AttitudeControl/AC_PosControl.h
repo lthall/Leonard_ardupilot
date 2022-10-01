@@ -3,6 +3,8 @@
 #include <AP_Common/AP_Common.h>
 #include <AP_Param/AP_Param.h>
 #include <AP_Math/AP_Math.h>
+#include <AP_Vehicle/AP_Vehicle.h>
+#include <AP_Motors/AP_Motors.h>
 #include <AC_PID/AC_P.h>            // P library
 #include <AC_PID/AC_PID.h>          // PID library
 #include <AC_PID/AC_P_1D.h>         // P library (1-axis)
@@ -34,13 +36,17 @@
 
 #define POSCONTROL_RELAX_TC                     0.16f   // This is used to decay the I term to 5% in half a second.
 
+#define AC_ATTITUDE_CONTROL_ANGLE_LIMIT_TC_DEFAULT      1.0f    // Time constant used to limit lean angle so that vehicle does not lose altitude
+
+#define AC_ATTITUDE_CONTROL_THR_MIX_DEFAULT             0.5f  // ratio controlling the max throttle output during competing requests of low throttle from the pilot (or autopilot) and higher throttle for attitude control.  Higher favours Attitude over pilot input
+
 class AC_PosControl
 {
 public:
 
     /// Constructor
     AC_PosControl(AP_AHRS_View& ahrs, const AP_InertialNav& inav,
-                  const class AP_Motors& motors, AC_AttitudeControl& attitude_control, float dt);
+                  AP_Motors& motors, AC_AttitudeControl& attitude_control, float dt);
 
     /// get_dt - gets time delta in seconds for all position controllers
     float get_dt() const { return _dt; }
@@ -390,6 +396,34 @@ public:
     // get earth-frame Z-axis acceleration with gravity removed in cm/s/s with +ve being up
     float get_z_accel_cmss() const { return -(_ahrs.get_accel_ef().z + GRAVITY_MSS) * 100.0f; }
 
+    // Update Alt_Hold angle maximum
+    virtual void update_althold_lean_angle_max(float throttle_in) = 0;
+
+    // Set output throttle
+    virtual void set_throttle_out(float throttle_in, bool apply_angle_boost, float filt_cutoff) = 0;
+
+    // get throttle passed into attitude controller (i.e. throttle_in provided to set_throttle_out)
+    float get_throttle_in() const { return _throttle_in; }
+
+    // Return throttle increase applied for tilt compensation
+    float angle_boost() const { return _angle_boost; }
+
+    // Return tilt angle limit for pilot input that prioritises altitude hold over lean angle
+    virtual float get_althold_lean_angle_max_cd() const;
+
+    // return true if the rpy mix is at lowest value
+    virtual bool is_throttle_mix_min() const { return true; }
+
+    // control rpy throttle mix
+    virtual void set_throttle_mix_min() {}
+    virtual void set_throttle_mix_man() {}
+    virtual void set_throttle_mix_max(float ratio) {}
+    virtual void set_throttle_mix_value(float value) {}
+    virtual float get_throttle_mix(void) const { return 0; }
+
+    // sanity check parameters.  should be called once before take-off
+    virtual void parameter_sanity_check() {}
+
     static const struct AP_Param::GroupInfo var_info[];
 
 protected:
@@ -418,7 +452,7 @@ protected:
     // references to inertial nav and ahrs libraries
     AP_AHRS_View&           _ahrs;
     const AP_InertialNav&   _inav;
-    const class AP_Motors&        _motors;
+    AP_Motors&              _motors;
     AC_AttitudeControl&     _attitude_control;
 
     // parameters
@@ -472,6 +506,25 @@ protected:
 
     // angle max override, if zero then use ANGLE_MAX parameter
     float       _angle_max_override_cd;
+
+    // throttle provided as input to attitude controller.  This does not include angle boost.
+    float               _throttle_in = 0.0f;
+
+    // This represents the throttle increase applied for tilt compensation.
+    // Used only for logging.
+    float               _angle_boost;
+
+    // Filtered Alt_Hold lean angle max - used to limit lean angle when throttle is saturated using Alt_Hold
+    float               _althold_lean_angle_max = 0.0f;
+
+    // Angle limit time constant (to maintain altitude)
+    AP_Float            _angle_limit_tc;
+
+    // desired throttle_low_comp value, actual throttle_low_comp is slewed towards this value over 1~2 seconds
+    float               _throttle_rpy_mix_desired;
+
+    // mix between throttle and hover throttle for 0 to 1 and ratio above hover throttle for >1
+    float               _throttle_rpy_mix;
 
     // return true if on a real vehicle or SITL with lock-step scheduling
     bool has_good_timing(void) const;

@@ -131,13 +131,13 @@ void Copter::thrust_loss_check()
     }
 
     // check for throttle over 90% or throttle saturation
-    if ((attitude_control->get_throttle_in() < THRUST_LOSS_CHECK_MINIMUM_THROTTLE) && (!motors->limit.throttle_upper)) {
+    if ((pos_control->get_throttle_in() < THRUST_LOSS_CHECK_MINIMUM_THROTTLE) && (!motors->limit.throttle_upper)) {
         thrust_loss_counter = 0;
         return;
     }
 
     // check throttle is over 25% to prevent checks triggering from thrust limitations caused by low commanded throttle
-    if ((attitude_control->get_throttle_in() < 0.25f)) {
+    if ((pos_control->get_throttle_in() < 0.25f)) {
         thrust_loss_counter = 0;
         return;
     }

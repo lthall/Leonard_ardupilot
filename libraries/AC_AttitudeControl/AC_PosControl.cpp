@@ -1,8 +1,7 @@
-#include <AP_HAL/AP_HAL.h>
 #include "AC_PosControl.h"
+#include <AP_HAL/AP_HAL.h>
 #include <AP_Math/AP_Math.h>
 #include <AP_Logger/AP_Logger.h>
-#include <AP_Motors/AP_Motors.h>    // motors library
 #include <AP_Vehicle/AP_Vehicle.h>
 
 extern const AP_HAL::HAL& hal;
@@ -22,11 +21,12 @@ extern const AP_HAL::HAL& hal;
  # define POSCONTROL_ACC_Z_DT                   0.02f   // vertical acceleration controller dt default
  # define POSCONTROL_POS_XY_P                   0.5f    // horizontal position controller P gain default
  # define POSCONTROL_VEL_XY_P                   0.7f    // horizontal velocity controller P gain default
- # define POSCONTROL_VEL_XY_I                   0.35f    // horizontal velocity controller I gain default
+ # define POSCONTROL_VEL_XY_I                   0.35f   // horizontal velocity controller I gain default
  # define POSCONTROL_VEL_XY_D                   0.17f   // horizontal velocity controller D gain default
  # define POSCONTROL_VEL_XY_IMAX                1000.0f // horizontal velocity controller IMAX gain default
  # define POSCONTROL_VEL_XY_FILT_HZ             5.0f    // horizontal velocity controller input filter
  # define POSCONTROL_VEL_XY_FILT_D_HZ           5.0f    // horizontal velocity controller input filter for D
+ # define POSCONTROL_CONTROL_ANGLE_LIMIT_MIN    5.0     // Min lean angle so that vehicle can maintain limited control
 #elif APM_BUILD_TYPE(APM_BUILD_ArduSub)
  // default gains for Sub
  # define POSCONTROL_POS_Z_P                    3.0f    // vertical position controller P gain default
@@ -47,6 +47,7 @@ extern const AP_HAL::HAL& hal;
  # define POSCONTROL_VEL_XY_IMAX                1000.0f // horizontal velocity controller IMAX gain default
  # define POSCONTROL_VEL_XY_FILT_HZ             5.0f    // horizontal velocity controller input filter
  # define POSCONTROL_VEL_XY_FILT_D_HZ           5.0f    // horizontal velocity controller input filter for D
+ # define POSCONTROL_CONTROL_ANGLE_LIMIT_MIN    10.0    // Min lean angle so that vehicle can maintain limited control
 #else
  // default gains for Copter / TradHeli
  # define POSCONTROL_POS_Z_P                    1.0f    // vertical position controller P gain default
@@ -67,6 +68,7 @@ extern const AP_HAL::HAL& hal;
  # define POSCONTROL_VEL_XY_IMAX                1000.0f // horizontal velocity controller IMAX gain default
  # define POSCONTROL_VEL_XY_FILT_HZ             5.0f    // horizontal velocity controller input filter
  # define POSCONTROL_VEL_XY_FILT_D_HZ           5.0f    // horizontal velocity controller input filter for D
+ # define POSCONTROL_CONTROL_ANGLE_LIMIT_MIN    10.0    // Min lean angle so that vehicle can maintain limited control
 #endif
 
 // vibration compensation gains
@@ -292,6 +294,13 @@ const AP_Param::GroupInfo AC_PosControl::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("_JERK_Z", 11, AC_PosControl, _shaping_jerk_z, POSCONTROL_JERK_Z),
 
+    // @Param: ANG_LIM_TC
+    // @DisplayName: Angle Limit (to maintain altitude) Time Constant
+    // @Description: Angle Limit (to maintain altitude) Time Constant
+    // @Range: 0.5 10.0
+    // @User: Advanced
+    AP_GROUPINFO("ANG_LIM_TC", 12, AC_PosControl, _angle_limit_tc, AC_ATTITUDE_CONTROL_ANGLE_LIMIT_TC_DEFAULT),
+
     AP_GROUPEND
 };
 
@@ -300,7 +309,7 @@ const AP_Param::GroupInfo AC_PosControl::var_info[] = {
 // their values.
 //
 AC_PosControl::AC_PosControl(AP_AHRS_View& ahrs, const AP_InertialNav& inav,
-                             const AP_Motors& motors, AC_AttitudeControl& attitude_control, float dt) :
+                             AP_Motors& motors, AC_AttitudeControl& attitude_control, float dt) :
     _ahrs(ahrs),
     _inav(inav),
     _motors(motors),
@@ -317,7 +326,10 @@ AC_PosControl::AC_PosControl(AP_AHRS_View& ahrs, const AP_InertialNav& inav,
     _accel_max_z_cmss(POSCONTROL_ACCEL_Z),
     _accel_max_xy_cmss(POSCONTROL_ACCEL_XY),
     _jerk_max_xy_cmsss(POSCONTROL_JERK_XY * 100.0),
-    _jerk_max_z_cmsss(POSCONTROL_JERK_Z * 100.0)
+    _jerk_max_z_cmsss(POSCONTROL_JERK_Z * 100.0),
+    _angle_boost(0),
+    _throttle_rpy_mix_desired(AC_ATTITUDE_CONTROL_THR_MIX_DEFAULT),
+    _throttle_rpy_mix(AC_ATTITUDE_CONTROL_THR_MIX_DEFAULT)
 {
     AP_Param::setup_object_defaults(this, var_info);
 }
@@ -501,7 +513,7 @@ void AC_PosControl::init_xy_controller()
     }
 
     // limit acceleration using maximum lean angles
-    float angle_max = MIN(_attitude_control.get_althold_lean_angle_max_cd(), get_lean_angle_max_cd());
+    float angle_max = MIN(get_althold_lean_angle_max_cd(), get_lean_angle_max_cd());
     float accel_max = angle_to_accel(angle_max * 0.01) * 100.0;
     _accel_target.xy().limit_length(accel_max);
 
@@ -638,7 +650,7 @@ void AC_PosControl::update_xy_controller()
     // Acceleration Controller
 
     // limit acceleration using maximum lean angles
-    float angle_max = MIN(_attitude_control.get_althold_lean_angle_max_cd(), get_lean_angle_max_cd());
+    float angle_max = MIN(get_althold_lean_angle_max_cd(), get_lean_angle_max_cd());
     float accel_max = angle_to_accel(angle_max * 0.01) * 100;
     // Define the limit vector before we constrain _accel_target 
     _limit_vector.xy() = _accel_target.xy();
@@ -767,7 +779,7 @@ void AC_PosControl::init_z_controller()
     // Set accel PID I term based on the current throttle
     // Remove the expected P term due to _accel_desired.z being constrained to _accel_max_z_cmss
     // Remove the expected FF term due to non-zero _accel_target.z
-    _pid_accel_z.set_integrator((_attitude_control.get_throttle_in() - _motors.get_throttle_hover()) * 1000.0f
+    _pid_accel_z.set_integrator((get_throttle_in() - _motors.get_throttle_hover()) * 1000.0f
         - _pid_accel_z.kP() * (_accel_target.z - get_z_accel_cmss())
         - _pid_accel_z.ff() * _accel_target.z);
 
@@ -964,7 +976,7 @@ void AC_PosControl::update_z_controller()
     // Actuator commands
 
     // send throttle to attitude controller with angle boost
-    _attitude_control.set_throttle_out(thr_out, true, POSCONTROL_THROTTLE_CUTOFF_FREQ_HZ);
+    set_throttle_out(thr_out, true, POSCONTROL_THROTTLE_CUTOFF_FREQ_HZ);
 
     // Check for vertical controller health
 
@@ -1271,6 +1283,13 @@ void AC_PosControl::handle_ekf_z_reset()
 
         _ekf_z_reset_ms = reset_ms;
     }
+}
+
+// Return tilt angle limit for pilot input that prioritises altitude hold over lean angle
+float AC_PosControl::get_althold_lean_angle_max_cd() const
+{
+    // convert to centi-degrees for public interface
+    return MAX(ToDeg(_althold_lean_angle_max), POSCONTROL_CONTROL_ANGLE_LIMIT_MIN) * 100.0f;
 }
 
 bool AC_PosControl::pre_arm_checks(const char *param_prefix,

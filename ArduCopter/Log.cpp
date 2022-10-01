@@ -48,8 +48,8 @@ void Copter::Log_Write_Control_Tuning()
     struct log_Control_Tuning pkt = {
         LOG_PACKET_HEADER_INIT(LOG_CONTROL_TUNING_MSG),
         time_us             : AP_HAL::micros64(),
-        throttle_in         : attitude_control->get_throttle_in(),
-        angle_boost         : attitude_control->angle_boost(),
+        throttle_in         : pos_control->get_throttle_in(),
+        angle_boost         : pos_control->angle_boost(),
         throttle_out        : motors->get_throttle(),
         throttle_hover      : motors->get_throttle_hover(),
         desired_alt         : des_alt_m,

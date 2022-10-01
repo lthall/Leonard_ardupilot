@@ -1164,7 +1164,7 @@ void ModeAuto::nav_attitude_time_run()
     target_climb_rate_cms = get_avoidance_adjusted_climbrate(target_climb_rate_cms);
 
     // limit and scale lean angles
-    const float angle_limit_cd = MAX(1000.0f, MIN(copter.aparm.angle_max, attitude_control->get_althold_lean_angle_max_cd()));
+    const float angle_limit_cd = MAX(1000.0f, MIN(copter.aparm.angle_max, pos_control->get_althold_lean_angle_max_cd()));
     Vector2f target_rp_cd(nav_attitude_time.roll_deg * 100, nav_attitude_time.pitch_deg * 100);
     target_rp_cd.limit_length(angle_limit_cd);
 
