@@ -11,7 +11,7 @@ public:
     /// Constructor
     AC_PosControl_Heli(AP_AHRS_View& ahrs,
                        const AP_InertialNav& inav,
-                       AP_Motors& motors,
+                       AP_MotorsHeli& motors,
                        AC_AttitudeControl& attitude_control,
                        float dt):
         AC_PosControl(ahrs,inav,motors,attitude_control,dt)
