@@ -171,7 +171,7 @@ protected:
     ParametersG2 &g2;
     AC_WPNav *&wp_nav;
     AC_Loiter *&loiter_nav;
-    AC_PosControl *&pos_control;
+    AC_PosControl_t *&pos_control;
     AP_InertialNav &inertial_nav;
     AP_AHRS &ahrs;
     AC_AttitudeControl_t *&attitude_control;

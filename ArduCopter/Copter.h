@@ -44,7 +44,9 @@
 #include <AC_AttitudeControl/AC_AttitudeControl_Multi.h>        // Attitude control library
 #include <AC_AttitudeControl/AC_AttitudeControl_Multi_6DoF.h>   // 6DoF Attitude control library
 #include <AC_AttitudeControl/AC_AttitudeControl_Heli.h>         // Attitude control library for traditional helicopter
-#include <AC_AttitudeControl/AC_PosControl.h>                   // Position control library
+#include <AC_AttitudeControl/AC_PosControl_Multi.h>             // Position control library
+#include <AC_AttitudeControl/AC_PosControl_Multi_6DoF.h>             // Position control library
+#include <AC_AttitudeControl/AC_PosControl_Heli.h>              // Position control library
 #include <AC_AttitudeControl/AC_CommandModel.h>                 // Command model library
 #include <AP_Motors/AP_Motors.h>            // AP Motors library
 #include <AP_Stats/AP_Stats.h>              // statistics library
@@ -76,8 +78,10 @@
 
 #if FRAME_CONFIG == HELI_FRAME
     #define AC_AttitudeControl_t AC_AttitudeControl_Heli
+    #define AC_PosControl_t AC_PosControl_Heli
 #else
     #define AC_AttitudeControl_t AC_AttitudeControl_Multi
+    #define AC_PosControl_t AC_PosControl_Multi
 #endif
 
 #if FRAME_CONFIG == HELI_FRAME
@@ -464,7 +468,7 @@ private:
     // Attitude, Position and Waypoint navigation objects
     // To-Do: move inertial nav up or other navigation variables down here
     AC_AttitudeControl_t *attitude_control;
-    AC_PosControl *pos_control;
+    AC_PosControl_t *pos_control;
     AC_WPNav *wp_nav;
     AC_Loiter *loiter_nav;
 

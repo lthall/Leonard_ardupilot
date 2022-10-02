@@ -445,23 +445,27 @@ void Copter::allocate_motors(void)
     }
 
     const struct AP_Param::GroupInfo *ac_var_info;
+    const struct AP_Param::GroupInfo *pos_var_info;
 
 #if FRAME_CONFIG != HELI_FRAME
     if ((AP_Motors::motor_frame_class)g2.frame_class.get() == AP_Motors::MOTOR_FRAME_6DOF_SCRIPTING) {
 #if AP_SCRIPTING_ENABLED
         attitude_control = new AC_AttitudeControl_Multi_6DoF(*ahrs_view, aparm, *motors, scheduler.get_loop_period_s());
-        pos_control = new AC_PosControl_Multi_6DoF(*ahrs_view, inertial_nav, *motors, *attitude_control, scheduler.get_loop_period_s());
         ac_var_info = AC_AttitudeControl_Multi_6DoF::var_info;
+        pos_control = new AC_PosControl_Multi_6DoF(*ahrs_view, inertial_nav, *motors, *attitude_control, scheduler.get_loop_period_s());
+        pos_var_info = AC_PosControl_Multi_6DoF::var_info;
 #endif // AP_SCRIPTING_ENABLED
     } else {
         attitude_control = new AC_AttitudeControl_Multi(*ahrs_view, aparm, *motors, scheduler.get_loop_period_s());
-        pos_control = new AC_PosControl_Multi(*ahrs_view, inertial_nav, *motors, *attitude_control, scheduler.get_loop_period_s());
         ac_var_info = AC_AttitudeControl_Multi::var_info;
+        pos_control = new AC_PosControl_Multi(*ahrs_view, inertial_nav, *motors, *attitude_control, scheduler.get_loop_period_s());
+        pos_var_info = AC_PosControl_Multi::var_info;
     }
 #else
     attitude_control = new AC_AttitudeControl_Heli(*ahrs_view, aparm, *motors, scheduler.get_loop_period_s());
-    pos_control = new AC_PosControl_Heli(*ahrs_view, inertial_nav, *motors, *attitude_control, scheduler.get_loop_period_s());
     ac_var_info = AC_AttitudeControl_Heli::var_info;
+    pos_control = new AC_PosControl_Heli(*ahrs_view, inertial_nav, *motors, *attitude_control, scheduler.get_loop_period_s());
+    pos_var_info = AC_PosControl_Heli::var_info;
 #endif
     if (attitude_control == nullptr) {
         AP_BoardConfig::allocation_error("AttitudeControl");
@@ -471,7 +475,7 @@ void Copter::allocate_motors(void)
     if (pos_control == nullptr) {
         AP_BoardConfig::allocation_error("PosControl");
     }
-    AP_Param::load_object_from_eeprom(pos_control, pos_control->var_info);
+    AP_Param::load_object_from_eeprom(pos_control, pos_var_info);
 
 #if AC_OAPATHPLANNER_ENABLED == ENABLED
     wp_nav = new AC_WPNav_OA(inertial_nav, *ahrs_view, *pos_control, *attitude_control);
