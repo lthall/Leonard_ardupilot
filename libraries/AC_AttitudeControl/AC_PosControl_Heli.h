@@ -28,6 +28,8 @@ public:
     // calculate total body frame throttle required to produce the given earth frame throttle
     float get_throttle_boosted(float throttle_in);
 
+    // user settable parameters
+    static const struct AP_Param::GroupInfo var_info[];
 
 protected:
 

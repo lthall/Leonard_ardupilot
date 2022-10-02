@@ -2,9 +2,13 @@
 
 #include "AC_PosControl_Heli.h"
 
+// table of user settable parameters
+const AP_Param::GroupInfo AC_PosControl_Heli::var_info[] = {
+    // parameters from parent vehicle
+    AP_NESTEDGROUPINFO(AC_PosControl, 0),
 
-
-
+    AP_GROUPEND
+};
 
 //
 // throttle functions
