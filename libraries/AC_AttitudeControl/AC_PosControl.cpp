@@ -658,9 +658,7 @@ void AC_PosControl::update_xy_controller()
         // _accel_target was not limited so we can zero the xy limit vector
         _limit_vector.xy().zero();
     }
-
-    // update angle targets that will be passed to stabilize controller
-    accel_to_lean_angles(_accel_target.x, _accel_target.y, _roll_target, _pitch_target);
+    
     calculate_yaw_and_rate_yaw();
 }
 
@@ -743,10 +741,6 @@ void AC_PosControl::relax_z_controller(float throttle_setting)
 {
     // Initialise the position controller to the current position, velocity and acceleration.
     init_z_controller();
-
-    // init_z_controller has set the accel PID I term to generate the current throttle set point
-    // Use relax_integrator to decay the throttle set point to throttle_setting
-    _pid_accel_z.relax_integrator((throttle_setting - _motors.get_throttle_hover()) * 1000.0f, POSCONTROL_RELAX_TC);
 }
 
 /// init_z_controller - initialise the position controller to the current position, velocity, acceleration and attitude.
@@ -768,20 +762,12 @@ void AC_PosControl::init_z_controller()
     _accel_desired.z = constrain_float(get_z_accel_cmss(), -_accel_max_z_cmss, _accel_max_z_cmss);
     // with zero position error _accel_target = _accel_desired
     _accel_target.z = _accel_desired.z;
-    _pid_accel_z.reset_filter();
 
     // initialise vertical offsets
     _pos_offset_target_z = 0.0;
     _pos_offset_z = 0.0;
     _vel_offset_z = 0.0;
     _accel_offset_z = 0.0;
-
-    // Set accel PID I term based on the current throttle
-    // Remove the expected P term due to _accel_desired.z being constrained to _accel_max_z_cmss
-    // Remove the expected FF term due to non-zero _accel_target.z
-    _pid_accel_z.set_integrator((get_throttle_in() - _motors.get_throttle_hover()) * 1000.0f
-        - _pid_accel_z.kP() * (_accel_target.z - get_z_accel_cmss())
-        - _pid_accel_z.ff() * _accel_target.z);
 
     // initialise ekf z reset handler
     init_ekf_z_reset();
@@ -954,45 +940,6 @@ void AC_PosControl::update_z_controller()
 
     // add feed forward component
     _accel_target.z += _accel_desired.z;
-
-    // Acceleration Controller
-
-    // Calculate vertical acceleration
-    const float z_accel_meas = get_z_accel_cmss();
-
-    // ensure imax is always large enough to overpower hover throttle
-    if (_motors.get_throttle_hover() * 1000.0f > _pid_accel_z.imax()) {
-        _pid_accel_z.imax(_motors.get_throttle_hover() * 1000.0f);
-    }
-    float thr_out;
-    if (_vibe_comp_enabled) {
-        thr_out = get_throttle_with_vibration_override();
-    } else {
-        thr_out = _pid_accel_z.update_all(_accel_target.z, z_accel_meas, (_motors.limit.throttle_lower || _motors.limit.throttle_upper)) * 0.001f;
-        thr_out += _pid_accel_z.get_ff() * 0.001f;
-    }
-    thr_out += _motors.get_throttle_hover();
-
-    // Actuator commands
-
-    // send throttle to attitude controller with angle boost
-    set_throttle_out(thr_out, true, POSCONTROL_THROTTLE_CUTOFF_FREQ_HZ);
-
-    // Check for vertical controller health
-
-    // _speed_down_cms is checked to be non-zero when set
-    float error_ratio = _pid_vel_z.get_error() / _vel_max_down_cms;
-    _vel_z_control_ratio += _dt * 0.1f * (0.5 - error_ratio);
-    _vel_z_control_ratio = constrain_float(_vel_z_control_ratio, 0.0f, 2.0f);
-
-    // set vertical component of the limit vector
-    if (_motors.limit.throttle_upper) {
-        _limit_vector.z = 1.0f;
-    } else if (_motors.limit.throttle_lower) {
-        _limit_vector.z = -1.0f;
-    } else {
-        _limit_vector.z = 0.0f;
-    }
 }
 
 
@@ -1105,27 +1052,12 @@ int32_t AC_PosControl::get_bearing_to_target_cd() const
 /// System methods
 ///
 
-// get throttle using vibration-resistant calculation (uses feed forward with manually calculated gain)
-float AC_PosControl::get_throttle_with_vibration_override()
-{
-    const float thr_per_accelz_cmss = _motors.get_throttle_hover() / (GRAVITY_MSS * 100.0f);
-    // during vibration compensation use feed forward with manually calculated gain
-    // ToDo: clear pid_info P, I and D terms for logging
-    if (!(_motors.limit.throttle_lower || _motors.limit.throttle_upper) || ((is_positive(_pid_accel_z.get_i()) && is_negative(_pid_vel_z.get_error())) || (is_negative(_pid_accel_z.get_i()) && is_positive(_pid_vel_z.get_error())))) {
-        _pid_accel_z.set_integrator(_pid_accel_z.get_i() + _dt * thr_per_accelz_cmss * 1000.0f * _pid_vel_z.get_error() * _pid_vel_z.kP() * POSCONTROL_VIBE_COMP_I_GAIN);
-    }
-    return POSCONTROL_VIBE_COMP_P_GAIN * thr_per_accelz_cmss * _accel_target.z + _pid_accel_z.get_i() * 0.001f;
-}
-
 /// standby_xyz_reset - resets I terms and removes position error
 ///     This function will let Loiter and Alt Hold continue to operate
 ///     in the event that the flight controller is in control of the
 ///     aircraft when in standby.
 void AC_PosControl::standby_xyz_reset()
 {
-    // Set _pid_accel_z integrator to zero.
-    _pid_accel_z.set_integrator(0.0f);
-
     // Set the target position to the current pos.
     _pos_target = _inav.get_position_neu_cm().topostype();
 
@@ -1177,32 +1109,6 @@ float AC_PosControl::crosstrack_error() const
 ///
 /// private methods
 ///
-
-// get_lean_angles_to_accel - convert roll, pitch lean angles to NE frame accelerations in cm/s/s
-void AC_PosControl::accel_to_lean_angles(float accel_x_cmss, float accel_y_cmss, float& roll_target, float& pitch_target) const
-{
-    // rotate accelerations into body forward-right frame
-    const float accel_forward = accel_x_cmss * _ahrs.cos_yaw() + accel_y_cmss * _ahrs.sin_yaw();
-    const float accel_right = -accel_x_cmss * _ahrs.sin_yaw() + accel_y_cmss * _ahrs.cos_yaw();
-
-    // update angle targets that will be passed to stabilize controller
-    pitch_target = accel_to_angle(-accel_forward * 0.01) * 100;
-    float cos_pitch_target = cosf(pitch_target * M_PI / 18000.0f);
-    roll_target = accel_to_angle((accel_right * cos_pitch_target)*0.01) * 100;
-}
-
-// lean_angles_to_accel_xy - convert roll, pitch lean target angles to NE frame accelerations in cm/s/s
-// todo: this should be based on thrust vector attitude control
-void AC_PosControl::lean_angles_to_accel_xy(float& accel_x_cmss, float& accel_y_cmss) const
-{
-    // rotate our roll, pitch angles into lat/lon frame
-    Vector3f att_target_euler = _attitude_control.get_att_target_euler_rad();
-    att_target_euler.z = _ahrs.yaw;
-    Vector3f accel_cmss = lean_angles_to_accel(att_target_euler);
-
-    accel_x_cmss = accel_cmss.x;
-    accel_y_cmss = accel_cmss.y;
-}
 
 // calculate_yaw_and_rate_yaw - update the calculated the vehicle yaw and rate of yaw.
 bool AC_PosControl::calculate_yaw_and_rate_yaw()
@@ -1283,13 +1189,6 @@ void AC_PosControl::handle_ekf_z_reset()
 
         _ekf_z_reset_ms = reset_ms;
     }
-}
-
-// Return tilt angle limit for pilot input that prioritises altitude hold over lean angle
-float AC_PosControl::get_althold_lean_angle_max_cd() const
-{
-    // convert to centi-degrees for public interface
-    return MAX(ToDeg(_althold_lean_angle_max), POSCONTROL_CONTROL_ANGLE_LIMIT_MIN) * 100.0f;
 }
 
 bool AC_PosControl::pre_arm_checks(const char *param_prefix,
