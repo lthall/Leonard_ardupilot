@@ -426,16 +426,11 @@ public:
 
     static const struct AP_Param::GroupInfo var_info[];
 
+    // lean_angles_to_accel - convert roll, pitch lean angles to lat/lon frame accelerations in cm/s/s
+    // todo: this needs to be replaced with a genereric accessor for the starting target accelerations.
+    virtual void lean_angles_to_accel_xy(float& accel_x_cmss, float& accel_y_cmss) const;
+
 protected:
-
-    // get throttle using vibration-resistant calculation (uses feed forward with manually calculated gain)
-    float get_throttle_with_vibration_override();
-
-    // lean_angles_to_accel - convert roll, pitch lean angles to lat/lon frame accelerations in cm/s/s
-    void accel_to_lean_angles(float accel_x_cmss, float accel_y_cmss, float& roll_target, float& pitch_target) const;
-
-    // lean_angles_to_accel - convert roll, pitch lean angles to lat/lon frame accelerations in cm/s/s
-    void lean_angles_to_accel_xy(float& accel_x_cmss, float& accel_y_cmss) const;
 
     // calculate_yaw_and_rate_yaw - calculate the vehicle yaw and rate of yaw.
     bool calculate_yaw_and_rate_yaw();

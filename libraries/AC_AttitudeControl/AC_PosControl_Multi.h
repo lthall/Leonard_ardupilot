@@ -26,6 +26,27 @@ public:
     // calculate total body frame throttle required to produce the given earth frame throttle
     float get_throttle_boosted(float throttle_in);
 
+    /// update_xy_controller - runs the horizontal position controller correcting position, velocity and acceleration errors.
+    ///     Position and velocity errors are converted to velocity and acceleration targets using PID objects
+    ///     Desired velocity and accelerations are added to these corrections as they are calculated
+    ///     Kinematically consistent target position and desired velocity and accelerations should be provided before calling this function
+    void update_xy_controller();
+
+    // relax_z_controller - initialise the position controller to the current position and velocity with decaying acceleration.
+    ///     This function decays the output acceleration by 95% every half second to achieve a smooth transition to zero requested acceleration.
+    void relax_z_controller(float throttle_setting);
+
+    // init_z_controller - initialise the position controller to the current position, velocity, acceleration and attitude.
+    ///     This function is the default initialisation for any position control that provides position, velocity and acceleration.
+    ///     This function is private and contains all the shared z axis initialisation functions
+    void init_z_controller();
+
+    /// update_z_controller - runs the vertical position controller correcting position, velocity and acceleration errors.
+    ///     Position and velocity errors are converted to velocity and acceleration targets using PID objects
+    ///     Desired velocity and accelerations are added to these corrections as they are calculated
+    ///     Kinematically consistent target position and desired velocity and accelerations should be provided before calling this function
+    void update_z_controller();
+
     // Update Alt_Hold angle maximum
     void update_althold_lean_angle_max(float throttle_in) override;
 
@@ -41,11 +62,23 @@ public:
     // are we producing min throttle?
     bool is_throttle_mix_min() const override { return (_throttle_rpy_mix < 1.25f * _thr_mix_min); }
 
+    /// standby_xyz_reset - resets I terms and removes position error
+    ///     This function will let Loiter and Alt Hold continue to operate
+    ///     in the event that the flight controller is in control of the
+    ///     aircraft when in standby.
+    void standby_xyz_reset();
+
     // sanity check parameters.  should be called once before take-off
     void parameter_sanity_check() override;
 
     // user settable parameters
     static const struct AP_Param::GroupInfo var_info[];
+
+    // lean_angles_to_accel - convert roll, pitch lean angles to lat/lon frame accelerations in cm/s/s
+    void lean_angles_to_accel_xy(float& accel_x_cmss, float& accel_y_cmss) const override;
+
+    // Return tilt angle limit for pilot input that prioritises altitude hold over lean angle
+    float get_althold_lean_angle_max_cd() const override;
 
 protected:
 
@@ -54,6 +87,12 @@ protected:
 
     // get maximum value throttle can be raised to based on throttle vs attitude prioritisation
     float get_throttle_avg_max(float throttle_in);
+
+    // get throttle using vibration-resistant calculation (uses feed forward with manually calculated gain)
+    float get_throttle_with_vibration_override();
+
+    // lean_angles_to_accel - convert roll, pitch lean angles to lat/lon frame accelerations in cm/s/s
+    void accel_to_lean_angles(float accel_x_cmss, float accel_y_cmss, float& roll_target, float& pitch_target) const;
 
     AP_MotorsMulticopter& _motors_multi;
 

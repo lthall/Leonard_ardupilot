@@ -1,5 +1,20 @@
 #include "AC_PosControl_Multi.h"
 
+// vibration compensation gains
+#define POSCONTROL_VIBE_COMP_P_GAIN 0.250f
+#define POSCONTROL_VIBE_COMP_I_GAIN 0.125f
+
+#if APM_BUILD_TYPE(APM_BUILD_ArduPlane)
+ // default gains for Plane
+ # define POSCONTROL_CONTROL_ANGLE_LIMIT_MIN    5.0     // Min lean angle so that vehicle can maintain limited control
+#elif APM_BUILD_TYPE(APM_BUILD_ArduSub)
+ // default gains for Sub
+ # define POSCONTROL_CONTROL_ANGLE_LIMIT_MIN    10.0    // Min lean angle so that vehicle can maintain limited control
+#else
+ // default gains for Copter / TradHeli
+ # define POSCONTROL_CONTROL_ANGLE_LIMIT_MIN    10.0    // Min lean angle so that vehicle can maintain limited control
+#endif
+
 // table of user settable parameters
 const AP_Param::GroupInfo AC_PosControl_Multi::var_info[] = {
     // parameters from parent vehicle
@@ -73,22 +88,31 @@ float AC_PosControl_Multi::get_throttle_boosted(float throttle_in)
     return throttle_out;
 }
 
+/// update_xy_controller - runs the horizontal position controller correcting position, velocity and acceleration errors.
+///     Position and velocity errors are converted to velocity and acceleration targets using PID objects
+///     Desired velocity and accelerations are added to these corrections as they are calculated
+///     Kinematically consistent target position and desired velocity and accelerations should be provided before calling this function
+void AC_PosControl_Multi::update_xy_controller()
+{
+    AC_PosControl::update_xy_controller();
 
-
-void AC_PosControl::update_xy_controller()
-{    // update angle targets that will be passed to stabilize controller
+    // update angle targets that will be passed to stabilize controller
     accel_to_lean_angles(_accel_target.x, _accel_target.y, _roll_target, _pitch_target);
 }
 
-void AC_PosControl::relax_z_controller(float throttle_setting)
+void AC_PosControl_Multi::relax_z_controller(float throttle_setting)
 {
+    AC_PosControl::relax_z_controller(0.0f);
+
     // init_z_controller has set the accel PID I term to generate the current throttle set point
     // Use relax_integrator to decay the throttle set point to throttle_setting
     _pid_accel_z.relax_integrator((throttle_setting - _motors.get_throttle_hover()) * 1000.0f, POSCONTROL_RELAX_TC);
 }
 
-void AC_PosControl::init_z_controller()
+void AC_PosControl_Multi::init_z_controller()
 {
+    AC_PosControl::init_z_controller();
+
     _pid_accel_z.reset_filter();
 
     // Set accel PID I term based on the current throttle
@@ -99,8 +123,10 @@ void AC_PosControl::init_z_controller()
         - _pid_accel_z.ff() * _accel_target.z);
 }
 
-void AC_PosControl::update_z_controller()
+void AC_PosControl_Multi::update_z_controller()
 {
+    AC_PosControl::update_z_controller();
+
     // Acceleration Controller
 
     // Calculate vertical acceleration
@@ -141,9 +167,8 @@ void AC_PosControl::update_z_controller()
     }
 }
 
-
 // get throttle using vibration-resistant calculation (uses feed forward with manually calculated gain)
-float AC_PosControl::get_throttle_with_vibration_override()
+float AC_PosControl_Multi::get_throttle_with_vibration_override()
 {
     const float thr_per_accelz_cmss = _motors.get_throttle_hover() / (GRAVITY_MSS * 100.0f);
     // during vibration compensation use feed forward with manually calculated gain
@@ -154,14 +179,16 @@ float AC_PosControl::get_throttle_with_vibration_override()
     return POSCONTROL_VIBE_COMP_P_GAIN * thr_per_accelz_cmss * _accel_target.z + _pid_accel_z.get_i() * 0.001f;
 }
 
-void AC_PosControl::standby_xyz_reset()
+void AC_PosControl_Multi::standby_xyz_reset()
 {
+    AC_PosControl::standby_xyz_reset();
+
     // Set _pid_accel_z integrator to zero.
     _pid_accel_z.set_integrator(0.0f);
 }
 
 // get_lean_angles_to_accel - convert roll, pitch lean angles to NE frame accelerations in cm/s/s
-void AC_PosControl::accel_to_lean_angles(float accel_x_cmss, float accel_y_cmss, float& roll_target, float& pitch_target) const
+void AC_PosControl_Multi::accel_to_lean_angles(float accel_x_cmss, float accel_y_cmss, float& roll_target, float& pitch_target) const
 {
     // rotate accelerations into body forward-right frame
     const float accel_forward = accel_x_cmss * _ahrs.cos_yaw() + accel_y_cmss * _ahrs.sin_yaw();
@@ -175,7 +202,7 @@ void AC_PosControl::accel_to_lean_angles(float accel_x_cmss, float accel_y_cmss,
 
 // lean_angles_to_accel_xy - convert roll, pitch lean target angles to NE frame accelerations in cm/s/s
 // todo: this should be based on thrust vector attitude control
-void AC_PosControl::lean_angles_to_accel_xy(float& accel_x_cmss, float& accel_y_cmss) const
+void AC_PosControl_Multi::lean_angles_to_accel_xy(float& accel_x_cmss, float& accel_y_cmss) const
 {
     // rotate our roll, pitch angles into lat/lon frame
     Vector3f att_target_euler = _attitude_control.get_att_target_euler_rad();
@@ -247,7 +274,7 @@ void AC_PosControl_Multi::update_throttle_rpy_mix()
 }
 
 // Return tilt angle limit for pilot input that prioritises altitude hold over lean angle
-float AC_PosControl::get_althold_lean_angle_max_cd() const
+float AC_PosControl_Multi::get_althold_lean_angle_max_cd() const
 {
     // convert to centi-degrees for public interface
     return MAX(ToDeg(_althold_lean_angle_max), POSCONTROL_CONTROL_ANGLE_LIMIT_MIN) * 100.0f;

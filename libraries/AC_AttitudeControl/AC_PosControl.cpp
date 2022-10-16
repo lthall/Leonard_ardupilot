@@ -71,10 +71,6 @@ extern const AP_HAL::HAL& hal;
  # define POSCONTROL_CONTROL_ANGLE_LIMIT_MIN    10.0    // Min lean angle so that vehicle can maintain limited control
 #endif
 
-// vibration compensation gains
-#define POSCONTROL_VIBE_COMP_P_GAIN 0.250f
-#define POSCONTROL_VIBE_COMP_I_GAIN 0.125f
-
 const AP_Param::GroupInfo AC_PosControl::var_info[] = {
     // 0 was used for HOVER
 
@@ -741,6 +737,8 @@ void AC_PosControl::relax_z_controller(float throttle_setting)
 {
     // Initialise the position controller to the current position, velocity and acceleration.
     init_z_controller();
+
+    // todo: this should relax the velocity PID loop
 }
 
 /// init_z_controller - initialise the position controller to the current position, velocity, acceleration and attitude.
