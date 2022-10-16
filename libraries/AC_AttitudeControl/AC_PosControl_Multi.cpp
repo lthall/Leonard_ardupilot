@@ -187,6 +187,36 @@ void AC_PosControl_Multi::standby_xyz_reset()
     _pid_accel_z.set_integrator(0.0f);
 }
 
+// get_actuator_accel_target - convert aircraft current attitude and actuator settings to an expected acceleration
+Vector2f AC_PosControl_Multi::get_actuator_accel_target_xy() const
+{
+    Vector2f accel_target;
+    // limit acceleration using maximum lean angles
+    float angle_max = MIN(get_althold_lean_angle_max_cd(), get_lean_angle_max_cd());
+    float accel_max = angle_to_accel(angle_max * 0.01) * 100.0;
+    accel_target.limit_length(accel_max);
+    return accel_target;
+}
+
+// Return tilt angle limit for pilot input that prioritises altitude hold over lean angle
+float AC_PosControl_Multi::get_althold_lean_angle_max_cd() const
+{
+    // convert to centi-degrees for public interface
+    return MAX(ToDeg(_althold_lean_angle_max), POSCONTROL_CONTROL_ANGLE_LIMIT_MIN) * 100.0f;
+}
+
+// lean_angles_to_accel_xy - convert roll, pitch lean target angles to NE frame accelerations in cm/s/s
+// todo: this should be based on thrust vector attitude control
+Vector2f AC_PosControl_Multi::lean_angles_to_accel_xy() const
+{
+    // rotate our roll, pitch angles into lat/lon frame
+    Vector3f att_target_euler = _attitude_control.get_att_target_euler_rad();
+    att_target_euler.z = _ahrs.yaw;
+    Vector3f accel_cmss = lean_angles_to_accel(att_target_euler);
+
+    return accel_cmss.xy();
+}
+
 // get_lean_angles_to_accel - convert roll, pitch lean angles to NE frame accelerations in cm/s/s
 void AC_PosControl_Multi::accel_to_lean_angles(float accel_x_cmss, float accel_y_cmss, float& roll_target, float& pitch_target) const
 {
@@ -199,21 +229,6 @@ void AC_PosControl_Multi::accel_to_lean_angles(float accel_x_cmss, float accel_y
     float cos_pitch_target = cosf(pitch_target * M_PI / 18000.0f);
     roll_target = accel_to_angle((accel_right * cos_pitch_target)*0.01) * 100;
 }
-
-// lean_angles_to_accel_xy - convert roll, pitch lean target angles to NE frame accelerations in cm/s/s
-// todo: this should be based on thrust vector attitude control
-void AC_PosControl_Multi::lean_angles_to_accel_xy(float& accel_x_cmss, float& accel_y_cmss) const
-{
-    // rotate our roll, pitch angles into lat/lon frame
-    Vector3f att_target_euler = _attitude_control.get_att_target_euler_rad();
-    att_target_euler.z = _ahrs.yaw;
-    Vector3f accel_cmss = lean_angles_to_accel(att_target_euler);
-
-    accel_x_cmss = accel_cmss.x;
-    accel_y_cmss = accel_cmss.y;
-}
-
-
 
 // Update Alt_Hold angle maximum
 void AC_PosControl_Multi::update_althold_lean_angle_max(float throttle_in)
@@ -271,13 +286,6 @@ void AC_PosControl_Multi::update_throttle_rpy_mix()
         _throttle_rpy_mix = MIN(_throttle_rpy_mix, MAX(mix_used, _throttle_rpy_mix_desired));
     }
     _throttle_rpy_mix = constrain_float(_throttle_rpy_mix, 0.1f, AC_ATTITUDE_CONTROL_MAX);
-}
-
-// Return tilt angle limit for pilot input that prioritises altitude hold over lean angle
-float AC_PosControl_Multi::get_althold_lean_angle_max_cd() const
-{
-    // convert to centi-degrees for public interface
-    return MAX(ToDeg(_althold_lean_angle_max), POSCONTROL_CONTROL_ANGLE_LIMIT_MIN) * 100.0f;
 }
 
 // sanity check parameters.  should be called once before takeoff

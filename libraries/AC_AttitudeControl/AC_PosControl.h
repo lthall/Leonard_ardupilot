@@ -409,7 +409,7 @@ public:
     float angle_boost() const { return _angle_boost; }
 
     // Return tilt angle limit for pilot input that prioritises altitude hold over lean angle
-    virtual float get_althold_lean_angle_max_cd() const;
+    virtual float get_althold_lean_angle_max_cd() const = 0;
 
     // return true if the rpy mix is at lowest value
     virtual bool is_throttle_mix_min() const { return true; }
@@ -426,9 +426,8 @@ public:
 
     static const struct AP_Param::GroupInfo var_info[];
 
-    // lean_angles_to_accel - convert roll, pitch lean angles to lat/lon frame accelerations in cm/s/s
-    // todo: this needs to be replaced with a genereric accessor for the starting target accelerations.
-    virtual void lean_angles_to_accel_xy(float& accel_x_cmss, float& accel_y_cmss) const;
+    // get_actuator_accel_target - convert aircraft current attitude and actuator settings to an expected acceleration
+    virtual Vector2f get_actuator_accel_target_xy() const = 0;
 
 protected:
 

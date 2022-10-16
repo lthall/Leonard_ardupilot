@@ -505,13 +505,8 @@ void AC_PosControl::init_xy_controller()
     _accel_desired.xy().zero();
 
     if (!is_active_xy()) {
-        lean_angles_to_accel_xy(_accel_target.x, _accel_target.y);
+        _accel_target.xy() = get_actuator_accel_target_xy();
     }
-
-    // limit acceleration using maximum lean angles
-    float angle_max = MIN(get_althold_lean_angle_max_cd(), get_lean_angle_max_cd());
-    float accel_max = angle_to_accel(angle_max * 0.01) * 100.0;
-    _accel_target.xy().limit_length(accel_max);
 
     // initialise I terms from lean angles
     _pid_vel_xy.reset_filter();
@@ -1070,14 +1065,13 @@ void AC_PosControl::standby_xyz_reset()
 void AC_PosControl::write_log()
 {
     if (is_active_xy()) {
-        float accel_x, accel_y;
-        lean_angles_to_accel_xy(accel_x, accel_y);
+        Vector2f accel = get_actuator_accel_target_xy();
         AP::logger().Write_PSCN(get_pos_target_cm().x, _inav.get_position_neu_cm().x,
                                 get_vel_desired_cms().x, get_vel_target_cms().x, _inav.get_velocity_neu_cms().x,
-                                _accel_desired.x, get_accel_target_cmss().x, accel_x);
+                                _accel_desired.x, get_accel_target_cmss().x, accel.x);
         AP::logger().Write_PSCE(get_pos_target_cm().y, _inav.get_position_neu_cm().y,
                                 get_vel_desired_cms().y, get_vel_target_cms().y, _inav.get_velocity_neu_cms().y,
-                                _accel_desired.y, get_accel_target_cmss().y, accel_y);
+                                _accel_desired.y, get_accel_target_cmss().y, accel.y);
     }
 
     if (is_active_z()) {

@@ -74,13 +74,16 @@ public:
     // user settable parameters
     static const struct AP_Param::GroupInfo var_info[];
 
-    // lean_angles_to_accel - convert roll, pitch lean angles to lat/lon frame accelerations in cm/s/s
-    void lean_angles_to_accel_xy(float& accel_x_cmss, float& accel_y_cmss) const override;
+    // get_actuator_accel_target - convert aircraft current attitude and actuator settings to an expected acceleration
+    virtual Vector2f get_actuator_accel_target_xy() const override;
 
     // Return tilt angle limit for pilot input that prioritises altitude hold over lean angle
     float get_althold_lean_angle_max_cd() const override;
 
 protected:
+
+    // lean_angles_to_accel - convert roll, pitch lean angles to lat/lon frame accelerations in cm/s/s
+    Vector2f lean_angles_to_accel_xy() const;
 
     // update_throttle_rpy_mix - updates thr_low_comp value towards the target
     void update_throttle_rpy_mix();
