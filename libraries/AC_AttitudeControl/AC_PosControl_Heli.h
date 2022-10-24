@@ -28,6 +28,12 @@ public:
     // calculate total body frame throttle required to produce the given earth frame throttle
     float get_throttle_boosted(float throttle_in);
 
+    // Return tilt angle limit for pilot input that prioritises altitude hold over lean angle
+    float get_althold_lean_angle_max_cd() const override { return 0; }
+
+    // get_actuator_accel_target - convert aircraft current attitude and actuator settings to an expected acceleration
+    virtual Vector2f get_actuator_accel_target_xy() const override { Vector2f var2f; return var2f; }
+
     // user settable parameters
     static const struct AP_Param::GroupInfo var_info[];
 
