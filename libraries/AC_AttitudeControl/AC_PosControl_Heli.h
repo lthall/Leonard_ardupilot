@@ -61,6 +61,8 @@ public:
     ///     aircraft when in standby.
     void standby_xyz_reset();
 
+    void input_ned_accel_rate_heading(const Vector3f& ned_accel, float heading_rate_cds, bool slew_yaw=true) override;
+
     // user settable parameters
     static const struct AP_Param::GroupInfo var_info[];
 

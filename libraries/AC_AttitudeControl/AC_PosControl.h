@@ -429,6 +429,8 @@ public:
     // get_actuator_accel_target - convert aircraft current attitude and actuator settings to an expected acceleration
     virtual Vector2f get_actuator_accel_target_xy() const = 0;
 
+    virtual void input_ned_accel_rate_heading(const Vector3f& ned_accel, float heading_rate_cds, bool slew_yaw = true) {}
+
 protected:
 
     // calculate_yaw_and_rate_yaw - calculate the vehicle yaw and rate of yaw.

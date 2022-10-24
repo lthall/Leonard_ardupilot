@@ -178,3 +178,10 @@ void AC_PosControl_Heli::update_althold_lean_angle_max(float throttle_in)
     float althold_lean_angle_max = acosf(constrain_float(throttle_in / AC_ATTITUDE_HELI_ANGLE_LIMIT_THROTTLE_MAX, 0.0f, 1.0f));
     _althold_lean_angle_max = _althold_lean_angle_max + (_dt / (_dt + _angle_limit_tc)) * (althold_lean_angle_max - _althold_lean_angle_max);
 }
+
+void AC_PosControl_Heli::input_ned_accel_rate_heading(const Vector3f& ned_accel, float heading_rate_cds, bool slew_yaw)
+{
+
+    _attitude_control.input_thrust_vector_rate_heading(ned_accel, heading_rate_cds, slew_yaw);
+}
+
