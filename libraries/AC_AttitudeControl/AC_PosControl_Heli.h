@@ -4,6 +4,7 @@
 #include <AP_Motors/AP_MotorsHeli.h>
 
 #define AC_ATTITUDE_HELI_ANGLE_LIMIT_THROTTLE_MAX   0.95f    // Heli's use 95% of max collective before limiting frame angle
+#define AC_POSCON_HELI_COMPOUND_ACCEL_X_MAX       5.0f
 
 class AC_PosControl_Heli : public AC_PosControl {
 public:
@@ -63,6 +64,9 @@ public:
 
     void input_ned_accel_rate_heading(const Vector3f& ned_accel, float heading_rate_cds, bool slew_yaw=true) override;
 
+    // Set use forward flight collective flag
+    void set_use_ff_collective(bool ff_collective) { use_ff_collective = ff_collective; };
+
     // user settable parameters
     static const struct AP_Param::GroupInfo var_info[];
 
@@ -77,6 +81,9 @@ protected:
     // lean_angles_to_accel - convert roll, pitch lean angles to lat/lon frame accelerations in cm/s/s
     void accel_to_lean_angles(float accel_x_cmss, float accel_y_cmss, float& roll_target, float& pitch_target) const;
 
+    bool use_ff_collective;  // true if the forward flight collective is set
 
+    bool current_ff_flt_coll;  // holds current forward flight collective status
 
+    LowPassFilterFloat pitch_cd_lpf;
 };

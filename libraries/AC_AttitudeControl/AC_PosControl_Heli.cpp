@@ -22,6 +22,21 @@ const AP_Param::GroupInfo AC_PosControl_Heli::var_info[] = {
 
 void AC_PosControl_Heli::set_throttle_out(float throttle_in, bool apply_angle_boost, float filter_cutoff)
 {
+
+/* need to find home for this
+    float throttle_cutoff_freq_hz = POSCONTROL_THROTTLE_CUTOFF_FREQ_HZ;
+
+    if (strcmp(_motors_heli._get_frame(), "HELI_COMPOUND") == 0) {
+        if (use_ff_collective) {
+            // smoothly set collective to forward flight collective
+            thr_out = _motors_heli.get_fwd_flt_coll();
+            throttle_cutoff_freq_hz = 0.5f;
+        }
+    }
+    // send throttle to attitude controller with angle boost
+    _attitude_control.set_throttle_out(thr_out, true, throttle_cutoff_freq_hz);
+
+*/
     _throttle_in = throttle_in;
     update_althold_lean_angle_max(throttle_in);
     _motors.set_throttle_filter_cutoff(filter_cutoff);
@@ -182,6 +197,44 @@ void AC_PosControl_Heli::update_althold_lean_angle_max(float throttle_in)
 void AC_PosControl_Heli::input_ned_accel_rate_heading(const Vector3f& ned_accel, float heading_rate_cds, bool slew_yaw)
 {
 
-    _attitude_control.input_thrust_vector_rate_heading(ned_accel, heading_rate_cds, slew_yaw);
-}
+    bool print_gcs = false;
+    float pitch_cd = 0.0f;
 
+    if (current_ff_flt_coll != use_ff_collective) {
+        current_ff_flt_coll = use_ff_collective;
+        print_gcs = true;
+    }
+
+    if (strcmp(_motors_heli._get_frame(), "HELI_COMPOUND") == 0) {
+
+        // rotate accelerations into body forward-right frame
+        float accel_forward = ned_accel.x * _ahrs.cos_yaw() + ned_accel.y * _ahrs.sin_yaw();
+        float accel_right = -ned_accel.x * _ahrs.sin_yaw() + ned_accel.y * _ahrs.cos_yaw();
+
+        // update angle targets that will be passed to stabilize controller
+        float pitch_target = accel_to_angle(-accel_forward * 0.01) * 100;
+        float cos_pitch_target = cosf(pitch_target * M_PI / 18000.0f);
+        float roll_target = accel_to_angle((accel_right * cos_pitch_target)*0.01) * 100;
+
+        float accel_x_target = constrain_float(accel_forward / AC_POSCON_HELI_COMPOUND_ACCEL_X_MAX, -1.0f, 1.0f);
+        _motors_heli.set_forward(accel_x_target);
+        if (use_ff_collective) {
+            pitch_cd = constrain_float(_accel_target.z / 500.0f, -1.0f, 1.0f) * 3000.0f;
+            pitch_cd_lpf.reset(pitch_cd);
+        } else {
+            // smoothly set pitch_cd to zero
+            pitch_cd = pitch_cd_lpf.apply(0.0f, _dt);
+        }
+        _attitude_control.input_euler_angle_roll_pitch_euler_rate_yaw(roll_target, pitch_cd, heading_rate_cds);
+
+    } else {
+        _attitude_control.input_thrust_vector_rate_heading(ned_accel, heading_rate_cds, slew_yaw);
+    }
+    if (print_gcs) {
+        gcs().send_text(MAV_SEVERITY_NOTICE,"use ff coll; %s pitch_cd: %f", (use_ff_collective)?"true ":"false ", pitch_cd);
+        print_gcs = false;
+    }
+
+
+
+}
