@@ -23,20 +23,14 @@ const AP_Param::GroupInfo AC_PosControl_Heli::var_info[] = {
 void AC_PosControl_Heli::set_throttle_out(float throttle_in, bool apply_angle_boost, float filter_cutoff)
 {
 
-/* need to find home for this
-    float throttle_cutoff_freq_hz = POSCONTROL_THROTTLE_CUTOFF_FREQ_HZ;
-
     if (strcmp(_motors_heli._get_frame(), "HELI_COMPOUND") == 0) {
         if (use_ff_collective) {
             // smoothly set collective to forward flight collective
-            thr_out = _motors_heli.get_fwd_flt_coll();
-            throttle_cutoff_freq_hz = 0.5f;
+            throttle_in = _motors_heli.get_fwd_flt_coll();
+            filter_cutoff = 0.5f;
         }
     }
-    // send throttle to attitude controller with angle boost
-    _attitude_control.set_throttle_out(thr_out, true, throttle_cutoff_freq_hz);
 
-*/
     _throttle_in = throttle_in;
     update_althold_lean_angle_max(throttle_in);
     _motors.set_throttle_filter_cutoff(filter_cutoff);

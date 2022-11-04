@@ -15,7 +15,8 @@ public:
                        AP_MotorsHeli& motors,
                        AC_AttitudeControl& attitude_control,
                        float dt):
-        AC_PosControl(ahrs,inav,motors,attitude_control,dt)
+        AC_PosControl(ahrs,inav,motors,attitude_control,dt),
+        _motors_heli(motors)
         {
             AP_Param::setup_object_defaults(this, var_info);
         }
@@ -86,4 +87,7 @@ protected:
     bool current_ff_flt_coll;  // holds current forward flight collective status
 
     LowPassFilterFloat pitch_cd_lpf;
+
+    AP_MotorsHeli& _motors_heli;
+
 };
