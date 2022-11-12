@@ -577,6 +577,11 @@ public:
     void *mode_flowhold_ptr;
 #endif
 
+#if MODE_SHIP_OPS_ENABLED == ENABLED
+    // we need a pointer to the mode for the G2 table
+    void *mode_shipops_ptr;
+#endif
+    
 #if MODE_FOLLOW_ENABLED == ENABLED
     // follow
     AP_Follow follow;
@@ -674,6 +679,7 @@ public:
 #if HAL_WITH_ESC_TELEM && FRAME_CONFIG != HELI_FRAME
     AP_Int16 takeoff_rpm_min;
 #endif
+
 };
 
 extern const AP_Param::Info        var_info[];
