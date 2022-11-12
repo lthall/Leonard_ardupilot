@@ -225,8 +225,10 @@ void Mode::auto_takeoff_run()
     bool reached_climb_rate = copter.pos_control->get_vel_desired_cms().z < copter.pos_control->get_max_speed_up_cms() * 0.1;
     auto_takeoff_complete = reached_altitude && reached_climb_rate;
 
-    // calculate completion for location in case it is needed for a smooth transition to wp_nav
     if (auto_takeoff_complete) {
+        // reset vertical speed limits to default
+        pos_control->set_max_speed_accel_z(wp_nav->get_default_speed_down(), wp_nav->get_default_speed_up(), wp_nav->get_accel_z());
+        // calculate completion for location in case it is needed for a smooth transition to wp_nav
         const Vector3p& complete_pos = copter.pos_control->get_pos_target_cm();
         auto_takeoff_complete_pos = Vector3p{complete_pos.x, complete_pos.y, pos_z};
     }
@@ -244,6 +246,10 @@ void Mode::auto_takeoff_start(float complete_alt_cm, bool terrain_alt)
         auto_takeoff_no_nav_active = true;
     } else {
         auto_takeoff_no_nav_active = false;
+    }
+    // set climb rate to takeoff climb rate if non-zero
+    if (is_positive(copter.g2.takeoff_speed)) {
+            pos_control->set_max_speed_accel_z(wp_nav->get_default_speed_down(), copter.g2.takeoff_speed * 100.0, wp_nav->get_accel_z());
     }
 }
 

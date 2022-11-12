@@ -1160,6 +1160,14 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     AP_GROUPINFO("TKOFF_RPM_MIN", 58, ParametersG2, takeoff_rpm_min, 0),
 #endif
 
+    // @Param: TKOFF_SPEED
+    // @DisplayName: The climbe speed during takeoff in m/s
+    // @Description: The climbe speed during takeoff in m/s. Set to zero to use WP_Nav defaults.
+    // @Units: m/s
+    // @Range: 0.25 5.0
+    // @User: Standard
+    AP_GROUPINFO("TKOFF_SPEED", 59, ParametersG2, takeoff_speed, 2.0),
+
     // ID 62 is reserved for the SHOW_... parameters from the Skybrush fork at
     // https://github.com/skybrush-io/ardupilot
 
