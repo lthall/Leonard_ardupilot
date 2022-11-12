@@ -532,6 +532,7 @@ void RC_Channel::init_aux_function(const aux_func_t ch_option, const AuxSwitchPo
 #endif
     case AUX_FUNC::LOG_PAUSE:
     case AUX_FUNC::ARM_EMERGENCY_STOP:
+    case AUX_FUNC::TIE_DOWN_RELEASE:
 
         run_aux_function(ch_option, ch_flag, AuxFuncTriggerSource::INIT);
         break;

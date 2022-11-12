@@ -231,6 +231,7 @@ public:
         MOUNT_LOCK =         163, // Mount yaw lock vs follow
         LOG_PAUSE =          164, // Pauses logging if under logging rate control
         ARM_EMERGENCY_STOP = 165, // ARM on high, MOTOR_ESTOP on low
+        TIE_DOWN_RELEASE =   166, // Operate tie down release low=open, middle=auto, high=close
 
         // inputs from 200 will eventually used to replace RCMAP
         ROLL =               201, // roll input
