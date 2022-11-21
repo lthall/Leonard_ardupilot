@@ -1173,9 +1173,26 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     // @Path: mode_ship_ops.cpp
     AP_SUBGROUPPTR(mode_shipops_ptr, "SHIP_", 60, ParametersG2, ModeShipOperation),
 #endif
+
+    // @Param: PLDP_THRESH
+    // @DisplayName: Payload place thrust ratio to detect payload touchdown
+    // @Description: Ratio of vertical thrust during decent below which payload touchdown will trigger.
+    // @Range: 0.5 0.9
+    // @User: Standard
+    AP_GROUPINFO("PLDP_THRESH", 61, ParametersG2, descent_throttle_placed_fraction, 0.9),
+
+    // @Param: PLDP_RNG_MIN
+    // @DisplayName: Minimum range finder altitude in m to trigger payload touchdown
+    // @Description: Minimum range finder altitude in m to trigger payload touchdown, set to zero to dissable.
+    // @Units: m
+    // @Range: 0 to 100
+    // @User: Standard
+    AP_GROUPINFO("PLDP_RNG_MIN", 62, ParametersG2, range_finder_minimum, 0.0),
     
     // ID 62 is reserved for the SHOW_... parameters from the Skybrush fork at
     // https://github.com/skybrush-io/ardupilot
+    
+    // ID 63 is reserved for the SHIP_OPS
 
     AP_GROUPEND
 };

@@ -90,15 +90,13 @@ enum class AirMode {
 
 enum PayloadPlaceStateType {
     PayloadPlaceStateType_FlyToLocation,
-    PayloadPlaceStateType_Calibrating_Hover_Start,
-    PayloadPlaceStateType_Calibrating_Hover,
-    PayloadPlaceStateType_Descending_Start,
-    PayloadPlaceStateType_Descending,
+    PayloadPlaceStateType_Descent_Start,
+    PayloadPlaceStateType_Descent,
     PayloadPlaceStateType_Releasing_Start,
     PayloadPlaceStateType_Releasing,
     PayloadPlaceStateType_Released,
-    PayloadPlaceStateType_Ascending_Start,
-    PayloadPlaceStateType_Ascending,
+    PayloadPlaceStateType_Ascent_Start,
+    PayloadPlaceStateType_Ascent,
     PayloadPlaceStateType_Done,
 };
 

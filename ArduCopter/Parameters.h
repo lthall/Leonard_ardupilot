@@ -680,6 +680,8 @@ public:
     AP_Int16 takeoff_rpm_min;
 #endif
 
+    AP_Float descent_throttle_placed_fraction;
+    AP_Float range_finder_minimum;
 };
 
 extern const AP_Param::Info        var_info[];

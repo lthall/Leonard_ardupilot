@@ -611,10 +611,8 @@ private:
     State state = State::FlyToLocation;
 
     struct {
-        PayloadPlaceStateType state = PayloadPlaceStateType_Calibrating_Hover_Start; // records state of place (descending, releasing, released, ...)
-        uint32_t hover_start_timestamp; // milliseconds
-        float hover_throttle_level;
-        uint32_t descend_start_timestamp; // milliseconds
+        PayloadPlaceStateType state = PayloadPlaceStateType_Descent_Start; // records state of place (descending, releasing, released, ...)
+        uint32_t descent_established_timestamp; // milliseconds
         uint32_t place_start_timestamp; // milliseconds
         float descend_throttle_level;
         float descend_start_altitude;
