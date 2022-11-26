@@ -4,6 +4,8 @@
 #include <AP_Logger/AP_Logger.h>
 #include <AP_Motors/AP_Motors.h>    // motors library
 #include <AP_Vehicle/AP_Vehicle_Type.h>
+#include <AP_InertialSensor/AP_InertialSensor.h>
+#include <AP_Scheduler/AP_Scheduler.h>
 
 extern const AP_HAL::HAL& hal;
 
@@ -310,7 +312,6 @@ AC_PosControl::AC_PosControl(AP_AHRS_View& ahrs, const AP_InertialNav& inav,
     _pid_accel_z(POSCONTROL_ACC_Z_P, POSCONTROL_ACC_Z_I, POSCONTROL_ACC_Z_D, 0.0f, POSCONTROL_ACC_Z_IMAX, 0.0f, POSCONTROL_ACC_Z_FILT_HZ, 0.0f, dt),
     _p_pos_xy(POSCONTROL_POS_XY_P, dt),
     _pid_vel_xy(POSCONTROL_VEL_XY_P, POSCONTROL_VEL_XY_I, POSCONTROL_VEL_XY_D, 0.0f, POSCONTROL_VEL_XY_IMAX, POSCONTROL_VEL_XY_FILT_HZ, POSCONTROL_VEL_XY_FILT_D_HZ, dt),
-    _dt(dt),
     _vel_max_down_cms(POSCONTROL_SPEED_DOWN),
     _vel_max_up_cms(POSCONTROL_SPEED_UP),
     _vel_max_xy_cms(POSCONTROL_SPEED),
@@ -347,10 +348,10 @@ void AC_PosControl::input_pos_xyz(const Vector3p& pos, float pos_offset_z, float
     float accel_max_z_cmss = _accel_max_z_cmss * calculate_overspeed_gain();
     float jerk_max_z_cmsss = _jerk_max_z_cmsss * calculate_overspeed_gain();
 
-    update_pos_vel_accel_xy(_pos_target.xy(), _vel_desired.xy(), _accel_desired.xy(), _dt, _limit_vector.xy(), _p_pos_xy.get_error(), _pid_vel_xy.get_error());
+    update_pos_vel_accel_xy(_pos_target.xy(), _vel_desired.xy(), _accel_desired.xy(), get_dt(), _limit_vector.xy(), _p_pos_xy.get_error(), _pid_vel_xy.get_error());
 
     // adjust desired altitude if motors have not hit their limits
-    update_pos_vel_accel(_pos_target.z, _vel_desired.z, _accel_desired.z, _dt, _limit_vector.z, _p_pos_z.get_error(), _pid_vel_z.get_error());
+    update_pos_vel_accel(_pos_target.z, _vel_desired.z, _accel_desired.z, get_dt(), _limit_vector.z, _p_pos_z.get_error(), _pid_vel_z.get_error());
 
     // calculate the horizontal and vertical velocity limits to travel directly to the destination defined by pos
     float vel_max_xy_cms = 0.0f;
@@ -371,14 +372,14 @@ void AC_PosControl::input_pos_xyz(const Vector3p& pos, float pos_offset_z, float
     Vector2f vel;
     Vector2f accel;
     shape_pos_vel_accel_xy(pos.xy(), vel, accel, _pos_target.xy(), _vel_desired.xy(), _accel_desired.xy(),
-                           vel_max_xy_cms, _accel_max_xy_cmss, _jerk_max_xy_cmsss, _dt, false);
+                           vel_max_xy_cms, _accel_max_xy_cmss, _jerk_max_xy_cmsss, get_dt(), false);
 
     float posz = pos.z;
     shape_pos_vel_accel(posz, 0, 0,
                         _pos_target.z, _vel_desired.z, _accel_desired.z,
                         -vel_max_z_cms, vel_max_z_cms,
                         -constrain_float(accel_max_z_cmss, 0.0f, 750.0f), accel_max_z_cmss,
-                        jerk_max_z_cmsss, _dt, false);
+                        jerk_max_z_cmsss, get_dt(), false);
 
     // update the vertical position, velocity and acceleration offsets
     update_pos_offset_z(pos_offset_z);
@@ -458,7 +459,7 @@ void AC_PosControl::relax_velocity_controller_xy()
 {
     // decay acceleration and therefore current attitude target to zero
     // this will be reset by init_xy_controller() if !is_active_xy()
-    float decay = 1.0 - _dt / (_dt + POSCONTROL_RELAX_TC);
+    float decay = 1.0 - get_dt() / (get_dt() + POSCONTROL_RELAX_TC);
     _accel_target.xy() *= decay;
 
     init_xy_controller();
@@ -468,7 +469,7 @@ void AC_PosControl::relax_velocity_controller_xy()
 void AC_PosControl::soften_for_landing_xy()
 {
     // decay position error to zero
-    _pos_target.xy() += (_inav.get_position_xy_cm().topostype() - _pos_target.xy()) * (_dt / (_dt + POSCONTROL_RELAX_TC));
+    _pos_target.xy() += (_inav.get_position_xy_cm().topostype() - _pos_target.xy()) * (get_dt() / (get_dt() + POSCONTROL_RELAX_TC));
 
     // Prevent I term build up in xy velocity controller.
     // Note that this flag is reset on each loop in update_xy_controller()
@@ -515,7 +516,7 @@ void AC_PosControl::init_xy_controller()
     init_ekf_xy_reset();
 
     // initialise z_controller time out
-    _last_update_xy_us = AP_HAL::micros64();
+    _last_update_xy_us = AP::ins().get_last_update_usec();
 }
 
 /// input_accel_xy - calculate a jerk limited path from the current position, velocity and acceleration to an input acceleration.
@@ -528,8 +529,8 @@ void AC_PosControl::input_accel_xy(const Vector3f& accel)
     // check for ekf xy position reset
     handle_ekf_xy_reset();
 
-    update_pos_vel_accel_xy(_pos_target.xy(), _vel_desired.xy(), _accel_desired.xy(), _dt, _limit_vector.xy(), _p_pos_xy.get_error(), _pid_vel_xy.get_error());
-    shape_accel_xy(accel, _accel_desired, _jerk_max_xy_cmsss, _dt);
+    update_pos_vel_accel_xy(_pos_target.xy(), _vel_desired.xy(), _accel_desired.xy(), get_dt(), _limit_vector.xy(), _p_pos_xy.get_error(), _pid_vel_xy.get_error());
+    shape_accel_xy(accel, _accel_desired, _jerk_max_xy_cmsss, get_dt());
 }
 
 /// input_vel_accel_xy - calculate a jerk limited path from the current position, velocity and acceleration to an input velocity and acceleration.
@@ -539,12 +540,12 @@ void AC_PosControl::input_accel_xy(const Vector3f& accel)
 ///     The parameter limit_output specifies if the velocity and acceleration limits are applied to the sum of commanded and correction values or just correction.
 void AC_PosControl::input_vel_accel_xy(Vector2f& vel, const Vector2f& accel, bool limit_output)
 {
-    update_pos_vel_accel_xy(_pos_target.xy(), _vel_desired.xy(), _accel_desired.xy(), _dt, _limit_vector.xy(), _p_pos_xy.get_error(), _pid_vel_xy.get_error());
+    update_pos_vel_accel_xy(_pos_target.xy(), _vel_desired.xy(), _accel_desired.xy(), get_dt(), _limit_vector.xy(), _p_pos_xy.get_error(), _pid_vel_xy.get_error());
 
     shape_vel_accel_xy(vel, accel, _vel_desired.xy(), _accel_desired.xy(),
-        _accel_max_xy_cmss, _jerk_max_xy_cmsss, _dt, limit_output);
+        _accel_max_xy_cmss, _jerk_max_xy_cmsss, get_dt(), limit_output);
 
-    update_vel_accel_xy(vel, accel, _dt, Vector2f(), Vector2f());
+    update_vel_accel_xy(vel, accel, get_dt(), Vector2f(), Vector2f());
 }
 
 /// input_pos_vel_accel_xy - calculate a jerk limited path from the current position, velocity and acceleration to an input position velocity and acceleration.
@@ -554,12 +555,12 @@ void AC_PosControl::input_vel_accel_xy(Vector2f& vel, const Vector2f& accel, boo
 ///     The parameter limit_output specifies if the velocity and acceleration limits are applied to the sum of commanded and correction values or just correction.
 void AC_PosControl::input_pos_vel_accel_xy(Vector2p& pos, Vector2f& vel, const Vector2f& accel, bool limit_output)
 {
-    update_pos_vel_accel_xy(_pos_target.xy(), _vel_desired.xy(), _accel_desired.xy(), _dt, _limit_vector.xy(), _p_pos_xy.get_error(), _pid_vel_xy.get_error());
+    update_pos_vel_accel_xy(_pos_target.xy(), _vel_desired.xy(), _accel_desired.xy(), get_dt(), _limit_vector.xy(), _p_pos_xy.get_error(), _pid_vel_xy.get_error());
 
     shape_pos_vel_accel_xy(pos, vel, accel, _pos_target.xy(), _vel_desired.xy(), _accel_desired.xy(),
-                           _vel_max_xy_cms, _accel_max_xy_cmss, _jerk_max_xy_cmsss, _dt, limit_output);
+                           _vel_max_xy_cms, _accel_max_xy_cmss, _jerk_max_xy_cmsss, get_dt(), limit_output);
 
-    update_pos_vel_accel_xy(pos, vel, accel, _dt, Vector2f(), Vector2f(), Vector2f());
+    update_pos_vel_accel_xy(pos, vel, accel, get_dt(), Vector2f(), Vector2f(), Vector2f());
 }
 
 /// stop_pos_xy_stabilisation - sets the target to the current position to remove any position corrections from the system
@@ -583,10 +584,10 @@ void AC_PosControl::stop_vel_xy_stabilisation()
     _pid_vel_xy.reset_I();
 }
 
-// is_active_xy - returns true if the xy position controller has been run in the previous 5 loop times
+// is_active_xy - returns true if the xy position controller has bee n run in the previous 5 loop times
 bool AC_PosControl::is_active_xy() const
 {
-    return ((AP_HAL::micros64() - _last_update_xy_us) <= _dt * 5000000.0);
+    return ((AP::ins().get_last_update_usec() - _last_update_xy_us) <= get_dt()* 2000000.0);
 }
 
 /// update_xy_controller - runs the horizontal position controller correcting position, velocity and acceleration errors.
@@ -606,7 +607,7 @@ void AC_PosControl::update_xy_controller()
             INTERNAL_ERROR(AP_InternalError::error_t::flow_of_control);
         }
     }
-    _last_update_xy_us = AP_HAL::micros64();
+    _last_update_xy_us = AP::ins().get_last_update_usec();
 
     float ahrsGndSpdLimit, ahrsControlScaleXY;
     AP::ahrs().getControlLimits(ahrsGndSpdLimit, ahrsControlScaleXY);
@@ -775,7 +776,7 @@ void AC_PosControl::init_z_controller()
     init_ekf_z_reset();
 
     // initialise z_controller time out
-    _last_update_z_us = AP_HAL::micros64();
+    _last_update_z_us = AP::ins().get_last_update_usec();
 }
 
 /// input_vel_accel_z - calculate a jerk limited path from the current position, velocity and acceleration to an input velocity and acceleration.
@@ -788,9 +789,9 @@ void AC_PosControl::input_accel_z(float accel)
     float jerk_max_z_cmsss = _jerk_max_z_cmsss * calculate_overspeed_gain();
 
     // adjust desired alt if motors have not hit their limits
-    update_pos_vel_accel(_pos_target.z, _vel_desired.z, _accel_desired.z, _dt, _limit_vector.z, _p_pos_z.get_error(), _pid_vel_z.get_error());
+    update_pos_vel_accel(_pos_target.z, _vel_desired.z, _accel_desired.z, get_dt(), _limit_vector.z, _p_pos_z.get_error(), _pid_vel_z.get_error());
 
-    shape_accel(accel, _accel_desired.z, jerk_max_z_cmsss, _dt);
+    shape_accel(accel, _accel_desired.z, jerk_max_z_cmsss, get_dt());
 }
 
 /// input_accel_z - calculate a jerk limited path from the current position, velocity and acceleration to an input acceleration.
@@ -809,14 +810,14 @@ void AC_PosControl::input_vel_accel_z(float &vel, float accel, bool ignore_desce
     float jerk_max_z_cmsss = _jerk_max_z_cmsss * calculate_overspeed_gain();
 
     // adjust desired alt if motors have not hit their limits
-    update_pos_vel_accel(_pos_target.z, _vel_desired.z, _accel_desired.z, _dt, _limit_vector.z, _p_pos_z.get_error(), _pid_vel_z.get_error());
+    update_pos_vel_accel(_pos_target.z, _vel_desired.z, _accel_desired.z, get_dt(), _limit_vector.z, _p_pos_z.get_error(), _pid_vel_z.get_error());
 
     shape_vel_accel(vel, accel,
                     _vel_desired.z, _accel_desired.z,
                     -constrain_float(accel_max_z_cmss, 0.0f, 750.0f), accel_max_z_cmss,
-                    jerk_max_z_cmsss, _dt, limit_output);
+                    jerk_max_z_cmsss, get_dt(), limit_output);
 
-    update_vel_accel(vel, accel, _dt, 0.0, 0.0);
+    update_vel_accel(vel, accel, get_dt(), 0.0, 0.0);
 }
 
 /// set_pos_target_z_from_climb_rate_cm - adjusts target up or down using a commanded climb rate in cm/s
@@ -861,16 +862,16 @@ void AC_PosControl::input_pos_vel_accel_z(float &pos, float &vel, float accel, b
     float jerk_max_z_cmsss = _jerk_max_z_cmsss * calculate_overspeed_gain();
 
     // adjust desired altitude if motors have not hit their limits
-    update_pos_vel_accel(_pos_target.z, _vel_desired.z, _accel_desired.z, _dt, _limit_vector.z, _p_pos_z.get_error(), _pid_vel_z.get_error());
+    update_pos_vel_accel(_pos_target.z, _vel_desired.z, _accel_desired.z, get_dt(), _limit_vector.z, _p_pos_z.get_error(), _pid_vel_z.get_error());
 
     shape_pos_vel_accel(pos, vel, accel,
                         _pos_target.z, _vel_desired.z, _accel_desired.z,
                         _vel_max_down_cms, _vel_max_up_cms,
                         -constrain_float(accel_max_z_cmss, 0.0f, 750.0f), accel_max_z_cmss,
-                        jerk_max_z_cmsss, _dt, limit_output);
+                        jerk_max_z_cmsss, get_dt(), limit_output);
 
     postype_t posp = pos;
-    update_pos_vel_accel(posp, vel, accel, _dt, 0.0, 0.0, 0.0);
+    update_pos_vel_accel(posp, vel, accel, get_dt(), 0.0, 0.0, 0.0);
     pos = posp;
 }
 
@@ -885,9 +886,8 @@ void AC_PosControl::set_alt_target_with_slew(float pos)
 /// update_pos_offset_z - updates the vertical offsets used by terrain following
 void AC_PosControl::update_pos_offset_z(float pos_offset_z)
 {
-
     postype_t p_offset_z = _pos_offset_z;
-    update_pos_vel_accel(p_offset_z, _vel_offset_z, _accel_offset_z, _dt, MIN(_limit_vector.z, 0.0f), _p_pos_z.get_error(), _pid_vel_z.get_error());
+    update_pos_vel_accel(p_offset_z, _vel_offset_z, _accel_offset_z, get_dt(), MIN(_limit_vector.z, 0.0f), _p_pos_z.get_error(), _pid_vel_z.get_error());
     _pos_offset_z = p_offset_z;
 
     // input shape the terrain offset
@@ -895,13 +895,13 @@ void AC_PosControl::update_pos_offset_z(float pos_offset_z)
         _pos_offset_z, _vel_offset_z, _accel_offset_z,
         get_max_speed_down_cms(), get_max_speed_up_cms(),
         -get_max_accel_z_cmss(), get_max_accel_z_cmss(),
-        _jerk_max_z_cmsss, _dt, false);
+        _jerk_max_z_cmsss, get_dt(), false);
 }
 
 // is_active_z - returns true if the z position controller has been run in the previous 5 loop times
 bool AC_PosControl::is_active_z() const
 {
-    return ((AP_HAL::micros64() - _last_update_z_us) <= _dt * 5000000.0);
+    return ((AP::ins().get_last_update_usec() - _last_update_z_us) <= get_dt()* 2000000.0);
 }
 
 /// update_z_controller - runs the vertical position controller correcting position, velocity and acceleration errors.
@@ -921,7 +921,7 @@ void AC_PosControl::update_z_controller()
             INTERNAL_ERROR(AP_InternalError::error_t::flow_of_control);
         }
     }
-    _last_update_z_us = AP_HAL::micros64();
+    _last_update_z_us = AP::ins().get_last_update_usec();
 
     // calculate the target velocity correction
     float pos_target_zf = _pos_target.z;
@@ -970,7 +970,7 @@ void AC_PosControl::update_z_controller()
 
     // _speed_down_cms is checked to be non-zero when set
     float error_ratio = _pid_vel_z.get_error() / _vel_max_down_cms;
-    _vel_z_control_ratio += _dt * 0.1f * (0.5 - error_ratio);
+    _vel_z_control_ratio += get_dt() * 0.1f * (0.5 - error_ratio);
     _vel_z_control_ratio = constrain_float(_vel_z_control_ratio, 0.0f, 2.0f);
 
     // set vertical component of the limit vector
@@ -1100,7 +1100,7 @@ float AC_PosControl::get_throttle_with_vibration_override()
     // during vibration compensation use feed forward with manually calculated gain
     // ToDo: clear pid_info P, I and D terms for logging
     if (!(_motors.limit.throttle_lower || _motors.limit.throttle_upper) || ((is_positive(_pid_accel_z.get_i()) && is_negative(_pid_vel_z.get_error())) || (is_negative(_pid_accel_z.get_i()) && is_positive(_pid_vel_z.get_error())))) {
-        _pid_accel_z.set_integrator(_pid_accel_z.get_i() + _dt * thr_per_accelz_cmss * 1000.0f * _pid_vel_z.get_error() * _pid_vel_z.kP() * POSCONTROL_VIBE_COMP_I_GAIN);
+        _pid_accel_z.set_integrator(_pid_accel_z.get_i() + get_dt() * thr_per_accelz_cmss * 1000.0f * _pid_vel_z.get_error() * _pid_vel_z.kP() * POSCONTROL_VIBE_COMP_I_GAIN);
     }
     return POSCONTROL_VIBE_COMP_P_GAIN * thr_per_accelz_cmss * _accel_target.z + _pid_accel_z.get_i() * 0.001f;
 }

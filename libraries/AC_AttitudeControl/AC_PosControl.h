@@ -12,6 +12,8 @@
 #include <AC_PID/AC_PID_2D.h>       // PID library (2-axis)
 #include <AP_InertialNav/AP_InertialNav.h>  // Inertial Navigation library
 #include "AC_AttitudeControl.h"     // Attitude control library
+#include <AP_InertialSensor/AP_InertialSensor.h>
+#include <AP_Scheduler/AP_Scheduler.h>
 
 // position controller default definitions
 #define POSCONTROL_ACCEL_XY                     100.0f  // default horizontal acceleration in cm/s/s.  This is overwritten by waypoint and loiter controllers
@@ -42,7 +44,7 @@ public:
                   const class AP_Motors& motors, AC_AttitudeControl& attitude_control, float dt);
 
     /// get_dt - gets time delta in seconds for all position controllers
-    float get_dt() const { return _dt; }
+    float get_dt() const { return AP::scheduler().get_last_loop_time_s(); }
 
     /// get_shaping_jerk_xy_cmsss - gets the jerk limit of the xy kinematic path generation in cm/s/s/s
     float get_shaping_jerk_xy_cmsss() const { return _shaping_jerk_xy*100.0; }
@@ -417,7 +419,7 @@ protected:
     // references to inertial nav and ahrs libraries
     AP_AHRS_View&           _ahrs;
     const AP_InertialNav&   _inav;
-    const class AP_Motors&        _motors;
+    const class AP_Motors&  _motors;
     AC_AttitudeControl&     _attitude_control;
 
     // parameters
@@ -431,7 +433,6 @@ protected:
     AC_PID          _pid_accel_z;       // Z axis acceleration controller to convert desired acceleration to throttle output
 
     // internal variables
-    float       _dt;                    // time difference (in seconds) between calls from the main program
     uint64_t    _last_update_xy_us;     // system time (in microseconds) since last update_xy_controller call
     uint64_t    _last_update_z_us;      // system time (in microseconds) since last update_z_controller call
     float       _vel_max_xy_cms;        // max horizontal speed in cm/s used for kinematic shaping
