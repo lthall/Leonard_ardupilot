@@ -34,7 +34,7 @@ void ModeQAcro::run()
 {
     if (quadplane.throttle_wait) {
         quadplane.set_desired_spool_state(AP_Motors::DesiredSpoolState::GROUND_IDLE);
-        attitude_control->set_throttle_out(0, true, 0);
+        pos_control->set_throttle_out(0, true, 0);
         quadplane.relax_attitude_control();
     } else {
         quadplane.set_desired_spool_state(AP_Motors::DesiredSpoolState::THROTTLE_UNLIMITED);
@@ -62,7 +62,7 @@ void ModeQAcro::run()
         }
 
         // output pilot's throttle without angle boost
-        attitude_control->set_throttle_out(throttle_out, false, 10.0f);
+        pos_control->set_throttle_out(throttle_out, false, 10.0f);
     }
 }
 

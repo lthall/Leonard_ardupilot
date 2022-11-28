@@ -26,7 +26,7 @@ void ModeQHover::run()
 {
     if (quadplane.throttle_wait) {
         quadplane.set_desired_spool_state(AP_Motors::DesiredSpoolState::GROUND_IDLE);
-        attitude_control->set_throttle_out(0, true, 0);
+        pos_control->set_throttle_out(0, true, 0);
         quadplane.relax_attitude_control();
         pos_control->relax_z_controller(0);
     } else {

@@ -30,7 +30,7 @@ void ModeQLoiter::run()
 {
     if (quadplane.throttle_wait) {
         quadplane.set_desired_spool_state(AP_Motors::DesiredSpoolState::GROUND_IDLE);
-        attitude_control->set_throttle_out(0, true, 0);
+        pos_control->set_throttle_out(0, true, 0);
         quadplane.relax_attitude_control();
         pos_control->relax_z_controller(0);
         loiter_nav->clear_pilot_desired_acceleration();
@@ -60,7 +60,7 @@ void ModeQLoiter::run()
 
     // process pilot's roll and pitch input
     float target_roll_cd, target_pitch_cd;
-    quadplane.get_pilot_desired_lean_angles(target_roll_cd, target_pitch_cd, loiter_nav->get_angle_max_cd(), attitude_control->get_althold_lean_angle_max_cd());
+    quadplane.get_pilot_desired_lean_angles(target_roll_cd, target_pitch_cd, loiter_nav->get_angle_max_cd(), pos_control->get_althold_lean_angle_max_cd());
     loiter_nav->set_pilot_desired_acceleration(target_roll_cd, target_pitch_cd);
     
     // run loiter controller
