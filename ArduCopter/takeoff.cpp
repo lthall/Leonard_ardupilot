@@ -199,7 +199,7 @@ void Mode::auto_takeoff_run()
     pos_control->update_z_controller();
 
     // call attitude controller with auto yaw
-    attitude_control->input_thrust_vector_heading(pos_control->get_thrust_vector(), auto_yaw.get_heading());
+    pos_control->input_ned_accel_rate_heading(pos_control->get_thrust_vector(), auto_yaw.get_heading());
 
     // handle takeoff completion
     bool reached_altitude = (copter.pos_control->get_pos_target_z_cm() - auto_takeoff_start_alt_cm) >= ((auto_takeoff_complete_alt_cm + terr_offset - auto_takeoff_start_alt_cm) * 0.90);

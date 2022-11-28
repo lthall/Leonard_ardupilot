@@ -186,8 +186,8 @@ void ModeLoiter::run()
 #endif
 
         // call attitude controller
-        AC_AttitudeControl::HeadingCommand heading;
-        heading.heading_mode = AC_AttitudeControl::HeadingMode::Rate_Only;
+        AC_PosControl_Multi::Orientation heading;
+        heading.orientation_mode = AC_PosControl::OrientationMode::Rate_Only;
         heading.yaw_rate_cds = target_yaw_rate;
         pos_control->input_ned_accel_rate_heading(loiter_nav->get_thrust_vector(), heading);
 

@@ -723,7 +723,7 @@ void Mode::land_run_horizontal_control()
     }
 
     // call attitude controller
-    attitude_control->input_thrust_vector_heading(thrust_vector, auto_yaw.get_heading());
+    pos_control->input_ned_accel_rate_heading(thrust_vector, auto_yaw.get_heading());
 
 }
 
@@ -789,7 +789,7 @@ void Mode::precland_retry_position(const Vector3f &retry_pos)
     pos_control->update_z_controller();
 
     // call attitude controller
-    attitude_control->input_thrust_vector_heading(pos_control->get_thrust_vector(), auto_yaw.get_heading());
+    pos_control->input_ned_accel_rate_heading(pos_control->get_thrust_vector(), auto_yaw.get_heading());
 
 }
 

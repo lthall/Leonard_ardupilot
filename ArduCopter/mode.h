@@ -267,7 +267,7 @@ public:
 
         bool reached_fixed_yaw_target();
 
-        AC_AttitudeControl::HeadingCommand get_heading();
+        AC_PosControl::Orientation get_heading();
 
     private:
 
