@@ -365,13 +365,6 @@ void AC_AttitudeControl_Heli::rate_controller_run()
 
 }
 
-// Update Alt_Hold angle maximum
-void AC_AttitudeControl_Heli::update_althold_lean_angle_max(float throttle_in)
-{
-    float althold_lean_angle_max = acosf(constrain_float(throttle_in / AC_ATTITUDE_HELI_ANGLE_LIMIT_THROTTLE_MAX, 0.0f, 1.0f));
-    _althold_lean_angle_max = _althold_lean_angle_max + (_dt / (_dt + _angle_limit_tc)) * (althold_lean_angle_max - _althold_lean_angle_max);
-}
-
 //
 // private methods
 //
@@ -467,20 +460,6 @@ float AC_AttitudeControl_Heli::rate_target_to_motor_yaw(float rate_yaw_actual_ra
 
     // output to motors
     return yaw_out;
-}
-
-//
-// throttle functions
-//
-
-void AC_AttitudeControl_Heli::set_throttle_out(float throttle_in, bool apply_angle_boost, float filter_cutoff)
-{
-    _throttle_in = throttle_in;
-    update_althold_lean_angle_max(throttle_in);
-    _motors.set_throttle_filter_cutoff(filter_cutoff);
-    _motors.set_throttle(throttle_in);
-    // Clear angle_boost for logging purposes
-    _angle_boost = 0.0f;
 }
 
 // Command an euler roll and pitch angle and an euler yaw rate with angular velocity feedforward and smoothing

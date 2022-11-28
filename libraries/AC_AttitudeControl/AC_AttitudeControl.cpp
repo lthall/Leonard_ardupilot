@@ -7,11 +7,9 @@ extern const AP_HAL::HAL& hal;
 #if APM_BUILD_TYPE(APM_BUILD_ArduPlane)
  // default gains for Plane
  # define AC_ATTITUDE_CONTROL_INPUT_TC_DEFAULT  0.2f    // Soft
- #define AC_ATTITUDE_CONTROL_ANGLE_LIMIT_MIN     5.0     // Min lean angle so that vehicle can maintain limited control
 #else
  // default gains for Copter and Sub
  # define AC_ATTITUDE_CONTROL_INPUT_TC_DEFAULT  0.15f   // Medium
- #define AC_ATTITUDE_CONTROL_ANGLE_LIMIT_MIN     10.0   // Min lean angle so that vehicle can maintain limited control
 #endif
 
 AC_AttitudeControl *AC_AttitudeControl::_singleton;
@@ -71,13 +69,6 @@ const AP_Param::GroupInfo AC_AttitudeControl::var_info[] = {
 
     // IDs 8,9,10,11 RESERVED (in use on Solo)
 
-    // @Param: ANGLE_BOOST
-    // @DisplayName: Angle Boost
-    // @Description: Angle Boost increases output throttle as the vehicle leans to reduce loss of altitude
-    // @Values: 0:Disabled, 1:Enabled
-    // @User: Advanced
-    AP_GROUPINFO("ANGLE_BOOST", 12, AC_AttitudeControl, _angle_boost_enabled, 1),
-
     // @Param: ANG_RLL_P
     // @DisplayName: Roll axis angle controller P gain
     // @Description: Roll axis angle controller P gain.  Converts the error between the desired roll angle and actual angle to a desired roll rate
@@ -101,13 +92,6 @@ const AP_Param::GroupInfo AC_AttitudeControl::var_info[] = {
     // @Range{Sub}: 0.0 6.000
     // @User: Standard
     AP_SUBGROUPINFO(_p_angle_yaw, "ANG_YAW_", 15, AC_AttitudeControl, AC_P),
-
-    // @Param: ANG_LIM_TC
-    // @DisplayName: Angle Limit (to maintain altitude) Time Constant
-    // @Description: Angle Limit (to maintain altitude) Time Constant
-    // @Range: 0.5 10.0
-    // @User: Advanced
-    AP_GROUPINFO("ANG_LIM_TC", 16, AC_AttitudeControl, _angle_limit_tc, AC_ATTITUDE_CONTROL_ANGLE_LIMIT_TC_DEFAULT),
 
     // @Param: RATE_R_MAX
     // @DisplayName: Angular Velocity Max for Roll
@@ -1055,13 +1039,6 @@ void AC_AttitudeControl::accel_limiting(bool enable_limits)
         _accel_pitch_max.set(0.0f);
         _accel_yaw_max.set(0.0f);
     }
-}
-
-// Return tilt angle limit for pilot input that prioritises altitude hold over lean angle
-float AC_AttitudeControl::get_althold_lean_angle_max_cd() const
-{
-    // convert to centi-degrees for public interface
-    return MAX(ToDeg(_althold_lean_angle_max), AC_ATTITUDE_CONTROL_ANGLE_LIMIT_MIN) * 100.0f;
 }
 
 // Return roll rate step size in centidegrees/s that results in maximum output after 4 time steps

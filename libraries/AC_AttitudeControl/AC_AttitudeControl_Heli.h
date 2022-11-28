@@ -22,7 +22,6 @@
 #define AC_ATC_HELI_RATE_YAW_FF                     0.024f
 #define AC_ATC_HELI_RATE_YAW_FILT_HZ                20.0f
 
-#define AC_ATTITUDE_HELI_ANGLE_LIMIT_THROTTLE_MAX   0.95f    // Heli's use 95% of max collective before limiting frame angle
 #define AC_ATTITUDE_HELI_RATE_INTEGRATOR_LEAK_RATE  0.02f
 #define AC_ATTITUDE_HELI_RATE_RP_FF_FILTER          20.0f
 #define AC_ATTITUDE_HELI_RATE_Y_FF_FILTER          20.0f
@@ -70,9 +69,6 @@ public:
 	// should be called at 100hz or more
 	virtual void rate_controller_run() override;
 
-    // Update Alt_Hold angle maximum
-    void update_althold_lean_angle_max(float throttle_in) override;
-
 	// use_leaky_i - controls whether we use leaky i term for body-frame to motor output stage
 	void use_leaky_i(bool leaky_i) override {  _flags_heli.leaky_i = leaky_i; }
     
@@ -91,9 +87,6 @@ public:
 
     // get_roll_trim - angle in centi-degrees to be added to roll angle for learn hover collective. Used by helicopter to counter tail rotor thrust in hover
     float get_roll_trim_cd() override { return constrain_float(_hover_roll_trim_scalar * _hover_roll_trim, -1000.0f,1000.0f);}
-
-    // Set output throttle
-    void set_throttle_out(float throttle_in, bool apply_angle_boost, float filt_cutoff) override;
 
     // Command an euler roll and pitch angle and an euler yaw rate with angular velocity feedforward and smoothing
     void input_euler_angle_roll_pitch_euler_rate_yaw(float euler_roll_angle_cd, float euler_pitch_angle_cd, float euler_yaw_rate_cds) override;
