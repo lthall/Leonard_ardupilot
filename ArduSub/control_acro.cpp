@@ -27,7 +27,7 @@ void Sub::acro_run()
     // if not armed set throttle to zero and exit immediately
     if (!motors.armed()) {
         motors.set_desired_spool_state(AP_Motors::DesiredSpoolState::GROUND_IDLE);
-        attitude_control.set_throttle_out(0,true,g.throttle_filt);
+        pos_control.set_throttle_out(0,true,g.throttle_filt);
         attitude_control.relax_attitude_controllers();
         return;
     }
@@ -41,7 +41,7 @@ void Sub::acro_run()
     attitude_control.input_rate_bf_roll_pitch_yaw(target_roll, target_pitch, target_yaw);
 
     // output pilot's throttle without angle boost
-    attitude_control.set_throttle_out(channel_throttle->norm_input(), false, g.throttle_filt);
+    pos_control.pos_control(channel_throttle->norm_input(), false, g.throttle_filt);
 
     //control_in is range 0-1000
     //radio_in is raw pwm value
