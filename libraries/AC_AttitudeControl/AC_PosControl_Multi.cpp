@@ -311,8 +311,18 @@ void AC_PosControl_Multi::parameter_sanity_check()
     }
 }
 
-void AC_PosControl_Multi::input_ned_accel_rate_heading(const Vector3f& thrust_vector, AC_AttitudeControl::HeadingCommand heading)
+// Command a thrust vector and heading rate
+void AC_PosControl_Multi::input_ned_accel_rate_heading(const Vector3f& thrust_vector, Orientation heading)
 {
-    _attitude_control.input_thrust_vector_heading(thrust_vector, heading);
+    switch (heading.orientation_mode) {
+    case OrientationMode::Rate_Only:
+        _attitude_control.input_thrust_vector_rate_heading(thrust_vector, heading.yaw_rate_cds);
+        break;
+    case OrientationMode::Angle_Rate:
+        _attitude_control.input_thrust_vector_heading(thrust_vector, heading.yaw_angle_cd, heading.yaw_rate_cds);
+        break;
+    default:
+        _attitude_control.input_thrust_vector_rate_heading(thrust_vector, 0.0);
+    }
 }
 

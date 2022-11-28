@@ -63,7 +63,7 @@ public:
     ///     aircraft when in standby.
     void standby_xyz_reset();
 
-    void input_ned_accel_rate_heading(const Vector3f& thrust_vector, AC_AttitudeControl::HeadingCommand heading) override;
+    void input_ned_accel_rate_heading(const Vector3f& thrust_vector, Orientation heading) override;
 
     // Set use forward flight collective flag
     void set_use_ff_collective(bool ff_collective) { use_ff_collective = ff_collective; };

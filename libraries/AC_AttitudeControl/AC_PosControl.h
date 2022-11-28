@@ -428,7 +428,24 @@ public:
     // get_actuator_accel_target - convert aircraft current attitude and actuator settings to an expected acceleration
     virtual Vector2f get_actuator_accel_target_xy() const = 0;
 
-    virtual void input_ned_accel_rate_heading(const Vector3f& thrust_vector, AC_AttitudeControl::HeadingCommand heading) {}
+    // structure for angle and/or rate target
+    enum class OrientationMode {
+        Attitude_YawRate,
+        Angle_Rate,
+        Quaternion_Rate,
+        Rate_Only
+    };
+    struct Orientation {
+        Quaternion quaternion;
+        float roll_angle_cd;
+        float pitch_angle_cd;
+        float yaw_angle_cd;
+        float roll_rate_cds;
+        float pitch_rate_cds;
+        float yaw_rate_cds;
+        OrientationMode orientation_mode;
+    };
+    virtual void input_ned_accel_rate_heading(const Vector3f& thrust_vector, Orientation heading) {}
 
 protected:
 

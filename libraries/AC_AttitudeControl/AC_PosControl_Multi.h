@@ -68,7 +68,7 @@ public:
     ///     aircraft when in standby.
     void standby_xyz_reset();
 
-    void input_ned_accel_rate_heading(const Vector3f& thrust_vector, AC_AttitudeControl::HeadingCommand heading) override;
+    void input_ned_accel_rate_heading(const Vector3f& thrust_vector, Orientation heading) override;
 
     // sanity check parameters.  should be called once before take-off
     void parameter_sanity_check() override;

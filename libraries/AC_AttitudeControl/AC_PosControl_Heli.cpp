@@ -189,7 +189,7 @@ void AC_PosControl_Heli::update_althold_lean_angle_max(float throttle_in)
     _althold_lean_angle_max = _althold_lean_angle_max + (_dt / (_dt + _angle_limit_tc)) * (althold_lean_angle_max - _althold_lean_angle_max);
 }
 
-void AC_PosControl_Heli::input_ned_accel_rate_heading(const Vector3f& thrust_vector, AC_AttitudeControl::HeadingCommand heading)
+void AC_PosControl_Heli::input_ned_accel_rate_heading(const Vector3f& thrust_vector, Orientation heading)
 {
 
     bool print_gcs = false;
@@ -220,18 +220,27 @@ void AC_PosControl_Heli::input_ned_accel_rate_heading(const Vector3f& thrust_vec
             // smoothly set pitch_cd to zero
             pitch_cd = pitch_cd_lpf.apply(0.0f, _dt);
         }
-        switch (heading.heading_mode) {
-        case AC_AttitudeControl::HeadingMode::Rate_Only:
+        switch (heading.orientation_mode) {
+        case OrientationMode::Rate_Only:
             _attitude_control.input_euler_angle_roll_pitch_euler_rate_yaw(roll_target, pitch_cd, heading.yaw_rate_cds);
             break;
-        case AC_AttitudeControl::HeadingMode::Angle_Only:
-        case AC_AttitudeControl::HeadingMode::Angle_And_Rate:
+        case OrientationMode::Angle_Rate:
             _attitude_control.input_euler_angle_roll_pitch_yaw(roll_target, pitch_cd, heading.yaw_angle_cd, true);
             break;
+        default:
+            _attitude_control.input_euler_angle_roll_pitch_euler_rate_yaw(roll_target, pitch_cd, 0.0);
         }
-
     } else {
-        _attitude_control.input_thrust_vector_heading(thrust_vector, heading);
+        switch (heading.orientation_mode) {
+        case OrientationMode::Rate_Only:
+            _attitude_control.input_thrust_vector_rate_heading(thrust_vector, heading.yaw_rate_cds);
+            break;
+        case OrientationMode::Angle_Rate:
+            _attitude_control.input_thrust_vector_heading(thrust_vector, heading.yaw_angle_cd, heading.yaw_rate_cds);
+            break;
+        default:
+            _attitude_control.input_thrust_vector_rate_heading(thrust_vector, 0.0);
+        }
     }
     if (print_gcs) {
         gcs().send_text(MAV_SEVERITY_NOTICE,"use ff coll; %s pitch_cd: %f", (use_ff_collective)?"true ":"false ", pitch_cd);
