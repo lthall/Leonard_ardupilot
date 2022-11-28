@@ -83,7 +83,7 @@ void GCS_MAVLINK_Copter::send_attitude_target()
 {
     const Quaternion quat  = copter.attitude_control->get_attitude_target_quat();
     const Vector3f ang_vel = copter.attitude_control->get_attitude_target_ang_vel();
-    const float thrust = copter.attitude_control->get_throttle_in();
+    const float thrust = copter.pos_control->get_throttle_in();
 
     const float quat_out[4] {quat.q1, quat.q2, quat.q3, quat.q4};
 

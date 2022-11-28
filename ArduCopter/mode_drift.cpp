@@ -119,7 +119,7 @@ void ModeDrift::run()
 
     // output pilot's throttle with angle boost
     const float assisted_throttle = get_throttle_assist(vel.z, get_pilot_desired_throttle());
-    attitude_control->set_throttle_out(assisted_throttle, true, g.throttle_filt);
+    pos_control->set_throttle_out(assisted_throttle, true, g.throttle_filt);
 }
 
 // get_throttle_assist - return throttle output (range 0 ~ 1) based on pilot input and z-axis velocity

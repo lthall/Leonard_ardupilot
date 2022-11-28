@@ -262,9 +262,9 @@ void ModeSystemId::run()
 
     // output pilot's throttle
     if (copter.is_tradheli()) {
-        attitude_control->set_throttle_out(pilot_throttle_scaled, false, g.throttle_filt);
+        pos_control->set_throttle_out(pilot_throttle_scaled, false, g.throttle_filt);
     } else {
-        attitude_control->set_throttle_out(pilot_throttle_scaled, true, g.throttle_filt);
+        pos_control->set_throttle_out(pilot_throttle_scaled, true, g.throttle_filt);
     }
 
     if (log_subsample <= 0) {

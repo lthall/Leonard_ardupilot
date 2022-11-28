@@ -499,14 +499,14 @@ void Mode::zero_throttle_and_relax_ac(bool spool_up)
         motors->set_desired_spool_state(AP_Motors::DesiredSpoolState::GROUND_IDLE);
     }
     attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(0.0f, 0.0f, 0.0f);
-    attitude_control->set_throttle_out(0.0f, false, copter.g.throttle_filt);
+    pos_control->set_throttle_out(0.0f, false, copter.g.throttle_filt);
 }
 
 void Mode::zero_throttle_and_hold_attitude()
 {
     // run attitude controller
     attitude_control->input_rate_bf_roll_pitch_yaw(0.0f, 0.0f, 0.0f);
-    attitude_control->set_throttle_out(0.0f, false, copter.g.throttle_filt);
+    pos_control->set_throttle_out(0.0f, false, copter.g.throttle_filt);
 }
 
 // handle situations where the vehicle is on the ground waiting for takeoff
@@ -766,7 +766,7 @@ void Mode::precland_retry_position(const Vector3f &retry_pos)
             float target_roll = 0.0f;
             float target_pitch = 0.0f;
             // convert pilot input to lean angles
-            get_pilot_desired_lean_angles(target_roll, target_pitch, loiter_nav->get_angle_max_cd(), attitude_control->get_althold_lean_angle_max_cd());
+            get_pilot_desired_lean_angles(target_roll, target_pitch, loiter_nav->get_angle_max_cd(), pos_control->get_althold_lean_angle_max_cd());
 
             // record if pilot has overridden roll or pitch
             if (!is_zero(target_roll) || !is_zero(target_pitch)) {

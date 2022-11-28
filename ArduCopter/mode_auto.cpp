@@ -976,9 +976,7 @@ void ModeAuto::wp_run()
     // WP_Nav has set the vertical position control targets
     // run the vertical position controller and set output throttle
     pos_control->update_z_controller();
-
-    // call attitude controller with auto yaw
-    attitude_control->input_thrust_vector_heading(pos_control->get_thrust_vector(), auto_yaw.get_heading());
+    pos_control->input_ned_accel_rate_heading(pos_control->get_thrust_vector(), auto_yaw.get_heading());
 }
 
 // auto_land_run - lands in auto mode
@@ -1017,9 +1015,7 @@ void ModeAuto::circle_run()
     // WP_Nav has set the vertical position control targets
     // run the vertical position controller and set output throttle
     pos_control->update_z_controller();
-
-    // call attitude controller with auto yaw
-    attitude_control->input_thrust_vector_heading(pos_control->get_thrust_vector(), auto_yaw.get_heading());
+    pos_control->input_ned_accel_rate_heading(pos_control->get_thrust_vector(), auto_yaw.get_heading());
 }
 
 #if NAV_GUIDED == ENABLED || AP_SCRIPTING_ENABLED
@@ -1049,9 +1045,7 @@ void ModeAuto::loiter_run()
     copter.failsafe_terrain_set_status(wp_nav->update_wpnav());
 
     pos_control->update_z_controller();
-
-    // call attitude controller with auto yaw
-    attitude_control->input_thrust_vector_heading(pos_control->get_thrust_vector(), auto_yaw.get_heading());
+    pos_control->input_ned_accel_rate_heading(pos_control->get_thrust_vector(), auto_yaw.get_heading());
 }
 
 // auto_loiter_run - loiter to altitude in AUTO flight mode
@@ -1134,7 +1128,7 @@ void ModeAuto::nav_attitude_time_run()
     target_climb_rate_cms = get_avoidance_adjusted_climbrate(target_climb_rate_cms);
 
     // limit and scale lean angles
-    const float angle_limit_cd = MAX(1000.0f, MIN(copter.aparm.angle_max, attitude_control->get_althold_lean_angle_max_cd()));
+    const float angle_limit_cd = MAX(1000.0f, MIN(copter.aparm.angle_max, pos_control->get_althold_lean_angle_max_cd()));
     Vector2f target_rp_cd(nav_attitude_time.roll_deg * 100, nav_attitude_time.pitch_deg * 100);
     target_rp_cd.limit_length(angle_limit_cd);
 

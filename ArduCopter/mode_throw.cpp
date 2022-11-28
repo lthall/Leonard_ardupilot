@@ -123,7 +123,7 @@ void ModeThrow::run()
         // demand zero throttle (motors will be stopped anyway) and continually reset the attitude controller
         attitude_control->reset_yaw_target_and_rate();
         attitude_control->reset_rate_controller_I_terms();
-        attitude_control->set_throttle_out(0,true,g.throttle_filt);
+        pos_control->set_throttle_out(0,true,g.throttle_filt);
         break;
 
     case Throw_Detecting:
@@ -138,7 +138,7 @@ void ModeThrow::run()
         // Hold throttle at zero during the throw and continually reset the attitude controller
         attitude_control->reset_yaw_target_and_rate();
         attitude_control->reset_rate_controller_I_terms();
-        attitude_control->set_throttle_out(0,true,g.throttle_filt);
+        pos_control->set_throttle_out(0,true,g.throttle_filt);
 
         // Play the waiting for throw tone sequence to alert the user
         AP_Notify::flags.waiting_for_throw = true;
@@ -161,7 +161,7 @@ void ModeThrow::run()
         attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(0.0f, 0.0f, 0.0f);
 
         // output 50% throttle and turn off angle boost to maximise righting moment
-        attitude_control->set_throttle_out(0.5f, false, g.throttle_filt);
+        pos_control->set_throttle_out(0.5f, false, g.throttle_filt);
 
         break;
 

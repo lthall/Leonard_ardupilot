@@ -211,7 +211,7 @@ void ModeFlip::run()
     }
 
     // output pilot's throttle without angle boost
-    attitude_control->set_throttle_out(throttle_out, false, g.throttle_filt);
+    pos_control->set_throttle_out(throttle_out, false, g.throttle_filt);
 }
 
 #endif

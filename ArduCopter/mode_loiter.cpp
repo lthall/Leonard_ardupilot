@@ -15,7 +15,7 @@ bool ModeLoiter::init(bool ignore_checks)
         update_simple_mode();
 
         // convert pilot input to lean angles
-        get_pilot_desired_lean_angles(target_roll, target_pitch, loiter_nav->get_angle_max_cd(), attitude_control->get_althold_lean_angle_max_cd());
+        get_pilot_desired_lean_angles(target_roll, target_pitch, loiter_nav->get_angle_max_cd(), pos_control->get_althold_lean_angle_max_cd());
 
         // process pilot's roll and pitch input
         loiter_nav->set_pilot_desired_acceleration(target_roll, target_pitch);
@@ -96,7 +96,7 @@ void ModeLoiter::run()
         update_simple_mode();
 
         // convert pilot input to lean angles
-        get_pilot_desired_lean_angles(target_roll, target_pitch, loiter_nav->get_angle_max_cd(), attitude_control->get_althold_lean_angle_max_cd());
+        get_pilot_desired_lean_angles(target_roll, target_pitch, loiter_nav->get_angle_max_cd(), pos_control->get_althold_lean_angle_max_cd());
 
         // process pilot's roll and pitch input
         loiter_nav->set_pilot_desired_acceleration(target_roll, target_pitch);
@@ -186,7 +186,10 @@ void ModeLoiter::run()
 #endif
 
         // call attitude controller
-        attitude_control->input_thrust_vector_rate_heading(loiter_nav->get_thrust_vector(), target_yaw_rate, false);
+        AC_AttitudeControl::HeadingCommand heading;
+        heading.heading_mode = AC_AttitudeControl::HeadingMode::Rate_Only;
+        heading.yaw_rate_cds = target_yaw_rate;
+        pos_control->input_ned_accel_rate_heading(loiter_nav->get_thrust_vector(), heading);
 
         // get avoidance adjusted climb rate
         target_climb_rate = get_avoidance_adjusted_climbrate(target_climb_rate);

@@ -116,6 +116,7 @@ void Copter::init_ardupilot()
 #endif
 
     attitude_control->parameter_sanity_check();
+    pos_control->parameter_sanity_check();
 
 #if AP_OPTICALFLOW_ENABLED
     // initialise optical flow sensor
@@ -425,6 +426,12 @@ void Copter::allocate_motors(void)
             AP_Param::set_frame_type_flags(AP_PARAM_FRAME_HELI);
             break;
             
+        case AP_Motors::MOTOR_FRAME_HELI_COMPOUND:
+            motors = new AP_MotorsHeli_Compound(copter.scheduler.get_loop_rate_hz());
+            motors_var_info = AP_MotorsHeli_Compound::var_info;
+            AP_Param::set_frame_type_flags(AP_PARAM_FRAME_HELI);
+            break;
+
         case AP_Motors::MOTOR_FRAME_HELI:
         default:
             motors = new AP_MotorsHeli_Single(copter.scheduler.get_loop_rate_hz());
@@ -444,31 +451,37 @@ void Copter::allocate_motors(void)
     }
 
     const struct AP_Param::GroupInfo *ac_var_info;
+    const struct AP_Param::GroupInfo *pos_var_info;
 
 #if FRAME_CONFIG != HELI_FRAME
     if ((AP_Motors::motor_frame_class)g2.frame_class.get() == AP_Motors::MOTOR_FRAME_6DOF_SCRIPTING) {
 #if AP_SCRIPTING_ENABLED
         attitude_control = new AC_AttitudeControl_Multi_6DoF(*ahrs_view, aparm, *motors, scheduler.get_loop_period_s());
         ac_var_info = AC_AttitudeControl_Multi_6DoF::var_info;
+        pos_control = new AC_PosControl_Multi_6DoF(*ahrs_view, inertial_nav, *motors, *attitude_control, scheduler.get_loop_period_s());
+        pos_var_info = AC_PosControl_Multi_6DoF::var_info;
 #endif // AP_SCRIPTING_ENABLED
     } else {
         attitude_control = new AC_AttitudeControl_Multi(*ahrs_view, aparm, *motors, scheduler.get_loop_period_s());
         ac_var_info = AC_AttitudeControl_Multi::var_info;
+        pos_control = new AC_PosControl_Multi(*ahrs_view, inertial_nav, *motors, *attitude_control, scheduler.get_loop_period_s());
+        pos_var_info = AC_PosControl_Multi::var_info;
     }
 #else
     attitude_control = new AC_AttitudeControl_Heli(*ahrs_view, aparm, *motors, scheduler.get_loop_period_s());
     ac_var_info = AC_AttitudeControl_Heli::var_info;
+    pos_control = new AC_PosControl_Heli(*ahrs_view, inertial_nav, *motors, *attitude_control, scheduler.get_loop_period_s());
+    pos_var_info = AC_PosControl_Heli::var_info;
 #endif
     if (attitude_control == nullptr) {
         AP_BoardConfig::allocation_error("AttitudeControl");
     }
     AP_Param::load_object_from_eeprom(attitude_control, ac_var_info);
         
-    pos_control = new AC_PosControl(*ahrs_view, inertial_nav, *motors, *attitude_control, scheduler.get_loop_period_s());
     if (pos_control == nullptr) {
         AP_BoardConfig::allocation_error("PosControl");
     }
-    AP_Param::load_object_from_eeprom(pos_control, pos_control->var_info);
+    AP_Param::load_object_from_eeprom(pos_control, pos_var_info);
 
 #if AC_OAPATHPLANNER_ENABLED == ENABLED
     wp_nav = new AC_WPNav_OA(inertial_nav, *ahrs_view, *pos_control, *attitude_control);

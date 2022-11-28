@@ -78,7 +78,7 @@ void Copter::update_land_detector()
 #else
         // check that the average throttle output is near minimum (less than 12.5% hover throttle)
         bool motor_at_lower_limit = motors->limit.throttle_lower;
-        bool throttle_mix_at_min = attitude_control->is_throttle_mix_min();
+        bool throttle_mix_at_min = pos_control->is_throttle_mix_min();
         // set throttle_mix_at_min to true because throttle is never at mix min in airmode
         // increase land_trigger_sec when using airmode
         if (flightmode->has_manual_throttle() && air_mode == AirMode::AIRMODE_ENABLED) {
@@ -180,16 +180,16 @@ void Copter::update_throttle_mix()
 #if FRAME_CONFIG != HELI_FRAME
     // if disarmed or landed prioritise throttle
     if (!motors->armed() || ap.land_complete) {
-        attitude_control->set_throttle_mix_min();
+        pos_control->set_throttle_mix_min();
         return;
     }
 
     if (flightmode->has_manual_throttle()) {
         // manual throttle
         if (channel_throttle->get_control_in() <= 0 && air_mode != AirMode::AIRMODE_ENABLED) {
-            attitude_control->set_throttle_mix_min();
+            pos_control->set_throttle_mix_min();
         } else {
-            attitude_control->set_throttle_mix_man();
+            pos_control->set_throttle_mix_man();
         }
     } else {
         // autopilot controlled throttle
@@ -212,9 +212,9 @@ void Copter::update_throttle_mix()
         const bool landing = flightmode->is_landing();
 
         if (((large_angle_request || force_flying) && !landing) || large_angle_error || accel_moving || descent_not_demanded) {
-            attitude_control->set_throttle_mix_max(pos_control->get_vel_z_control_ratio());
+            pos_control->set_throttle_mix_max(pos_control->get_vel_z_control_ratio());
         } else {
-            attitude_control->set_throttle_mix_min();
+            pos_control->set_throttle_mix_min();
         }
     }
 #endif

@@ -515,8 +515,12 @@ const AP_Param::Info Copter::var_info[] = {
 #endif
 
     // @Group: PSC
-    // @Path: ../libraries/AC_AttitudeControl/AC_PosControl.cpp
-    GOBJECTPTR(pos_control, "PSC", AC_PosControl),
+    // @Path: ../libraries/AC_AttitudeControl/AC_PosControl.cpp,../libraries/AC_AttitudeControl/AC_PosControl_Multi.cpp,../libraries/AC_AttitudeControl/AC_PosControl_Heli.cpp
+#if FRAME_CONFIG == HELI_FRAME
+    GOBJECTPTR(pos_control, "PSC", AC_PosControl_Heli),
+#else
+    GOBJECTPTR(pos_control, "PSC", AC_PosControl_Multi),
+#endif
 
     // @Group: SR0_
     // @Path: GCS_Mavlink.cpp
