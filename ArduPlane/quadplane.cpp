@@ -1987,7 +1987,7 @@ void QuadPlane::motors_output(bool run_rate_controller)
             // relax if have been inactive
             relax_attitude_control();
         }
-        attitude_control->rate_controller_run();
+        pos_control->controller_run();
         last_att_control_ms = now;
     }
 
