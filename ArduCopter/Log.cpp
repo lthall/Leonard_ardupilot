@@ -51,7 +51,7 @@ void Copter::Log_Write_Control_Tuning()
         throttle_in         : pos_control->get_throttle_in(),
         angle_boost         : pos_control->angle_boost(),
         throttle_out        : motors->get_throttle(),
-        throttle_hover      : motors->get_throttle_hover(),
+        throttle_hover      : pos_control->get_throttle_mix(),
         desired_alt         : des_alt_m,
         inav_alt            : inertial_nav.get_position_z_up_cm() * 0.01f,
         baro_alt            : baro_alt,
