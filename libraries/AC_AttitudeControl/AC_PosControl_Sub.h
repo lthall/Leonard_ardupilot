@@ -49,7 +49,7 @@ public:
 protected:
 
     // update_throttle_rpy_mix - updates thr_low_comp value towards the target
-    void update_throttle_rpy_mix();
+    void update_throttle_rpy_mix() override;
 
     // get maximum value throttle can be raised to based on throttle vs attitude prioritisation
     float get_throttle_avg_max(float throttle_in);
