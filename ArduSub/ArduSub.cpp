@@ -135,7 +135,7 @@ void Sub::run_rate_controller()
     //don't run rate controller in manual or motordetection modes
     if (control_mode != MANUAL && control_mode != MOTOR_DETECT) {
         // run low level rate controllers that only require IMU data
-        attitude_control.rate_controller_run();
+        pos_control.controller_run();
     }
 }
 
