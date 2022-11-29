@@ -419,6 +419,8 @@ public:
     virtual void set_throttle_mix_max(float ratio) {}
     virtual void set_throttle_mix_value(float value) {}
     virtual float get_throttle_mix(void) const { return 0; }
+    virtual void update_throttle_rpy_mix(void) const {}
+    virtual void controller_run() = 0;
 
     // sanity check parameters.  should be called once before take-off
     virtual void parameter_sanity_check() {}

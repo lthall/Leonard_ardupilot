@@ -82,6 +82,9 @@ public:
     // Return tilt angle limit for pilot input that prioritises altitude hold over lean angle
     float get_althold_lean_angle_max_cd() const override;
 
+    // run lowest level body-frame rate controller and send outputs to the motors
+    void controller_run() override;
+
 protected:
 
     // lean_angles_to_accel - convert roll, pitch lean angles to lat/lon frame accelerations in cm/s/s

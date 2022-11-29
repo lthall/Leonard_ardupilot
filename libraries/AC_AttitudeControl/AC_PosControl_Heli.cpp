@@ -247,3 +247,10 @@ void AC_PosControl_Heli::input_ned_accel_rate_heading(const Vector3f& thrust_vec
         print_gcs = false;
     }
 }
+
+void AC_PosControl_Heli::controller_run()
+{
+    // move throttle vs attitude mixing towards desired (called from here because this is conveniently called on every iteration)
+    update_throttle_rpy_mix();
+    _attitude_control.rate_controller_run();
+}

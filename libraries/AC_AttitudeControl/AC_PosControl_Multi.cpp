@@ -288,6 +288,13 @@ void AC_PosControl_Multi::update_throttle_rpy_mix()
     _throttle_rpy_mix = constrain_float(_throttle_rpy_mix, 0.1f, AC_ATTITUDE_CONTROL_MAX);
 }
 
+void AC_PosControl_Multi::controller_run()
+{
+    // move throttle vs attitude mixing towards desired (called from here because this is conveniently called on every iteration)
+    update_throttle_rpy_mix();
+    _attitude_control.rate_controller_run();
+}
+
 // sanity check parameters.  should be called once before takeoff
 void AC_PosControl_Multi::parameter_sanity_check()
 {

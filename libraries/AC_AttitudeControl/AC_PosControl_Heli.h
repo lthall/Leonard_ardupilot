@@ -65,6 +65,9 @@ public:
 
     void input_ned_accel_rate_heading(const Vector3f& thrust_vector, Orientation heading) override;
 
+    // run lowest level body-frame rate controller and send outputs to the motors
+    void controller_run() override;
+
     // Set use forward flight collective flag
     void set_use_ff_collective(bool ff_collective) { use_ff_collective = ff_collective; };
 

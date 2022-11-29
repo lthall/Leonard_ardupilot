@@ -226,9 +226,6 @@ AC_AttitudeControl_Multi::AC_AttitudeControl_Multi(AP_AHRS_View &ahrs, const AP_
 
 void AC_AttitudeControl_Multi::rate_controller_run()
 {
-    // move throttle vs attitude mixing towards desired (called from here because this is conveniently called on every iteration)
-    //update_throttle_rpy_mix();
-
     _ang_vel_body += _sysid_ang_vel_body;
 
     Vector3f gyro_latest = _ahrs.get_gyro_latest();
