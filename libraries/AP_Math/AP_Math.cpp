@@ -399,10 +399,12 @@ Vector3F get_vel_correction_for_sensor_offset(const Vector3F &sensor_offset_bf, 
  */
 float calc_lowpass_alpha_dt(float dt, float cutoff_freq)
 {
-    // alpha is zero if dt = 0 however this is not considered normal usage
-    if (!is_positive(dt) || !is_positive(cutoff_freq)) {
+    if (is_negative(dt) || !is_positive(cutoff_freq)) {
         INTERNAL_ERROR(AP_InternalError::error_t::flow_of_control);
         return 1.0;
+    }
+    if (is_zero(dt)) {
+        return 0.0;
     }
     float rc = 1.0f/(M_2PI*cutoff_freq);
     return dt/(dt+rc);
