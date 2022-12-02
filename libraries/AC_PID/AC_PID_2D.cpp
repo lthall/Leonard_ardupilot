@@ -91,7 +91,7 @@ Vector2f AC_PID_2D::update_all(const Vector2f &target, const Vector2f &measureme
         _error += ((_target - measurement) - _error) * get_filt_E_alpha(dt);
 
         // calculate and filter derivative
-        if (dt > 0.0f) {
+        if (is_positive(dt)) {
             const Vector2f derivative{(_error - error_last) / dt};
             _derivative += (derivative - _derivative) * get_filt_D_alpha(dt);
         }

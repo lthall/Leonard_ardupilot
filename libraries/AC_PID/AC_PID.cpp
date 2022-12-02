@@ -142,7 +142,7 @@ float AC_PID::update_all(float target, float measurement, float dt, bool limit)
         _error += get_filt_E_alpha(dt) * ((_target - measurement) - _error);
 
         // calculate and filter derivative
-        if (dt > 0.0f) {
+        if (is_positive(dt)) {
             float derivative = (_error - error_last) / dt;
             _derivative += get_filt_D_alpha(dt) * (derivative - _derivative);
         }
@@ -195,7 +195,7 @@ float AC_PID::update_error(float error, float dt, bool limit)
         _error += get_filt_E_alpha(dt) * (error - _error);
 
         // calculate and filter derivative
-        if (dt > 0.0f) {
+        if (is_positive(dt)) {
             float derivative = (_error - error_last) / dt;
             _derivative += get_filt_D_alpha(dt) * (derivative - _derivative);
         }
@@ -344,6 +344,8 @@ void AC_PID::set_integrator(float integrator)
 void AC_PID::relax_integrator(float integrator, float dt, float time_constant)
 {
     integrator = constrain_float(integrator, -_kimax, _kimax);
-    _integrator = _integrator + (integrator - _integrator) * (dt / (dt + time_constant));
+    if (is_positive(dt)) {
+        _integrator = _integrator + (integrator - _integrator) * (dt / (dt + time_constant));
+    }
     _pid_info.I = _integrator;
 }
