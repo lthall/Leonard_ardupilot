@@ -590,7 +590,8 @@ void AC_PosControl::stop_vel_xy_stabilisation()
 // is_active_xy - returns true if the xy position controller has bee n run in the previous 5 loop times
 bool AC_PosControl::is_active_xy() const
 {
-    return ((AP::ins().get_last_update_usec() - _last_update_xy_us) <= _dt* 2000000.0);
+    float last_update_usec = AP::ins().get_last_update_usec();
+    return ((last_update_usec - _last_update_xy_us) <= _dt* 2000000.0);
 }
 
 /// update_xy_controller - runs the horizontal position controller correcting position, velocity and acceleration errors.
@@ -607,7 +608,7 @@ void AC_PosControl::update_xy_controller()
         init_xy_controller();
         if (has_good_timing()) {
             // call internal error because initialisation has not been done
-            INTERNAL_ERROR(AP_InternalError::error_t::flow_of_control);
+            // INTERNAL_ERROR(AP_InternalError::error_t::flow_of_control);
         }
     }
     _last_update_xy_us = AP::ins().get_last_update_usec();
@@ -921,7 +922,7 @@ void AC_PosControl::update_z_controller()
         init_z_controller();
         if (has_good_timing()) {
             // call internal error because initialisation has not been done
-            INTERNAL_ERROR(AP_InternalError::error_t::flow_of_control);
+            // INTERNAL_ERROR(AP_InternalError::error_t::flow_of_control);
         }
     }
     _last_update_z_us = AP::ins().get_last_update_usec();
