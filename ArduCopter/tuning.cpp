@@ -184,10 +184,14 @@ void Copter::tuning()
         attitude_control->get_rate_yaw_pid().filt_E_hz(tuning_value);
         break;
 
-    case TUNING_SYSTEM_ID_MAGNITUDE:
 #if MODE_SYSTEMID_ENABLED == ENABLED
+    case TUNING_SYSTEM_ID_MAGNITUDE:
         copter.mode_systemid.set_magnitude(tuning_value);
+        break;
 #endif
+
+    case TUNING_POS_CONTROL_ANGLE_MAX:
+        pos_control->set_lean_angle_max_cd(tuning_value * 100.0);
         break;
     }
 }
