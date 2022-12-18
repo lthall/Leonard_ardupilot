@@ -4,7 +4,6 @@ Mode::_TakeOff Mode::takeoff;
 
 bool Mode::auto_takeoff_no_nav_active = false;
 float Mode::auto_takeoff_no_nav_alt_cm = 0;
-float Mode::auto_takeoff_start_alt_cm = 0;
 float Mode::auto_takeoff_complete_alt_cm = 0;
 bool Mode::auto_takeoff_terrain_alt = false;
 bool Mode::auto_takeoff_complete = false;
@@ -220,8 +219,9 @@ void Mode::auto_takeoff_run()
         attitude_control->input_thrust_vector_heading(pos_control->get_thrust_vector(), auto_yaw.yaw(), auto_yaw.rate_cds());
     }
 
-    // handle takeoff completion
-    bool reached_altitude = (copter.pos_control->get_pos_target_z_cm() - auto_takeoff_start_alt_cm) >= ((auto_takeoff_complete_alt_cm + terr_offset - auto_takeoff_start_alt_cm) * 0.90);
+    // takeoff complete when we are less than 1% of the stopping distance from the target altitude
+    // and 10% our maximum climb rate
+    bool reached_altitude = copter.pos_control->get_pos_target_z_cm() >= (auto_takeoff_complete_alt_cm + terr_offset - 0.01 * sq(copter.pos_control->get_max_speed_up_cms()) / copter.pos_control->get_max_accel_z_cmss());
     bool reached_climb_rate = copter.pos_control->get_vel_desired_cms().z < copter.pos_control->get_max_speed_up_cms() * 0.1;
     auto_takeoff_complete = reached_altitude && reached_climb_rate;
 
@@ -234,13 +234,13 @@ void Mode::auto_takeoff_run()
 
 void Mode::auto_takeoff_start(float complete_alt_cm, bool terrain_alt)
 {
-    auto_takeoff_start_alt_cm = inertial_nav.get_position_z_up_cm();
+    // auto_takeoff_complete_alt_cm is a problem if equal to auto_takeoff_start_alt_cm
     auto_takeoff_complete_alt_cm = complete_alt_cm;
     auto_takeoff_terrain_alt = terrain_alt;
     auto_takeoff_complete = false;
     if ((g2.wp_navalt_min > 0) && (is_disarmed_or_landed() || !motors->get_interlock())) {
         // we are not flying, climb with no navigation to current alt-above-ekf-origin + wp_navalt_min
-        auto_takeoff_no_nav_alt_cm = auto_takeoff_start_alt_cm + g2.wp_navalt_min * 100;
+        auto_takeoff_no_nav_alt_cm = inertial_nav.get_position_z_up_cm() + g2.wp_navalt_min * 100;
         auto_takeoff_no_nav_active = true;
     } else {
         auto_takeoff_no_nav_active = false;
