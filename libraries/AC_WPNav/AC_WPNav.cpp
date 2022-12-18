@@ -93,6 +93,15 @@ const AP_Param::GroupInfo AC_WPNav::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("TER_MARGIN",  12, AC_WPNav, _terrain_margin, 10.0),
 
+    // @Param: ACCEL_C
+    // @DisplayName: Waypoint Cornering Acceleration
+    // @Description: Defines the maximum cornering acceleration in cm/s/s used during missions, zero uses max lean angle.
+    // @Units: cm/s/s
+    // @Range: 0 500
+    // @Increment: 10
+    // @User: Standard
+    AP_GROUPINFO("ACCEL_C",     13, AC_WPNav, _wp_accel_c_cmss, 0.0),
+
     AP_GROUPEND
 };
 
@@ -150,9 +159,18 @@ void AC_WPNav::wp_and_spline_init(float speed_cms, Vector3f stopping_point)
     
     // sanity check parameters
     // check _wp_accel_cmss is reasonable
-    _scurve_accel_corner = angle_to_accel(_pos_control.get_lean_angle_max_cd() * 0.01) * 100;
-    const float wp_accel_cmss = MIN(_wp_accel_cmss, _scurve_accel_corner);
-    _wp_accel_cmss.set_and_save_ifchanged((_wp_accel_cmss <= 0) ? WPNAV_ACCELERATION : wp_accel_cmss);
+    const float accel_corner = angle_to_accel(_pos_control.get_lean_angle_max_cd() * 0.01) * 100.0;
+    const float wp_accel_cmss = MIN(_wp_accel_cmss, accel_corner);
+    _wp_accel_cmss.set_and_save_ifchanged((!is_positive(wp_accel_cmss)) ? WPNAV_ACCELERATION : wp_accel_cmss);
+
+    const float wp_accel_c_cmss = MIN(_wp_accel_c_cmss, accel_corner);
+    _wp_accel_c_cmss.set_and_save_ifchanged((is_negative(wp_accel_c_cmss)) ? 0.0 : wp_accel_c_cmss);
+    
+    if (is_positive(_wp_accel_c_cmss)) {
+        _scurve_accel_corner_cmss = _wp_accel_c_cmss;
+    } else {
+        _scurve_accel_corner_cmss = _wp_accel_cmss;
+    }
     
     // check _wp_radius_cm is reasonable
     _wp_radius_cm.set_and_save_ifchanged(MAX(_wp_radius_cm, WPNAV_WP_RADIUS_MIN));
@@ -504,7 +522,7 @@ bool AC_WPNav::advance_wp_target_along_track(float dt)
     if (!_this_leg_is_spline) {
         // update target position, velocity and acceleration
         target_pos = _origin;
-        s_finished = _scurve_this_leg.advance_target_along_track(_scurve_prev_leg, _scurve_next_leg, _wp_radius_cm, _scurve_accel_corner, _flags.fast_waypoint, _track_scalar_dt * vel_scaler_dt * dt, target_pos, target_vel, target_accel);
+        s_finished = _scurve_this_leg.advance_target_along_track(_scurve_prev_leg, _scurve_next_leg, _wp_radius_cm, _scurve_accel_corner_cmss, _flags.fast_waypoint, _track_scalar_dt * vel_scaler_dt * dt, target_pos, target_vel, target_accel);
     } else {
         // splinetarget_vel
         target_vel = curr_target_vel;
