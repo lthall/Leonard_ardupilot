@@ -488,6 +488,7 @@ public:
 
     // var_info for holding Parameter information
     static const struct AP_Param::GroupInfo var_info[];
+    static const struct AP_Param::GroupInfo var_info2[];
 
     // altitude at which nav control can start in takeoff
     AP_Float wp_navalt_min;
@@ -673,6 +674,12 @@ public:
 #if HAL_WITH_ESC_TELEM && FRAME_CONFIG != HELI_FRAME
     AP_Int16 takeoff_rpm_min;
 #endif
+
+    // payload place parameters
+    AP_Float pldp_throttle_placed_fraction;
+    AP_Float pldp_range_finder_minimum;
+    AP_Float pldp_delay;
+
 };
 
 extern const AP_Param::Info        var_info[];

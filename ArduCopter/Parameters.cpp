@@ -1160,10 +1160,44 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     AP_GROUPINFO("TKOFF_RPM_MIN", 58, ParametersG2, takeoff_rpm_min, 0),
 #endif
 
+    // extend to a new group
+    AP_SUBGROUPEXTENSION("", 59, ParametersG2, var_info2),
+    
     // ID 60 is reserved for the SHIP_OPS
 
     // ID 62 is reserved for the SHOW_... parameters from the Skybrush fork at
     // https://github.com/skybrush-io/ardupilot
+
+    AP_GROUPEND
+};
+
+/*
+  extension to g2 parameters
+ */
+const AP_Param::GroupInfo ParametersG2::var_info2[] = {
+
+    // @Param: PLDP_THRESH
+    // @DisplayName: Payload place thrust ratio to detect payload touchdown
+    // @Description: Ratio of vertical thrust during decent below which payload touchdown will trigger.
+    // @Range: 0.5 0.9
+    // @User: Standard
+    AP_GROUPINFO("PLDP_THRESH", 1, ParametersG2, pldp_throttle_placed_fraction, 0.9),
+
+    // @Param: PLDP_RNG_MIN
+    // @DisplayName: Minimum range finder altitude in m to trigger payload touchdown
+    // @Description: Minimum range finder altitude in m to trigger payload touchdown, set to zero to dissable.
+    // @Units: m
+    // @Range: 0 100
+    // @User: Standard
+    AP_GROUPINFO("PLDP_RNG_MIN", 2, ParametersG2, pldp_range_finder_minimum, 0.0),
+
+    // @Param: PLDP_DELAY
+    // @DisplayName: Minimum range finder altitude in m to trigger payload touchdown
+    // @Description: Minimum range finder altitude in m to trigger payload touchdown, set to zero to dissable.
+    // @Units: m
+    // @Range: 0 100
+    // @User: Standard
+    AP_GROUPINFO("PLDP_DELAY", 3, ParametersG2, pldp_delay, 0.0),
 
     AP_GROUPEND
 };
@@ -1221,6 +1255,7 @@ ParametersG2::ParametersG2(void)
     ,command_model_pilot(PILOT_Y_RATE_DEFAULT, PILOT_Y_EXPO_DEFAULT, 0.0f)
 {
     AP_Param::setup_object_defaults(this, var_info);
+    AP_Param::setup_object_defaults(this, var_info2);
 }
 
 /*
