@@ -1220,7 +1220,7 @@ void ModeAuto::payload_place_run()
         }
     }
 
-#if AP_GRIPPER_ENABLED == ENABLED
+#if GRIPPER_ENABLED == ENABLED
     // if pilot releases load manually:
     if (g2.gripper.valid() && g2.gripper.released()) {
         switch (nav_payload_place.state) {
@@ -1314,7 +1314,7 @@ void ModeAuto::payload_place_run()
     case PayloadPlaceStateType_Release:
         // Reinitialise vertical position controller to remove discontinuity due to touch down of payload
         pos_control->init_z_controller_no_descent();
-#if AP_GRIPPER_ENABLED == ENABLED
+#if GRIPPER_ENABLED == ENABLED
         if (g2.gripper.valid()) {
             gcs().send_text(MAV_SEVERITY_INFO, "%s Releasing the gripper", prefix_str);
             g2.gripper.release();
@@ -1328,7 +1328,7 @@ void ModeAuto::payload_place_run()
         break;
 
     case PayloadPlaceStateType_Releasing:
-#if AP_GRIPPER_ENABLED == ENABLED
+#if GRIPPER_ENABLED == ENABLED
         if (g2.gripper.valid() && !g2.gripper.released()) {
             break;
         }
