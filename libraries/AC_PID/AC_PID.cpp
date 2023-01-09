@@ -63,7 +63,6 @@ const AP_Param::GroupInfo AC_PID::var_info[] = {
     // @Increment: 0.5
     // @User: Advanced
     AP_GROUPINFO("SMAX", 12, AC_PID, _slew_rate_max, 0),
-
     // @Param: NCF
     // @DisplayName: Notch center frequency in Hz
     // @Description: 

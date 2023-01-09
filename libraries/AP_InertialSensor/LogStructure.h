@@ -99,15 +99,21 @@ static_assert(sizeof(log_ISBD) < 256, "log_ISBD is over-size");
 // @Description: Processed (acceleration) vibration information
 // @Field: TimeUS: Time since system startup
 // @Field: IMU: Vibration instance number
+// @Field: LpfAccX: Primary accelerometer low-pass filtered acceleration, x-axis
+// @Field: LpfAccY: Primary accelerometer low-pass filtered acceleration, y-axis
+// @Field: LpfAccZ: Primary accelerometer low-pass filtered acceleration, z-axis
 // @Field: VibeX: Primary accelerometer filtered vibration, x-axis
 // @Field: VibeY: Primary accelerometer filtered vibration, y-axis
 // @Field: VibeZ: Primary accelerometer filtered vibration, z-axis
+// @Field: LandR: Landing Detector Ratio, z-axis
 // @Field: Clip: Number of clipping events on 1st accelerometer
 struct PACKED log_Vibe {
     LOG_PACKET_HEADER;
     uint64_t time_us;
     uint8_t imu;
+    float lpf_acc_x, lpf_acc_y, lpf_acc_z;
     float vibe_x, vibe_y, vibe_z;
+    float landing_ratio;
     uint32_t clipping;
 };
 
@@ -119,7 +125,7 @@ struct PACKED log_Vibe {
     { LOG_IMU_MSG, sizeof(log_IMU), \
       "IMU",  "QBffffffIIfBBHH", "TimeUS,I,GyrX,GyrY,GyrZ,AccX,AccY,AccZ,EG,EA,T,GH,AH,GHz,AHz", "s#EEEooo--O--zz", "F-000000-----00" }, \
     { LOG_VIBE_MSG, sizeof(log_Vibe), \
-      "VIBE", "QBfffI", "TimeUS,IMU,VibeX,VibeY,VibeZ,Clip", "s#----", "F-----" }, \
+      "VIBE", "QBfffffffI", "TimeUS,IMU,LpfAccX,LpfAccY,LpfAccZ,VibeX,VibeY,VibeZ,LndR,Clip", "s#oooooo--", "F-000000--" }, \
     { LOG_ISBH_MSG, sizeof(log_ISBH), \
       "ISBH", "QHBBHHQf", "TimeUS,N,type,instance,mul,smp_cnt,SampleUS,smp_rate", "s-----sz", "F-----F-" },  \
     { LOG_ISBD_MSG, sizeof(log_ISBD), \

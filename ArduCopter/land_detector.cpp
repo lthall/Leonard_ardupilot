@@ -4,7 +4,7 @@
 #define LAND_CHECK_ANGLE_ERROR_DEG  30.0f       // maximum angle error to be considered landing
 #define LAND_CHECK_LARGE_ANGLE_CD   1500.0f     // maximum angle target to be considered landing
 #define LAND_CHECK_ACCEL_MOVING     3.0f        // maximum acceleration after subtracting gravity
-
+#define LAND_CHECK_CLOSE_TO_GRND_M  10.0f       // distance above ground level, when below, prioritize throttle (meters)
 
 // counter to verify landings
 static uint32_t land_detector_count = 0;
@@ -106,10 +106,45 @@ void Copter::update_land_detector()
             // we've sensed movement up or down so reset land_detector
             land_detector_count = 0;
         }
+
+        // Checking for an ArduPilot standard 'gentle landing' is often too long if we are tipping over, so we will ALSO check for impact.
+        // If an impact is sensed, we short circuit the built-in ArduPilot logic and confirm the landing immediately.
+        const uint8_t landing_impact_detector_enabled = g2.land_impact_detector_enabled;
+        if (landing_impact_detector_enabled == 1) {
+
+            // check if landing
+            const bool landing = flightmode->is_landing();
+
+            // check if below AGL threshold
+            const bool close_to_ground = (flightmode->get_alt_above_ground_cm() < (LAND_CHECK_CLOSE_TO_GRND_M*100));
+
+            // check if impact was detected
+            const bool impact_detected = landing_impact_detected();
+
+            if ( landing && close_to_ground && impact_detected ) {
+                set_land_complete(true);
+            }
+        }
     }
 
     set_land_complete_maybe(ap.land_complete || (land_detector_count >= LAND_DETECTOR_MAYBE_TRIGGER_SEC*scheduler.get_loop_rate_hz()));
 }
+
+// check for an impact event showing up in the IMU accelerometer data
+bool Copter::landing_impact_detected(void)
+{
+    const uint8_t imu_core = ins.get_primary_accel();
+    const Vector3f &accel = ins.get_accel(imu_core);
+    const Vector3f lpf_acc = ins.get_accel_vibe_floor_levels(imu_core);
+    const Vector3f vibration = ins.get_vibration_levels(imu_core);
+    float landing_detector_ratio = fabsf(accel.z-lpf_acc.z)/vibration.z;
+    float landing_impact_ratio_threshold = g2.land_impact_ratio_thresh;
+    if (landing_detector_ratio > landing_impact_ratio_threshold) {
+        return true;
+    }
+    return false;
+}
+
 
 // set land_complete flag and disarm motors if disarm-on-land is configured
 void Copter::set_land_complete(bool b)
@@ -195,7 +230,10 @@ void Copter::update_throttle_mix()
         // check if landing
         const bool landing = flightmode->is_landing();
 
-        if ((large_angle_request && !landing) || large_angle_error || accel_moving || descent_not_demanded) {
+        // check if below AGL threshold
+        const bool close_to_ground = (flightmode->get_alt_above_ground_cm() < (LAND_CHECK_CLOSE_TO_GRND_M*100));
+
+        if (large_angle_request || (!landing) || (!close_to_ground) || large_angle_error || accel_moving || descent_not_demanded) {
             attitude_control->set_throttle_mix_max(pos_control->get_vel_z_control_ratio());
         } else {
             attitude_control->set_throttle_mix_min();

@@ -23,7 +23,7 @@ public:
 
     // Constructor for PID
     AC_PID(float initial_p, float initial_i, float initial_d, float initial_ff, float initial_imax, float initial_filt_T_hz, float initial_filt_E_hz, float initial_filt_D_hz,
-           float dt, float initial_srmax = 0, float initial_srtau = 1.0);
+           float dt, float initial_srmax=0, float initial_srtau=1.0);
 
     CLASS_NO_COPY(AC_PID);
 
@@ -159,7 +159,6 @@ protected:
     float _error;             // error value to enable filtering
     float _derivative;        // derivative value to enable filtering
     int8_t _slew_limit_scale;
-
 
     AP_Logger::PID_Info _pid_info;
 };

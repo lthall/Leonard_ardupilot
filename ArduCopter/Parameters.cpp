@@ -1069,6 +1069,23 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     AP_GROUPINFO("GUID_TIMEOUT", 46, ParametersG2, guided_timeout, 3.0),
 #endif
 
+    // @Param: LAND_IMPACT_THR
+    // @DisplayName: Land impact thresh
+    // @Description: Threshold for a landing impact ratio, above which a landing is declared
+    // @Units: None
+    // @Range: 0.1 10.0
+    // @Increment: 0.1
+    // @User: Advanced
+    AP_GROUPINFO("LAND_IMPACT_THR", 47, ParametersG2, land_impact_ratio_thresh, 2.0),
+
+    // @Param: LAND_DET_ENABLE
+    // @DisplayName: Landing Impact Detection enable
+    // @Description: This enables the check on if a landing impact occurred to then disable the vehicle
+    // @Values: 0:Disabled, 1:Enabled
+    // @User: Standard
+    AP_GROUPINFO("LAND_DET_ENABLE", 48, ParametersG2, land_impact_detector_enabled, 0),
+
+
     AP_GROUPEND
 };
 

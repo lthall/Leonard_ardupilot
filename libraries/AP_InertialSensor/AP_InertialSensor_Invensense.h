@@ -130,6 +130,9 @@ private:
     LowPassFilter2pFloat _temp_filter;
     uint32_t last_reset_ms;
     uint8_t reset_count;
+    uint16_t total_fifo_resets = 0;
+    uint16_t total_fifo_internal_errors = 0;
+    uint8_t update_counter = 0;
 
     enum Rotation _rotation;
 

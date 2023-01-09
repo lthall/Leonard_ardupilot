@@ -160,7 +160,7 @@ void Mode::auto_takeoff_run()
 
     // call attitude controller
     if (auto_takeoff_no_nav_active) {
-        // zero roll & pitch and yaw rate
+        // zero roll, pitch, and yaw rate
         attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(auto_takeoff_roll, auto_takeoff_pitch, 0.0);
     } else if (auto_yaw.mode() == AUTO_YAW_HOLD) {
         // roll & pitch from position controller, yaw rate from pilot

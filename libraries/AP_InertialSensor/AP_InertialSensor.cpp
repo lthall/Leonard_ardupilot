@@ -1833,6 +1833,18 @@ Vector3f AP_InertialSensor::get_vibration_levels(uint8_t instance) const
     return vibe;
 }
 
+
+// retrieve latest acceleration vibe floor levels
+Vector3f AP_InertialSensor::get_accel_vibe_floor_levels(uint8_t instance) const
+{
+    Vector3f accel_vibe_floor;
+    if (instance < INS_VIBRATION_CHECK_INSTANCES) {
+        accel_vibe_floor = _accel_vibe_floor_filter[instance].get();
+    }
+    return accel_vibe_floor;
+}
+
+
 // check for vibration movement. Return true if all axis show nearly zero movement
 bool AP_InertialSensor::is_still()
 {

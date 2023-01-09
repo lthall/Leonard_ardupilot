@@ -970,6 +970,12 @@ MAV_RESULT GCS_MAVLINK_Copter::handle_command_long_packet(const mavlink_command_
         return MAV_RESULT_ACCEPTED;
     }
 
+    case MAV_CMD_USER_1: {
+        uint8_t p1 = (uint8_t)packet.param1;
+        AP::logger().Write("USR1", "TimeUS,Value", "QB", AP_HAL::micros64(), p1);
+        return MAV_RESULT_ACCEPTED;
+    }
+
     default:
         return GCS_MAVLINK::handle_command_long_packet(packet);
     }

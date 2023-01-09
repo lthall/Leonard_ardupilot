@@ -183,7 +183,7 @@ protected:
     static bool auto_takeoff_no_nav_active;
     static float auto_takeoff_no_nav_alt_cm;
 
-    // Attitude of the aircraft when takeoff is initialised
+    // Attitude of the aircraft when takeoff is initialized
     static float auto_takeoff_roll;
     static float auto_takeoff_pitch;
 

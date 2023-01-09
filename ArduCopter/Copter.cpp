@@ -135,7 +135,7 @@ const AP_Scheduler::Task Copter::scheduler_tasks[] = {
     SCHED_TASK(check_dynamic_flight,  50,     75),
 #endif
 #if LOGGING_ENABLED == ENABLED
-    SCHED_TASK(fourhundred_hz_logging,400,    50),
+    SCHED_TASK(fourhundred_hz_logging,400,    100),
 #endif
     SCHED_TASK_CLASS(AP_Notify,            &copter.notify,              update,          50,  90),
     SCHED_TASK(one_hz_loop,            1,    100),
@@ -453,6 +453,11 @@ void Copter::fourhundred_hz_logging()
     if (should_log(MASK_LOG_ATTITUDE_FAST) && !copter.flightmode->logs_attitude()) {
         Log_Write_Attitude();
     }
+
+    if (should_log(MASK_LOG_IMU_RAW) ) {
+            AP::ins().Write_IMU();
+            AP::ins().Write_Vibration();
+    }
 }
 
 // ten_hz_logging_loop
@@ -466,6 +471,10 @@ void Copter::ten_hz_logging_loop()
     // log EKF attitude data
     if (should_log(MASK_LOG_ATTITUDE_MED) || should_log(MASK_LOG_ATTITUDE_FAST)) {
         Log_Write_EKF_POS();
+    }
+    if (!should_log(MASK_LOG_IMU_RAW) && !should_log(MASK_LOG_IMU_FAST && should_log(MASK_LOG_IMU))) {
+            AP::ins().Write_IMU();
+            AP::ins().Write_Vibration();
     }
     if (should_log(MASK_LOG_MOTBATT)) {
         Log_Write_MotBatt();
@@ -481,9 +490,6 @@ void Copter::ten_hz_logging_loop()
     }
     if (should_log(MASK_LOG_NTUN) && (flightmode->requires_GPS() || landing_with_GPS() || !flightmode->has_manual_throttle())) {
         pos_control->write_log();
-    }
-    if (should_log(MASK_LOG_IMU) || should_log(MASK_LOG_IMU_FAST) || should_log(MASK_LOG_IMU_RAW)) {
-        AP::ins().Write_Vibration();
     }
     if (should_log(MASK_LOG_CTUN)) {
         attitude_control->control_monitor_log();
@@ -511,9 +517,13 @@ void Copter::twentyfive_hz_logging()
         Log_Write_EKF_POS();
     }
 
-    if (should_log(MASK_LOG_IMU)) {
-        AP::ins().Write_IMU();
+
+    if (!should_log(MASK_LOG_IMU_RAW) && should_log(MASK_LOG_IMU_FAST)) {
+            AP::ins().Write_IMU();
+            AP::ins().Write_Vibration();
     }
+
+
 
 #if MODE_AUTOROTATE_ENABLED == ENABLED
     if (should_log(MASK_LOG_ATTITUDE_MED) || should_log(MASK_LOG_ATTITUDE_FAST)) {

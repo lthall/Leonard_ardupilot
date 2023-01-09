@@ -81,14 +81,21 @@ void AP_InertialSensor::Write_Vibration() const
             continue;
         }
 
+        const Vector3f lpf_acc = get_accel_vibe_floor_levels(i);
         const Vector3f vibration = get_vibration_levels(i);
+        const Vector3f &accel = get_accel(i);
+        float landing_detector_ratio = fabsf(accel.z-lpf_acc.z)/vibration.z;
         const struct log_Vibe pkt{
             LOG_PACKET_HEADER_INIT(LOG_VIBE_MSG),
             time_us     : time_us,
             imu         : i,
+            lpf_acc_x   : lpf_acc.x,
+            lpf_acc_y   : lpf_acc.y,
+            lpf_acc_z   : lpf_acc.z,
             vibe_x      : vibration.x,
             vibe_y      : vibration.y,
             vibe_z      : vibration.z,
+            landing_ratio : landing_detector_ratio,
             clipping    : get_accel_clip_count(i)
         };
         AP::logger().WriteBlock(&pkt, sizeof(pkt));

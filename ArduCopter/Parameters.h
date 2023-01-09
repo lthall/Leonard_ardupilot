@@ -648,6 +648,12 @@ public:
 #if MODE_GUIDED_ENABLED == ENABLED
     AP_Float guided_timeout;
 #endif
+
+    // Landing detector impact ratio threshold
+    AP_Float land_impact_ratio_thresh;
+    // Landing detector impact ratio threshold enabled
+    AP_Int8 land_impact_detector_enabled;
+
 };
 
 extern const AP_Param::Info        var_info[];

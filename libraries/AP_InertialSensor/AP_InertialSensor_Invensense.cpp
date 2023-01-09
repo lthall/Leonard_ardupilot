@@ -84,10 +84,14 @@ AP_InertialSensor_Invensense::AP_InertialSensor_Invensense(AP_InertialSensor &im
     , _rotation(rotation)
     , _dev(std::move(dev))
 {
+
 }
 
 AP_InertialSensor_Invensense::~AP_InertialSensor_Invensense()
 {
+    AP::logger().Write("FIFO", "TimeUS, TotalResets, TotalIntErrs, AccelInst, GyroInst", "QHHBB", 
+      AP_HAL::micros64(), total_fifo_resets, total_fifo_internal_errors, _accel_instance, _gyro_instance);
+
     if (_fifo_buffer != nullptr) {
         hal.util->free_type(_fifo_buffer, MPU_FIFO_BUFFER_LEN * MPU_SAMPLE_SIZE, AP_HAL::Util::MEM_DMA_SAFE);
     }
@@ -153,6 +157,9 @@ bool AP_InertialSensor_Invensense::_init()
 
     bool success = _hardware_init();
 
+    AP::logger().Write("FIFO", "TimeUS, TotalResets, TotalErrs, AccelInst, GyroInst", "QHHBB", 
+        AP_HAL::micros64(), total_fifo_resets, total_fifo_internal_errors, _accel_instance, _gyro_instance);
+
     return success;
 }
 
@@ -166,6 +173,7 @@ void AP_InertialSensor_Invensense::_fifo_reset(bool log_error)
         if (reset_count == 10) {
             // 10 resets, each happening within 10s, triggers an internal error
             INTERNAL_ERROR(AP_InternalError::error_t::imu_reset);
+            total_fifo_internal_errors++;
             reset_count = 0;
         }
     } else if (log_error &&
@@ -192,6 +200,11 @@ void AP_InertialSensor_Invensense::_fifo_reset(bool log_error)
 
     notify_accel_fifo_reset(_accel_instance);
     notify_gyro_fifo_reset(_gyro_instance);
+
+    total_fifo_resets++;
+    AP::logger().Write("FIFO", "TimeUS, TotalResets, TotalIntErrs, AccelInst, GyroInst", "QHHBB", 
+        AP_HAL::micros64(), total_fifo_resets, total_fifo_internal_errors, _accel_instance, _gyro_instance);
+
 }
 
 bool AP_InertialSensor_Invensense::_has_auxiliary_bus()
@@ -410,6 +423,9 @@ void AP_InertialSensor_Invensense::start()
 
     // start the timer process to read samples, using the fastest rate avilable
     _dev->register_periodic_callback(1000000UL / _gyro_backend_rate_hz, FUNCTOR_BIND_MEMBER(&AP_InertialSensor_Invensense::_poll_data, void));
+
+    AP::logger().Write("FIFO", "TimeUS, TotalResets, TotalIntErrs, AccelInst, GyroInst", "QHHBB", 
+        AP_HAL::micros64(), total_fifo_resets, total_fifo_internal_errors, _accel_instance, _gyro_instance);
 }
 
 // get a startup banner to output to the GCS
@@ -431,6 +447,13 @@ bool AP_InertialSensor_Invensense::update()
     update_gyro(_gyro_instance);
 
     _publish_temperature(_accel_instance, _temp_filtered);
+
+    update_counter++;
+    if (update_counter > 100) {
+        AP::logger().Write("FIFO", "TimeUS, TotalResets, TotalIntErrs, AccelInst, GyroInst", "QHHBB", 
+          AP_HAL::micros64(), total_fifo_resets, total_fifo_internal_errors, _accel_instance, _gyro_instance);
+        update_counter = 0;
+    }
 
     return true;
 }
