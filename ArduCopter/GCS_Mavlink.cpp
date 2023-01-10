@@ -473,36 +473,35 @@ static const ap_message STREAM_RC_CHANNELS_msgs[] = {
 };
 static const ap_message STREAM_EXTRA1_msgs[] = {
     MSG_ATTITUDE,
-    MSG_SIMSTATE,
-    MSG_AHRS2,
-    MSG_PID_TUNING // Up to four PID_TUNING messages are sent, depending on GCS_PID_MASK parameter
+    // MSG_ATTITUDE_QUATERNION
+    // MSG_SIMSTATE,
+    // MSG_AHRS2,
+    // MSG_AHRS3,
+    // MSG_PID_TUNING // Up to four PID_TUNING messages are sent, depending on GCS_PID_MASK parameter
 };
 static const ap_message STREAM_EXTRA2_msgs[] = {
     MSG_VFR_HUD
 };
 static const ap_message STREAM_EXTRA3_msgs[] = {
-    MSG_AHRS,
-    MSG_HWSTATUS,
-    MSG_SYSTEM_TIME,
-    MSG_WIND,
-    MSG_RANGEFINDER,
-    MSG_DISTANCE_SENSOR,
+    // MSG_AHRS,
+    // MSG_HWSTATUS,
+    // MSG_SYSTEM_TIME,
+    // MSG_RANGEFINDER,
+    // MSG_DISTANCE_SENSOR,
 #if AP_TERRAIN_AVAILABLE && AC_TERRAIN
     MSG_TERRAIN,
 #endif
     MSG_BATTERY2,
     MSG_BATTERY_STATUS,
-    MSG_MOUNT_STATUS,
-    MSG_OPTICAL_FLOW,
-    MSG_GIMBAL_REPORT,
+    // MSG_MOUNT_STATUS,
+    // MSG_OPTICAL_FLOW,
+    // MSG_GIMBAL_REPORT,
     MSG_MAG_CAL_REPORT,
     MSG_MAG_CAL_PROGRESS,
     MSG_EKF_STATUS_REPORT,
-    MSG_VIBRATION,
+    // MSG_VIBRATION,
     MSG_RPM,
     MSG_ESC_TELEMETRY,
-    MSG_GENERATOR_STATUS,
-    MSG_WINCH_STATUS,
 };
 static const ap_message STREAM_PARAMS_msgs[] = {
     MSG_NEXT_PARAM

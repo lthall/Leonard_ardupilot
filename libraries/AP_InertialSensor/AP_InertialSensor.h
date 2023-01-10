@@ -3,8 +3,8 @@
 // Gyro and Accelerometer calibration criteria
 #define AP_INERTIAL_SENSOR_ACCEL_TOT_MAX_OFFSET_CHANGE  4.0f
 #define AP_INERTIAL_SENSOR_ACCEL_MAX_OFFSET             250.0f
-#define AP_INERTIAL_SENSOR_ACCEL_VIBE_FLOOR_FILT_HZ     5.0f    // accel vibration floor filter hz
-#define AP_INERTIAL_SENSOR_ACCEL_VIBE_FILT_HZ           2.0f    // accel vibration filter hz
+#define AP_INERTIAL_SENSOR_ACCEL_VIBE_FLOOR_FILT_HZ     0.5f    // accel vibration floor filter hz
+#define AP_INERTIAL_SENSOR_ACCEL_VIBE_FILT_HZ           0.5f    // accel vibration filter hz
 #define AP_INERTIAL_SENSOR_ACCEL_PEAK_DETECT_TIMEOUT_MS 500     // peak-hold detector timeout
 
 #include <AP_HAL/AP_HAL.h>
@@ -288,6 +288,10 @@ public:
     // retrieve latest calculated vibration levels
     Vector3f get_vibration_levels() const { return get_vibration_levels(_primary_accel); }
     Vector3f get_vibration_levels(uint8_t instance) const;
+
+    // retrieve latest calculated accel vibration floor levels
+    Vector3f get_accel_vibe_floor_levels() const { return get_accel_vibe_floor_levels(_primary_accel); }
+    Vector3f get_accel_vibe_floor_levels(uint8_t instance) const;
 
     // retrieve and clear accelerometer clipping count
     uint32_t get_accel_clip_count(uint8_t instance) const;
