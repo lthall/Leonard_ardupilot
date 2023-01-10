@@ -2911,11 +2911,15 @@ void GCS_MAVLINK::handle_timesync(const mavlink_message_t &msg)
         return;
     }
 
+    uint64_t time_unix = 0;
+    AP::rtc().get_utc_usec(time_unix); // may fail, leaving time_unix at 0
+
     // create new timesync struct with tc1 field as system time in
     // nanoseconds.  The client timestamp is as close as possible to
     // the time we received the TIMESYNC message.
     mavlink_timesync_t rsync;
-    rsync.tc1 = timesync_receive_timestamp_ns();
+    // rsync.tc1 = timesync_receive_timestamp_ns();
+    rsync.tc1 = time_unix;
     rsync.ts1 = tsync.ts1;
 
     // respond with a timesync message
@@ -4645,13 +4649,20 @@ void GCS_MAVLINK::send_attitude() const
 
 void GCS_MAVLINK::send_attitude_quaternion() const
 {
+    uint64_t time_unix = 0;
+    AP::rtc().get_utc_usec(time_unix); // may fail, leaving time_unix at 0
+    
+    uint32_t unixfirst32 = time_unix & 0xFFFFFFFF;
+    uint32_t unixsecond32 = (time_unix >> 32) & 0xFFFFFFFF;
+
+    float unixfirstfloat  = *reinterpret_cast<float*>(&unixfirst32);
+    float unixsecondfloat = *reinterpret_cast<float*>(&unixsecond32);
+
     const AP_AHRS &ahrs = AP::ahrs();
     Quaternion quat;
-    if (!ahrs.get_secondary_quaternion(quat)) {
-        return;
-    }
+    ahrs.get_quat_body_to_ned(quat);
     const Vector3f omega = ahrs.get_gyro();
-    const float repr_offseq_q[] {0,0,0,0};  // unused, but probably should correspond to the AHRS view?
+    const float repr_offseq_q[] {unixfirstfloat,unixsecondfloat,0,0};  // unused, but probably should correspond to the AHRS view?
     mavlink_msg_attitude_quaternion_send(
         chan,
         AP_HAL::millis(),

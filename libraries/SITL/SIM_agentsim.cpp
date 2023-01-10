@@ -13,7 +13,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 /*
-       Simulator Connector for agentsim
+	Simulator Connector for agentsim
 */
 
 #include "SIM_agentsim.h"
@@ -33,70 +33,83 @@ using namespace SITL;
 static const float ft_to_m = 0.3048f;
 
 agentsim::agentsim(const char *frame_str) :
-       Aircraft(frame_str),
-       sock(true)
+	Aircraft(frame_str),
+	sock(true)
 {
     rate_hz = 1000.0f;
     set_speedup(1.0f);
-       printf("Starting SITL agentsim\n");
+	printf("Starting SITL agentsim\n");
 }
 
 /*
-       Create & set in/out socket
+	Create & set in/out socket
 */
 void agentsim::set_interface_ports(const char* address, const int port_in, const int port_out)
 {
-       if (!sock.bind("0.0.0.0", port_in)) {
-               printf("Unable to bind agentsim sensor_in socket at port %u - Error: %s\n",
-                                port_in, strerror(errno));
-               return;
-       }
-       printf("Bind SITL sensor input at %s:%u\n", "127.0.0.1", port_in);
-       sock.set_blocking(false);
-       sock.reuseaddress();
+	if (!sock.bind("0.0.0.0", port_in)) {
+		printf("Unable to bind agentsim sensor_in socket at port %u - Error: %s\n",
+				 port_in, strerror(errno));
+		return;
+	}
+	printf("Bind SITL sensor input at %s:%u\n", "127.0.0.1", port_in);
+	sock.set_blocking(false);
+	sock.reuseaddress();
 
-       agentsim_ip = address;
-       agentsim_control_port = port_out;
-       agentsim_sensor_port = port_in;
+	agentsim_ip = address;
+	agentsim_control_port = port_out;
+	agentsim_sensor_port = port_in;
 
-       printf("agentsim control interface set to %s:%u\n", agentsim_ip, agentsim_control_port);
+	printf("agentsim control interface set to %s:%u\n", agentsim_ip, agentsim_control_port);
 }
 
 /*
-       Decode and send servos
+	Decode and send servos
 */
 void agentsim::send_servos(const struct sitl_input &input)
 {
-       servo_packet pkt{0};
-    float hot;
+	servo_packet pkt{0};
 
-       for (uint8_t i=0; i<num_pwm_sig; i++) {
-               pkt.pwm[i] = input.servos[i];
-       }
+	for (uint8_t i=0; i<num_pwm_sig; i++) {
+		pkt.pwm[i] = input.servos[i];
+	}
 
-    terrain->height_amsl(location, hot, false);
-    pkt.hot = (double)hot;
+	float hot_delta = 0.f;
 
-       ssize_t send_ret = sock.sendto(&pkt, sizeof(pkt), agentsim_ip, agentsim_control_port);
-       if (send_ret != sizeof(pkt)) {
-               if (send_ret <= 0) {
-                       printf("Unable to send servo output to %s:%u - Error: %s, Return value: %ld\n",
-                                        agentsim_ip, agentsim_control_port, strerror(errno), send_ret);
-               } else {
-                       printf("Sent %ld bytes instead of %ld bytes\n", send_ret, sizeof(pkt));
-               }
-       }
+#if AP_TERRAIN_AVAILABLE
+	// use available terrain data from AP
+	terrain->height_terrain_difference_home(hot_delta, false);
+#endif
+
+	// set initial altitude as 0 agl
+	pkt.hot = home.alt + static_cast<double>(hot_delta);
+
+
+	ssize_t send_ret = sock.sendto(&pkt, sizeof(pkt), agentsim_ip, agentsim_control_port);
+	if (send_ret != sizeof(pkt)) {
+		if (send_ret <= 0) {
+			printf("Unable to send servo output to %s:%u - Error: %s, Return value: %ld\n",
+					 agentsim_ip, agentsim_control_port, strerror(errno), send_ret);
+		} else {
+			printf("Sent %ld bytes instead of %ld bytes\n", send_ret, sizeof(pkt));
+		}
+	}
 }
 
 /*
-       Receive new sensor data from simulator
-       This is a blocking function (via polling)
+	Receive new sensor data from simulator
+	This is a blocking function (via polling)
 */
 void agentsim::recv_fdm()
 {
     // Receive sensor packet
     ssize_t ret = sock.recv(&sensor_buffer[sensor_buffer_len], sizeof(sensor_buffer)-sensor_buffer_len, 100);
-    while (ret <= 0) {
+    if (ret <= 0) {
+
+        // Make sure initialization has succeeded
+        if (recv_initmsg_confirm == 0) {
+            return;
+        }
+
         printf("No sensor message received - %s\n", strerror(errno));
         ret = sock.recv(&sensor_buffer[sensor_buffer_len], sizeof(sensor_buffer)-sensor_buffer_len, 100);
     }
@@ -107,7 +120,6 @@ void agentsim::recv_fdm()
                           ft_to_m * (float)sensdat.bd_tot_accel_fpss[1],
                           ft_to_m * (float)sensdat.bd_tot_accel_fpss[2]);
 
-
     gyro = Vector3f((float)sensdat.bd_ang_rates_rps[0],
                     (float)sensdat.bd_ang_rates_rps[1],
                     (float)sensdat.bd_ang_rates_rps[2]);
@@ -116,22 +128,37 @@ void agentsim::recv_fdm()
                            ft_to_m * (float)sensdat.ned_vel_fps[1],
                            ft_to_m * (float)sensdat.ned_vel_fps[2]);
 
+    airspeed = ft_to_m * (float)sqrt(sensdat.ned_vel_fps[0]*sensdat.ned_vel_fps[0]  +
+                                     sensdat.ned_vel_fps[1]*sensdat.ned_vel_fps[1]  +
+                                     sensdat.ned_vel_fps[2]*sensdat.ned_vel_fps[2]);
+
+// TODO (cah): figure out why this is commented out
+//    ang_accel = Vector3f((float)sensdat.bd_ang_accel_rpss[0],
+//                         (float)sensdat.bd_ang_accel_rpss[1],
+//                         (float)sensdat.bd_ang_accel_rpss[2]);
+
+    airspeed_pitot = airspeed;
+
     location.lat = (float)sensdat.lat_deg * 1.0e7;
     location.lng = (float)sensdat.long_deg * 1.0e7;
     location.alt = ft_to_m * (float)sensdat.alt_ft * 100.0f;
+
+    battery_voltage = (float)sensdat.batt_voltage;
 
     dcm.from_euler((float)sensdat.euler_att_rad[0], (float)sensdat.euler_att_rad[1], (float)sensdat.euler_att_rad[2]);
 
     time_now_us = (uint64_t)(sensdat.simtime_sec * 1000000.0);
 
+    rate_hz = sensdat.sim_rate_hz;
 
-    //rcin_chan_count = state.rc.rc_channels.length < 8 ? state.rc.rc_channels.length : 8;
-    for (uint8_t i=0; i < 8; i++) {
-        rcin[i] = 1000;
+    if (sensdat.num_rc_sig_act == 8)
+    {
+        rcin_chan_count = 8;
+        for (uint8_t i=0; i < 8; i++)
+        {
+            rcin[i] = sensdat.rc_sig[i];
+        }
     }
-
-    rcin[1] = 2000;
-
 
 #if 0
     AP::logger().Write("ASM1", "TimeUS,TUS,R,P,Y,GX,GY,GZ",
@@ -177,7 +204,7 @@ void agentsim::update(const struct sitl_input &input)
     }
     else
     {
-           send_servos(input);
+	    send_servos(input);
     }
     recv_fdm();
 
@@ -193,13 +220,13 @@ void agentsim::send_initdat()
     initdat_pkt.init_long = (double)home.lng*1e-7;
     initdat_pkt.init_alt = (double)home.alt*0.01;
 
-       ssize_t send_ret = sock.sendto(&initdat_pkt, sizeof(initdat_pkt), agentsim_ip, agentsim_control_port);
-       if (send_ret != sizeof(initdat_pkt)) {
-               if (send_ret <= 0) {
-                       printf("Unable to send init data output to %s:%u - Error: %s, Return value: %ld\n",
-                                        agentsim_ip, agentsim_control_port, strerror(errno), send_ret);
-               } else {
-                       printf("Sent %ld bytes instead of %ld bytes\n", send_ret, sizeof(initdat_pkt));
-               }
-       }
+	ssize_t send_ret = sock.sendto(&initdat_pkt, sizeof(initdat_pkt), agentsim_ip, agentsim_control_port);
+	if (send_ret != sizeof(initdat_pkt)) {
+		if (send_ret <= 0) {
+			printf("Unable to send init data output to %s:%u - Error: %s, Return value: %ld\n",
+					 agentsim_ip, agentsim_control_port, strerror(errno), send_ret);
+		} else {
+			printf("Sent %ld bytes instead of %ld bytes\n", send_ret, sizeof(initdat_pkt));
+		}
+	}
 }

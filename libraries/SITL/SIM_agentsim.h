@@ -6,18 +6,26 @@
 namespace SITL {
 
 /*
-       agentsim Simulator
+	agentsim Simulator
 */
 
+// Servo packet struct sent to SITL (Agentsim -> SITL)
+static const int num_rc_sig = 8;
 struct sensdat_type {
+    int num_rc_sig_act = 0;
     double bd_tot_accel_fpss[3];
     double bd_ang_rates_rps[3];
+    double bd_ang_accel_rpss[3];
     double ned_vel_fps[3];
     double lat_deg;
     double long_deg;
     double alt_ft;
     double euler_att_rad[3];
     double simtime_sec;
+    double sim_rate_hz;
+    double sim_dt;
+    double rc_sig[num_rc_sig];
+    double batt_voltage;
 };
 
 struct initdat_packet {
@@ -29,12 +37,12 @@ struct initdat_packet {
 
 class agentsim : public Aircraft {
 public:
-       agentsim(const char *frame_str);
+	agentsim(const char *frame_str);
 
-       /* update model by one time step */
-       void update(const struct sitl_input &input) override;
+	/* update model by one time step */
+	void update(const struct sitl_input &input) override;
 
-       /* static object creator */
+	/* static object creator */
     static Aircraft *create(const char *frame_str) {
         return new agentsim(frame_str);
     }
@@ -49,27 +57,27 @@ private:
   int recv_initmsg_confirm = 0;
 
   // Servo packet struct sent to agentsim (SITL -> agentsim)
-       static const int num_pwm_sig = 16;
+	static const int num_pwm_sig = 16;
 
-       struct servo_packet {
-               uint16_t pwm[num_pwm_sig];
-               double hot;
-       };
+	struct servo_packet {
+		uint16_t pwm[num_pwm_sig];
+		double hot;
+	};
 
-       // default connection_info_.ip_address
-       const char *agentsim_ip = "127.0.0.1";
+	// default connection_info_.ip_address
+	const char *agentsim_ip = "127.0.0.1";
 
-       // connection_info_.ip_port
-       uint16_t agentsim_sensor_port = 9003;
+	// connection_info_.ip_port
+	uint16_t agentsim_sensor_port = 9003;
 
-       // connection_info_.sitl_ip_port
-       uint16_t agentsim_control_port = 9002;
+	// connection_info_.sitl_ip_port
+	uint16_t agentsim_control_port = 9002;
 
-       SocketAPM sock;
+	SocketAPM sock;
 
-       void send_servos(const struct sitl_input &input);
-       void recv_fdm();
-       void send_initdat();
+	void send_servos(const struct sitl_input &input);
+	void recv_fdm();
+	void send_initdat();
 
   uint8_t sensor_buffer[65000];
   uint32_t sensor_buffer_len;
