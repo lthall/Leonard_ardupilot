@@ -159,7 +159,7 @@ bool AP_Arming_Copter::parameter_checks(bool display_failure)
         }
 
         // lean angle parameter check
-        if (copter.aparm.angle_max < 1000 || copter.aparm.angle_max > 8000) {
+        if (copter.aparm.angle_max < 1000) {
             check_failed(ARMING_CHECK_PARAMETERS, display_failure, "Check ANGLE_MAX");
             return false;
         }
