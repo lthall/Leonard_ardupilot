@@ -623,8 +623,7 @@ void ModeGuided::set_angle(const Quaternion &q, float climb_rate_cms_or_thrust, 
     // log target
     copter.Log_Write_GuidedTarget(guided_mode,
                            Vector3f(guided_angle_state.roll_cd, guided_angle_state.pitch_cd, guided_angle_state.yaw_cd),
-                           false,
-                           Vector3f(0.0f, 0.0f, climb_rate_cms_or_thrust), Vector3f());
+                           false, Vector3f(0.0f, 0.0f, climb_rate_cms_or_thrust), Vector3f(), use_thrust);
 }
 
 // takeoff_run - takeoff in guided mode
