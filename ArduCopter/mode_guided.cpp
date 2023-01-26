@@ -1009,7 +1009,7 @@ void ModeGuided::angle_control_run()
 
     // call position controller
     if (guided_angle_state.use_thrust) {
-        attitude_control->set_throttle_out(guided_angle_state.thrust, true, copter.g.throttle_filt);
+        attitude_control->set_throttle_out(guided_angle_state.thrust, false, copter.g.throttle_filt);
     } else {
         pos_control->set_pos_target_z_from_climb_rate_cm(climb_rate_cms);
         pos_control->update_z_controller();
