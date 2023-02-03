@@ -58,6 +58,7 @@ jobs:
           CI_BUILD_TARGET: ${{matrix.config}}
         shell: bash
         run: |
+          git config --global --add safe.directory ${GITHUB_WORKSPACE}
           set -ex
           # set up some variables based on what sort of build we're doing:
           BOOTLOADER=0
