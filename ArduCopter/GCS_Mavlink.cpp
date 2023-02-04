@@ -473,33 +473,31 @@ static const ap_message STREAM_RC_CHANNELS_msgs[] = {
 };
 static const ap_message STREAM_EXTRA1_msgs[] = {
     MSG_ATTITUDE,
-    // MSG_ATTITUDE_QUATERNION
-    // MSG_SIMSTATE,
-    // MSG_AHRS2,
-    // MSG_AHRS3,
-    // MSG_PID_TUNING // Up to four PID_TUNING messages are sent, depending on GCS_PID_MASK parameter
+    MSG_SIMSTATE,
+    MSG_AHRS2,
+    MSG_PID_TUNING // Up to four PID_TUNING messages are sent, depending on GCS_PID_MASK parameter
 };
 static const ap_message STREAM_EXTRA2_msgs[] = {
     MSG_VFR_HUD
 };
 static const ap_message STREAM_EXTRA3_msgs[] = {
-    // MSG_AHRS,
-    // MSG_HWSTATUS,
-    // MSG_SYSTEM_TIME,
-    // MSG_RANGEFINDER,
-    // MSG_DISTANCE_SENSOR,
+    MSG_AHRS,
+    MSG_HWSTATUS,
+    MSG_SYSTEM_TIME,
+    MSG_RANGEFINDER,
+    MSG_DISTANCE_SENSOR,
 #if AP_TERRAIN_AVAILABLE && AC_TERRAIN
     MSG_TERRAIN,
 #endif
     MSG_BATTERY2,
     MSG_BATTERY_STATUS,
-    // MSG_MOUNT_STATUS,
-    // MSG_OPTICAL_FLOW,
-    // MSG_GIMBAL_REPORT,
+    MSG_MOUNT_STATUS,
+    MSG_OPTICAL_FLOW,
+    MSG_GIMBAL_REPORT,
     MSG_MAG_CAL_REPORT,
     MSG_MAG_CAL_PROGRESS,
     MSG_EKF_STATUS_REPORT,
-    // MSG_VIBRATION,
+    MSG_VIBRATION,
     MSG_RPM,
     MSG_ESC_TELEMETRY,
 };
@@ -1072,10 +1070,7 @@ void GCS_MAVLINK_Copter::handleMessage(const mavlink_message_t &msg)
         }
 
         // check if we should be using thrust instead of climb rate
-        bool use_thrust = false;
-        if ((packet.type_mask & ((1<<5))) != 0) {
-            use_thrust = true;
-        }
+        bool use_thrust = ((packet.type_mask & ((1<<5))) != 0);
 
         float climb_rate_or_thrust;
         if (use_thrust) {

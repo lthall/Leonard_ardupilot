@@ -543,7 +543,6 @@ const struct LogStructure Copter::log_structure[] = {
 // @Description: Guided mode target information
 // @Field: TimeUS: Time since system startup
 // @Field: Type: Type of guided mode
-// @Field: use_throttle: Use of throttle in Angle Mode
 // @Field: pX: Target position, X-Axis
 // @Field: pY: Target position, Y-Axis
 // @Field: pZ: Target position, Z-Axis
@@ -556,7 +555,7 @@ const struct LogStructure Copter::log_structure[] = {
 // @Field: aZ: Target acceleration, Z-Axis
 
     { LOG_GUIDEDTARGET_MSG, sizeof(log_GuidedTarget),
-      "GUID",  "QBbfffbffffff",    "TimeUS,Type,use_throttle,pX,pY,pZ,Terrain,vX,vY,vZ,aX,aY,aZ", "s--mmm-nnnooo", "F--BBB-BBBBBB" },
+      "GUID",  "QBBfffbffffff",    "TimeUS,Type,IntTh,pX,pY,pZ,Terrain,vX,vY,vZ,aX,aY,aZ", "s--mmm-nnnooo", "F--BBB-BBBBBB" },
 };
 
 void Copter::Log_Write_Vehicle_Startup_Messages()

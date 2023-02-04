@@ -472,7 +472,7 @@ void Copter::ten_hz_logging_loop()
     if (should_log(MASK_LOG_ATTITUDE_MED) || should_log(MASK_LOG_ATTITUDE_FAST)) {
         Log_Write_EKF_POS();
     }
-    if (!should_log(MASK_LOG_IMU_RAW) && !should_log(MASK_LOG_IMU_FAST && should_log(MASK_LOG_IMU))) {
+    if (!should_log(MASK_LOG_IMU_RAW) && !should_log(MASK_LOG_IMU_FAST) && should_log(MASK_LOG_IMU)) {
             AP::ins().Write_IMU();
             AP::ins().Write_Vibration();
     }
