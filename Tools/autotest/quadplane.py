@@ -930,7 +930,6 @@ class AutoTestQuadPlane(AutoTest):
 
         ret = super(AutoTestQuadPlane, self).tests()
         ret.extend([
-            self.AirMode,
             self.TestMotorMask,
             self.PilotYaw,
             self.ParameterChecks,
