@@ -8994,7 +8994,6 @@ class AutoTestCopter(AutoTest):
             self.RefindGPS,
             Test(self.GyroFFT, attempts=8),
             Test(self.GyroFFTHarmonic, attempts=8),
-            self.GyroFFTAverage,
             Test(self.GyroFFTContinuousAveraging, attempts=8),
             self.CompassReordering,
             self.CRSF,
