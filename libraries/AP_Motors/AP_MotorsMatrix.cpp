@@ -368,8 +368,7 @@ void AP_MotorsMatrix::output_armed_stabilizing()
     // calculate how close the motors can come to the desired throttle
     rpy_high *= rpy_scale;
     rpy_low *= rpy_scale;
-    throttle_thrust_best_rpy = -rpy_low;
-    float thr_adj = throttle_thrust - throttle_thrust_best_rpy;
+    float thr_adj = throttle_thrust + rpy_low;
     if (rpy_scale < 1.0f) {
         // Full range is being used by roll, pitch, and yaw.
         limit.roll = true;
@@ -383,14 +382,14 @@ void AP_MotorsMatrix::output_armed_stabilizing()
         // Throttle can't be reduced to desired value
         // todo: add lower limit flag and ensure it is handled correctly in altitude controller
         thr_adj = 0.0f;
-    } else if (thr_adj > 1.0f - (throttle_thrust_best_rpy + rpy_high)) {
+    } else if (thr_adj > 1.0f - (rpy_high - rpy_low)) {
         // Throttle can't be increased to desired value
-        thr_adj = 1.0f - (throttle_thrust_best_rpy + rpy_high);
+        thr_adj = 1.0f - (rpy_high - rpy_low);
         limit.throttle_upper = true;
     }
 
     // add scaled roll, pitch, constrained yaw and throttle for each motor
-    const float throttle_thrust_best_plus_adj = throttle_thrust_best_rpy + thr_adj;
+    const float throttle_thrust_best_plus_adj = thr_adj - rpy_low;
     for (uint8_t i = 0; i < AP_MOTORS_MAX_NUM_MOTORS; i++) {
         if (motor_enabled[i]) {
             _thrust_rpyt_out[i] = (throttle_thrust_best_plus_adj * _throttle_factor[i]) + (rpy_scale * _thrust_rpyt_out[i]);
