@@ -248,7 +248,7 @@ void AP_MotorsMatrix::output_armed_stabilizing()
 
     // throttle providing maximum roll, pitch and yaw range
     // calculate the highest allowed average thrust that will provide maximum control range
-    float throttle_thrust_best_rpy = MIN(0.5f, throttle_avg_max);
+    float throttle_thrust_best_rpy = MIN(1.0 - _yaw_t_headroom, throttle_avg_max);
 
     // calculate throttle that gives most possible room for yaw which is the lower of:
     //      1. 0.5f - (rpy_low+rpy_high)/2.0 - this would give the maximum possible margin above the highest motor and below the lowest
@@ -297,12 +297,9 @@ void AP_MotorsMatrix::output_armed_stabilizing()
         }
     }
 
-    // calculate the maximum yaw control that can be used
-    // todo: make _yaw_headroom 0 to 1
-    float yaw_allowed_min = (float)_yaw_headroom * 0.001f;
-
     // increase yaw headroom to 50% if thrust boost enabled
-    yaw_allowed_min = boost_ratio(0.5, yaw_allowed_min);
+    // consider changing the 0.5 ratio based on frame choice to improve redundancy
+    float yaw_allowed_min = boost_ratio(0.5, _yaw_rp_headroom);
 
     // Let yaw access minimum amount of head room
     yaw_allowed = MAX(yaw_allowed, yaw_allowed_min);

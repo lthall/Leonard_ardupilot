@@ -8,7 +8,8 @@
 #define AP_MOTORS_DENSITY_COMP 1
 #endif
 
-#define AP_MOTORS_YAW_HEADROOM_DEFAULT  200
+#define AP_MOTORS_YAW_RP_MIN_DEFAULT    0.2     // Minimum Yaw actuator allowance vs Roll and Pitch
+#define AP_MOTORS_YAW_T_MIN_DEFAULT     0.5     // Minimum Yaw actuator allowance vs Thrust
 #define AP_MOTORS_THST_EXPO_DEFAULT     0.65f   // set to 0 for linear and 1 for second order approximation
 #define AP_MOTORS_THST_HOVER_DEFAULT    0.35f   // the estimated hover throttle, 0 ~ 1
 #define AP_MOTORS_THST_HOVER_TC         10.0f   // time constant used to update estimated hover throttle, 0 ~ 1
@@ -42,7 +43,7 @@ public:
     void                output_min() override;
 
     // set_yaw_headroom - set yaw headroom (yaw is given at least this amount of pwm)
-    void                set_yaw_headroom(int16_t pwm) { _yaw_headroom.set(pwm); }
+    void                set_yaw_headroom(int16_t pwm) { _yaw_rp_headroom.set(pwm); }
 
     // update_throttle_range - update throttle endpoints
     void                update_throttle_range();
@@ -169,7 +170,8 @@ protected:
     };
 
     // parameters
-    AP_Int16            _yaw_headroom;          // yaw control is given at least this pwm range
+    AP_Float            _yaw_rp_headroom;       // minimum Yaw actuator allowance vs Roll and Pitch in the range 0 ~ 1
+    AP_Float            _yaw_t_headroom;        // minimum Yaw actuator allowance vs Thrust in the range 0 ~ 1
     AP_Float            _thrust_curve_expo;     // curve used to linearize pwm to thrust conversion.  set to 0 for linear and 1 for second order approximation
     AP_Float            _slew_up_time;          // throttle increase slew limitting
     AP_Float            _slew_dn_time;          // throttle decrease slew limitting

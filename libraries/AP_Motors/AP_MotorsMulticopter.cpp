@@ -40,7 +40,6 @@ const AP_Param::GroupInfo AP_MotorsMulticopter::var_info[] = {
     // @Range: 0 500
     // @Units: PWM
     // @User: Advanced
-    AP_GROUPINFO("YAW_HEADROOM", 6, AP_MotorsMulticopter, _yaw_headroom, AP_MOTORS_YAW_HEADROOM_DEFAULT),
 
     // 7 was THR_LOW_CMP
 
@@ -214,6 +213,22 @@ const AP_Param::GroupInfo AP_MotorsMulticopter::var_info[] = {
     // @Increment: 0.001
     // @User: Advanced
     AP_GROUPINFO("SAFE_TIME", 42, AP_MotorsMulticopter, _safe_time, AP_MOTORS_SAFE_TIME_DEFAULT),
+
+    // @Param: YAW_RP_MIN
+    // @DisplayName: Minimum Yaw actuator allowance vs Roll and Pitch
+    // @Description: Minimum Yaw actuator range when roll and/or pitch is saturated, expressed as a number from 0 to 1
+    // @Range: 0 500
+    // @Units: PWM
+    // @User: Advanced
+    AP_GROUPINFO("YAW_RP_MIN", 43, AP_MotorsMulticopter, _yaw_rp_headroom, AP_MOTORS_YAW_RP_MIN_DEFAULT),
+
+    // @Param: YAW_T_MIN
+    // @DisplayName: Minimum Yaw actuator allowance vs Thrust
+    // @Description: Minimum Yaw actuator range when thrust is high, expressed as a number from 0 to 1
+    // @Range: 0 500
+    // @Units: PWM
+    // @User: Advanced
+    AP_GROUPINFO("YAW_T_MIN", 44, AP_MotorsMulticopter, _yaw_t_headroom, AP_MOTORS_YAW_T_MIN_DEFAULT),
 
     AP_GROUPEND
 };
@@ -883,6 +898,6 @@ float AP_MotorsMulticopter::get_throttle_avg_max() const
 
 int16_t AP_MotorsMulticopter::get_yaw_headroom() const
 {
-    return _yaw_headroom;
+    return _yaw_rp_headroom;
 }
 #endif

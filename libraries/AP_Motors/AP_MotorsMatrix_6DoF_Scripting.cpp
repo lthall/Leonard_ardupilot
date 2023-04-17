@@ -206,7 +206,7 @@ void AP_MotorsMatrix_6DoF_Scripting::output_armed_stabilizing()
         apply deadzone to revesible motors, this stops motors from reversing direction too often
         re-use yaw headroom param for deadzone, constain to a max of 25%
     */
-    const float deadzone = constrain_float(_yaw_headroom.get() * 0.001f,0.0f,0.25f);
+    const float deadzone = constrain_float(_yaw_rp_headroom.get(),0.0f,0.25f);
     for (i = 0; i < AP_MOTORS_MAX_NUM_MOTORS; i++) {
         if (motor_enabled[i] && _reversible[i]) {
             if (is_negative(_thrust_rpyt_out[i])) {
