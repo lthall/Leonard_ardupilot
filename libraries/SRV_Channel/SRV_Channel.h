@@ -57,7 +57,7 @@ public:
         k_mount_roll            = 8,            ///< mount roll
         k_mount_open            = 9,            ///< mount open (deploy) / close (retract)
         k_cam_trigger           = 10,           ///< camera trigger
-        k_egg_drop              = 11,           ///< egg drop, deprecated
+        k_tie_down_release      = 11,           ///< tie down release
         k_mount2_pan            = 12,           ///< mount2 yaw (pan)
         k_mount2_tilt           = 13,           ///< mount2 pitch (tilt)
         k_mount2_roll           = 14,           ///< mount2 roll
