@@ -235,6 +235,7 @@ public:
         CAMERA_ZOOM =        167, // camera zoom high = zoom in, middle = hold, low = zoom out
         CAMERA_MANUAL_FOCUS = 168,// camera manual focus.  high = long shot, middle = stop focus, low = close shot
         CAMERA_AUTO_FOCUS =  169, // camera auto focus
+        TIE_DOWN_RELEASE =   170, // Operate tie down release low=open, middle=auto, high=close
 
         // inputs from 200 will eventually used to replace RCMAP
         ROLL =               201, // roll input
