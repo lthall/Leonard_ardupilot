@@ -53,13 +53,14 @@ bool Mode::do_user_takeoff(float takeoff_alt_cm, bool must_navigate)
     return true;
 }
 
-// start takeoff to specified altitude above home in centimeters
+// start takeoff to specified altitude above home in centimetres
 void Mode::_TakeOff::start(float alt_cm)
 {
     // initialise takeoff state
     _running = true;
     take_off_start_alt = copter.pos_control->get_pos_target_z_cm();
     take_off_complete_alt  = take_off_start_alt + alt_cm;
+    SRV_Channels::set_output_scaled(SRV_Channel::k_tie_down_release, 1000);
 }
 
 // stop takeoff
@@ -217,6 +218,7 @@ void Mode::auto_takeoff_run()
     if (auto_takeoff_complete) {
         const Vector3p& complete_pos = copter.pos_control->get_pos_target_cm();
         auto_takeoff_complete_pos = Vector3p{complete_pos.x, complete_pos.y, pos_z};
+        SRV_Channels::set_output_scaled(SRV_Channel::k_tie_down_release, 0);
     }
 }
 
@@ -234,6 +236,7 @@ void Mode::auto_takeoff_start(float complete_alt_cm, bool terrain_alt)
     } else {
         auto_takeoff_no_nav_active = false;
     }
+    SRV_Channels::set_output_scaled(SRV_Channel::k_tie_down_release, 1000);
 }
 
 // return takeoff final position if takeoff has completed successfully
