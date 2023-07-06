@@ -72,6 +72,7 @@ public:
         AP_Int16    neutral_pwm;           // PWM value sent to gripper when not grabbing or releasing
         AP_Int8     regrab_interval;       // Time in seconds that EPM gripper will regrab the cargo to ensure grip has not weakend
         AP_Float    autoclose_time;        // Automatic close time (in seconds)
+        AP_Float    delaygrab_time;        // Delay grab time (in seconds)
         AP_Int16    uavcan_hardpoint_id;
 
         gripper_state state = STATE_RELEASED;

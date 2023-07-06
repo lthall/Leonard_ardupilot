@@ -74,6 +74,14 @@ const AP_Param::GroupInfo AP_Gripper::var_info[] = {
     // @Units: s
     AP_GROUPINFO("AUTOCLOSE",  7, AP_Gripper, config.autoclose_time, GRIPPER_AUTOCLOSE_DEFAULT),
 
+    // @Param: DELAYGRAB
+    // @DisplayName: Gripper delay close time
+    // @Description: Time in seconds that gripper waits before closing, 0 to disable
+    // @User: Advanced
+    // @Range: 0.25 255
+    // @Units: s
+    AP_GROUPINFO("DELAYGRAB",  8, AP_Gripper, config.delaygrab_time, GRIPPER_AUTOCLOSE_DEFAULT),
+
     AP_GROUPEND
 };
 
