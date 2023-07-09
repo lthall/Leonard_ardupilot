@@ -629,6 +629,23 @@ bool RC_Channel_Copter::do_aux_function(const aux_func_t ch_option, const AuxSwi
             }
             break;
 
+        case AUX_FUNC::TIE_DOWN_RELEASE:
+            switch (ch_flag) {
+            case AuxSwitchPos::LOW:
+                // release tie down
+                gcs().send_text(MAV_SEVERITY_INFO, "Release tie down");
+                SRV_Channels::set_output_scaled(SRV_Channel::k_tie_down_release, 1000);
+                break;
+            case AuxSwitchPos::MIDDLE:
+                break;
+            case AuxSwitchPos::HIGH:
+                // secure tie down
+                gcs().send_text(MAV_SEVERITY_INFO, "Secure tie down");
+                SRV_Channels::set_output_scaled(SRV_Channel::k_tie_down_release, 0);
+                break;
+            }
+            break;
+
 #if AC_CUSTOMCONTROL_MULTI_ENABLED == ENABLED
         case AUX_FUNC::CUSTOM_CONTROLLER:
             copter.custom_control.set_custom_controller(ch_flag == AuxSwitchPos::HIGH);
