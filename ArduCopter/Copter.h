@@ -216,6 +216,7 @@ public:
     friend class ModeLoiter;
     friend class ModePosHold;
     friend class ModeRTL;
+    friend class ModeShipOperation;
     friend class ModeSmartRTL;
     friend class ModeSport;
     friend class ModeStabilize;
@@ -606,7 +607,8 @@ private:
         SMARTRTL_LAND      = 4,
         TERMINATE          = 5,
         AUTO_DO_LAND_START = 6,
-        BRAKE_LAND         = 7
+        BRAKE_LAND         = 7,
+        SHIP_OPERATION     = 8
     };
 
     enum class FailsafeOption {
@@ -631,6 +633,7 @@ private:
                                                       (int8_t)FailsafeAction::RTL,
                                                       (int8_t)FailsafeAction::SMARTRTL_LAND,
                                                       (int8_t)FailsafeAction::SMARTRTL,
+                                                      (int8_t)FailsafeAction::SHIP_OPERATION,
                                                       (int8_t)FailsafeAction::NONE,
                                                       -1 // the priority list must end with a sentinel of -1
                                                      };
@@ -772,6 +775,7 @@ private:
     void gpsglitch_check();
     void failsafe_deadreckon_check();
     void set_mode_RTL_or_land_with_pause(ModeReason reason);
+    void set_mode_Ship_Op_or_RTL_or_land_with_pause(ModeReason reason);
     void set_mode_SmartRTL_or_RTL(ModeReason reason);
     void set_mode_SmartRTL_or_land_with_pause(ModeReason reason);
     void set_mode_auto_do_land_start_or_RTL(ModeReason reason);
@@ -1022,6 +1026,9 @@ private:
 #endif
 #if MODE_TURTLE_ENABLED == ENABLED
     ModeTurtle mode_turtle;
+#endif
+#if MODE_SHIP_OPS_ENABLED == ENABLED
+    ModeShipOperation mode_ship_ops;
 #endif
 
     // mode.cpp
