@@ -390,7 +390,7 @@ bool AP_GPS_Backend::calculate_moving_base_yaw(AP_GPS::GPS_State &interim_state,
         }
 
 
-        if ((offset_dist - reported_distance) > (min_dist * permitted_error_length_pct)) {
+        if (fabsf(offset_dist - reported_distance) > (min_dist * permitted_error_length_pct)) {
             // the magnitude of the vector is much further then we were expecting
             Debug("Exceeded the permitted error margin %f > %f",
                   (double)(offset_dist - reported_distance), (double)(min_dist * permitted_error_length_pct));
@@ -429,6 +429,7 @@ bool AP_GPS_Backend::calculate_moving_base_yaw(AP_GPS::GPS_State &interim_state,
 
         {
             // at this point the offsets are looking okay, go ahead and actually calculate a useful heading
+            // I think this assumes the antenna are on the X or Y axis.
             const float rotation_offset_rad = Vector2f(-offset.x, -offset.y).angle();
             interim_state.gps_yaw = wrap_360(reported_heading_deg - degrees(rotation_offset_rad));
             interim_state.have_gps_yaw = true;
