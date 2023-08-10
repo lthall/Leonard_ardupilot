@@ -1198,7 +1198,8 @@ void GCS_MAVLINK_Copter::handleMessage(const mavlink_message_t &msg)
         if (packet.coordinate_frame != MAV_FRAME_LOCAL_NED &&
             packet.coordinate_frame != MAV_FRAME_LOCAL_OFFSET_NED &&
             packet.coordinate_frame != MAV_FRAME_BODY_NED &&
-            packet.coordinate_frame != MAV_FRAME_BODY_OFFSET_NED) {
+            packet.coordinate_frame != MAV_FRAME_BODY_OFFSET_NED &&
+            packet.coordinate_frame != MAV_FRAME_LOCAL_FRD) {
             // input is not valid so stop
             copter.mode_guided.init(true);
             break;
@@ -1214,6 +1215,8 @@ void GCS_MAVLINK_Copter::handleMessage(const mavlink_message_t &msg)
         // Force inputs are not supported
         // Do not accept command if force_set is true and acc_ignore is false
         if (force_set && !acc_ignore) {
+            // input is not valid so stop
+            copter.mode_guided.init(true);
             break;
         }
 
@@ -1224,13 +1227,15 @@ void GCS_MAVLINK_Copter::handleMessage(const mavlink_message_t &msg)
             pos_vector = Vector3f(packet.x * 100.0f, packet.y * 100.0f, -packet.z * 100.0f);
             // rotate to body-frame if necessary
             if (packet.coordinate_frame == MAV_FRAME_BODY_NED ||
-                packet.coordinate_frame == MAV_FRAME_BODY_OFFSET_NED) {
+                packet.coordinate_frame == MAV_FRAME_BODY_OFFSET_NED ||
+                packet.coordinate_frame == MAV_FRAME_LOCAL_FRD) {
                 copter.rotate_body_frame_to_NE(pos_vector.x, pos_vector.y);
             }
             // add body offset if necessary
             if (packet.coordinate_frame == MAV_FRAME_LOCAL_OFFSET_NED ||
                 packet.coordinate_frame == MAV_FRAME_BODY_NED ||
-                packet.coordinate_frame == MAV_FRAME_BODY_OFFSET_NED) {
+                packet.coordinate_frame == MAV_FRAME_BODY_OFFSET_NED ||
+                packet.coordinate_frame == MAV_FRAME_LOCAL_FRD) {
                 pos_vector += copter.inertial_nav.get_position_neu_cm();
             }
         }
@@ -1246,7 +1251,7 @@ void GCS_MAVLINK_Copter::handleMessage(const mavlink_message_t &msg)
             }
             vel_vector *= 100;  // m/s -> cm/s
             // rotate to body-frame if necessary
-            if (packet.coordinate_frame == MAV_FRAME_BODY_NED || packet.coordinate_frame == MAV_FRAME_BODY_OFFSET_NED) {
+            if (packet.coordinate_frame == MAV_FRAME_BODY_NED || packet.coordinate_frame == MAV_FRAME_BODY_OFFSET_NED || packet.coordinate_frame == MAV_FRAME_LOCAL_FRD) {
                 copter.rotate_body_frame_to_NE(vel_vector.x, vel_vector.y);
             }
         }
@@ -1257,7 +1262,7 @@ void GCS_MAVLINK_Copter::handleMessage(const mavlink_message_t &msg)
             // convert to cm
             accel_vector = Vector3f(packet.afx * 100.0f, packet.afy * 100.0f, -packet.afz * 100.0f);
             // rotate to body-frame if necessary
-            if (packet.coordinate_frame == MAV_FRAME_BODY_NED || packet.coordinate_frame == MAV_FRAME_BODY_OFFSET_NED) {
+            if (packet.coordinate_frame == MAV_FRAME_BODY_NED || packet.coordinate_frame == MAV_FRAME_BODY_OFFSET_NED || packet.coordinate_frame == MAV_FRAME_LOCAL_FRD) {
                 copter.rotate_body_frame_to_NE(accel_vector.x, accel_vector.y);
             }
         }
@@ -1268,7 +1273,7 @@ void GCS_MAVLINK_Copter::handleMessage(const mavlink_message_t &msg)
         float yaw_rate_cds = 0.0f;
         if (!yaw_ignore) {
             yaw_cd = ToDeg(packet.yaw) * 100.0f;
-            yaw_relative = packet.coordinate_frame == MAV_FRAME_BODY_NED || packet.coordinate_frame == MAV_FRAME_BODY_OFFSET_NED;
+            yaw_relative = packet.coordinate_frame == MAV_FRAME_BODY_NED || packet.coordinate_frame == MAV_FRAME_BODY_OFFSET_NED || packet.coordinate_frame == MAV_FRAME_LOCAL_FRD;
         }
         if (!yaw_rate_ignore) {
             yaw_rate_cds = ToDeg(packet.yaw_rate) * 100.0f;

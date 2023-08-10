@@ -546,6 +546,7 @@ void ModeGuided::set_velaccel(const Vector3f& velocity, const Vector3f& accelera
     guided_pos_terrain_alt = false;
     guided_vel_target_cms = velocity;
     guided_accel_target_cmss = acceleration;
+    guided_angle_state.climb_rate_cms = -velocity.z;
     update_time_ms = millis();
 
     // log target
@@ -974,6 +975,66 @@ void ModeGuided::angle_control_run()
         pos_control->set_pos_target_z_from_climb_rate_cm(climb_rate_cms);
         pos_control->update_z_controller();
     }
+}
+
+// velaccel_control_run - runs the guided velocity controller
+// called from guided_run
+void ModeGuided::accel_control_run_nogps()
+{
+    float climb_rate_cms = 0.0f;
+    if (!guided_angle_state.use_thrust) {
+        // constrain climb rate
+        climb_rate_cms = constrain_float(guided_angle_state.climb_rate_cms, -wp_nav->get_default_speed_down(), wp_nav->get_default_speed_up());
+
+        // get avoidance adjusted climb rate
+        climb_rate_cms = get_avoidance_adjusted_climbrate(climb_rate_cms);
+    }
+
+    // check for timeout - set lean angles and climb rate to zero if no updates received for 3 seconds
+    uint32_t tnow = millis();
+    if (tnow - guided_angle_state.update_time_ms > get_timeout_ms()) {
+        guided_angle_state.attitude_quat.initialise();
+        guided_angle_state.ang_vel.zero();
+        climb_rate_cms = 0.0f;
+        guided_accel_target_cmss.zero();
+    }
+
+    // interpret positive climb rate as triggering take-off
+    if (motors->armed() && is_positive(climb_rate_cms)) {
+        copter.set_auto_armed(true);
+    }
+
+    // if not armed set throttle to zero and exit immediately
+    if (!motors->armed() || !copter.ap.auto_armed || (copter.ap.land_complete && !is_positive(climb_rate_cms))) {
+        // do not spool down tradheli when on the ground with motor interlock enabled
+        make_safe_ground_handling(copter.is_tradheli() && motors->get_interlock());
+        return;
+    }
+
+    // TODO: use get_alt_hold_state
+    // landed with positive desired climb rate, takeoff
+    if (copter.ap.land_complete && (guided_angle_state.climb_rate_cms > 0.0f)) {
+        zero_throttle_and_relax_ac();
+        motors->set_desired_spool_state(AP_Motors::DesiredSpoolState::THROTTLE_UNLIMITED);
+        if (motors->get_spool_state() == AP_Motors::SpoolState::THROTTLE_UNLIMITED) {
+            set_land_complete(false);
+            pos_control->init_z_controller();
+        }
+        return;
+    }
+
+    // set motors to full range
+    motors->set_desired_spool_state(AP_Motors::DesiredSpoolState::THROTTLE_UNLIMITED);
+
+    // call attitude controller
+    attitude_control->input_quaternion(guided_angle_state.attitude_quat, guided_angle_state.ang_vel);
+
+    // call attitude controller with auto yaw
+    attitude_control->input_thrust_vector_heading(guided_accel_target_cmss, auto_yaw.get_heading());
+
+    // call position controller
+    pos_control->set_pos_target_z_from_climb_rate_cm(climb_rate_cms);
+    pos_control->update_z_controller();
 }
 
 // helper function to set yaw state and targets

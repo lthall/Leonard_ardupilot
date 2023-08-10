@@ -1031,6 +1031,7 @@ public:
 
     void angle_control_start();
     void angle_control_run();
+    void accel_control_run_nogps();
 
     // return guided mode timeout in milliseconds. Only used for velocity, acceleration, angle control, and angular rate control
     uint32_t get_timeout_ms() const;
@@ -1040,6 +1041,7 @@ public:
     // pause continue in guided mode
     bool pause() override;
     bool resume() override;
+    SubMode guided_mode = SubMode::TakeOff;
 
     // true if weathervaning is allowed in guided
 #if WEATHERVANE_ENABLED == ENABLED
@@ -1087,7 +1089,6 @@ private:
     void set_yaw_state(bool use_yaw, float yaw_cd, bool use_yaw_rate, float yaw_rate_cds, bool relative_angle);
 
     // controls which controller is run (pos or vel):
-    SubMode guided_mode = SubMode::TakeOff;
     bool send_notification;     // used to send one time notification to ground station
     bool takeoff_complete;      // true once takeoff has completed (used to trigger retracting of landing gear)
 
@@ -1116,6 +1117,8 @@ protected:
     const char *name4() const override { return "GNGP"; }
 
 private:
+    void accel_control_start();
+    void accel_control_run();
 
 };
 

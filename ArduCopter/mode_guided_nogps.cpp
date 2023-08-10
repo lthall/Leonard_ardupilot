@@ -18,8 +18,25 @@ bool ModeGuidedNoGPS::init(bool ignore_checks)
 // should be called at 100hz or more
 void ModeGuidedNoGPS::run()
 {
-    // run angle controller
-    ModeGuided::angle_control_run();
+
+    // call the correct auto controller
+
+    switch (ModeGuided::guided_mode) {
+
+    case SubMode::VelAccel:
+        ModeGuided::accel_control_run_nogps();
+        break;
+
+    case SubMode::Angle:
+        ModeGuided::angle_control_run();
+        break;
+        
+    default:
+        // this will only run once
+        ModeGuided::angle_control_start();
+        ModeGuided::angle_control_run();
+        break;
+    }
 }
 
 #endif
