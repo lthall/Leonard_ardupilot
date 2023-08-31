@@ -77,7 +77,7 @@ void AP_InertialSensor::Write_Vibration() const
 {
     const uint64_t time_us = AP_HAL::micros64();
     for (uint8_t i = 0; i < INS_MAX_INSTANCES; i++) {
-        if (!use_accel(i)) {
+        if (!should_log(i)) {
             continue;
         }
 

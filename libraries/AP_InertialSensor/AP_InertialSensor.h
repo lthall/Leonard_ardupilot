@@ -179,6 +179,9 @@ public:
     uint8_t get_accel_count(void) const { return MIN(INS_MAX_INSTANCES, _accel_count); }
     bool accel_calibrated_ok_all() const;
     bool use_accel(uint8_t instance) const;
+    bool should_log(uint8_t instance) const;
+    bool is_high_vibrations() const;
+    bool is_high_vibrations(uint8_t instance) const;
 
     // get observed sensor rates, including any internal sampling multiplier
     uint16_t get_gyro_rate_hz(uint8_t instance) const { return uint16_t(_gyro_raw_sample_rates[instance] * _gyro_over_sampling[instance]); }
@@ -596,6 +599,9 @@ private:
     bool _gyro_cal_ok[INS_MAX_INSTANCES];
     bool _accel_id_ok[INS_MAX_INSTANCES];
 
+    // the best calibration error for each gyro
+    float _best_diff[INS_MAX_INSTANCES];
+
     // primary accel and gyro
     uint8_t _primary_gyro;
     uint8_t _primary_accel;
@@ -635,6 +641,7 @@ private:
     // health of gyros and accels
     bool _gyro_healthy[INS_MAX_INSTANCES];
     bool _accel_healthy[INS_MAX_INSTANCES];
+    bool _high_vibes[INS_MAX_INSTANCES];
 
     uint32_t _accel_error_count[INS_MAX_INSTANCES];
     uint32_t _gyro_error_count[INS_MAX_INSTANCES];
@@ -776,6 +783,9 @@ private:
     AP_Float caltemp_gyro[INS_MAX_INSTANCES];
     AP_Int32 tcal_options;
     bool tcal_learning;
+
+    AP_Int16 max_clips;
+    AP_Int16 max_vibes;
 #endif
 };
 

@@ -9,6 +9,7 @@
 #include <AP_Module/AP_Module.h>
 #endif
 #include <stdio.h>
+#include <GCS_MAVLink/GCS.h>
 
 #define SENSOR_RATE_DEBUG 0
 
@@ -452,6 +453,28 @@ void AP_InertialSensor_Backend::_publish_accel(uint8_t instance, const Vector3f 
     }
     _imu._accel[instance] = accel;
     _imu._accel_healthy[instance] = true;
+
+    static bool text_sent[INS_MAX_INSTANCES] { } ;
+    if (_imu._accel_clip_count[instance] > (uint32_t)_imu.max_clips) {
+        _imu._high_vibes[instance] = true;
+        if (!text_sent[instance]) {
+            GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "IMU%u accel clipped %" PRIu32 " times", instance+1, _imu._accel_clip_count[instance]);
+            text_sent[instance] = true;
+        }
+    }
+    const Vector3f vibration = _imu.get_vibration_levels(instance);
+    if ((vibration.x > _imu.max_vibes) ||
+        (vibration.y > _imu.max_vibes) ||
+        (vibration.z > _imu.max_vibes)) {
+        _imu._high_vibes[instance] = true;
+        if (!text_sent[instance]) {
+            GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "IMU%u accel vibration %.1f %.1f %.1f", instance+1, vibration.x, vibration.y, vibration.z);
+            text_sent[instance] = true;
+        }
+    }
+    if (!_imu._high_vibes[instance]) {
+        text_sent[instance] = false;
+    }
 
     // publish delta velocity
     _imu._delta_velocity[instance] = _imu._delta_velocity_acc[instance];

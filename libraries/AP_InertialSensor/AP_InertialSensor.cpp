@@ -643,6 +643,18 @@ const AP_Param::GroupInfo AP_InertialSensor::var_info[] = {
     
 #endif // HAL_INS_TEMPERATURE_CAL_ENABLE
 
+    // @Param: MAX_CLIPS
+    // @DisplayName: Maximum clip values
+    // @Description: Beyond this number of clips, the sensor will be considered unhealthy
+    // @User: Advanced
+    AP_GROUPINFO("MAX_CLIPS", 54, AP_InertialSensor, max_clips, 20),
+
+    // @Param: MAX_VIBES
+    // @DisplayName: Maximum vibe values
+    // @Description: Beyond this number of vibes, the sensor will be considered unhealthy
+    // @User: Advanced
+    AP_GROUPINFO("MAX_VIBES", 55, AP_InertialSensor, max_vibes, 25),
+
     /*
       NOTE: parameter indexes have gaps above. When adding new
       parameters check for conflicts carefully
@@ -1280,14 +1292,23 @@ bool AP_InertialSensor::get_gyro_health_all(void) const
 // gyro_calibration_ok_all - returns true if all gyros were calibrated successfully
 bool AP_InertialSensor::gyro_calibrated_ok_all() const
 {
+    bool calibrated = true;
     for (uint8_t i=0; i<get_gyro_count(); i++) {
         if (!gyro_calibrated_ok(i)) {
-            return false;
+            // if _best_diff[i] == -1 then the accelerometer reported too high values to conduct the test
+            GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "Gyro %u is not calibrated. Best diff=%f", i, _best_diff[i]);
+            calibrated = false;
         }
     }
+
+    if (!calibrated) {
+        return false;
+    }
+
     for (uint8_t i=get_gyro_count(); i<INS_MAX_INSTANCES; i++) {
         if (_gyro_id[i] != 0) {
             // missing gyro
+            GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "Gyro %u is missing", i);
             return false;
         }
     }
@@ -1314,6 +1335,27 @@ bool AP_InertialSensor::get_accel_health_all(void) const
     }
     // return true if we have at least one accel
     return (get_accel_count() > 0);
+}
+
+// is all accel vibrations under healthy threshold
+bool AP_InertialSensor::is_high_vibrations() const
+{
+    for (uint8_t i = 0; i < get_accel_count(); ++i) {
+        if (is_high_vibrations(i)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// is accel instance vibrations under healthy threshold
+bool AP_InertialSensor::is_high_vibrations(uint8_t instance) const
+{
+    if (instance >= INS_MAX_INSTANCES) {
+        return false;
+    }
+
+    return _high_vibes[instance];
 }
 
 
@@ -1415,13 +1457,22 @@ bool AP_InertialSensor::use_accel(uint8_t instance) const
     return (get_accel_health(instance) && _use[instance]);
 }
 
+// return true if accel instance should be logged (must have it's use parameter set to 1)
+bool AP_InertialSensor::should_log(uint8_t instance) const
+{
+    if (instance >= INS_MAX_INSTANCES) {
+        return false;
+    }
+
+    return _use[instance];
+}
+
 void
 AP_InertialSensor::_init_gyro()
 {
     uint8_t num_gyros = MIN(get_gyro_count(), INS_MAX_INSTANCES);
     Vector3f last_average[INS_MAX_INSTANCES], best_avg[INS_MAX_INSTANCES];
     Vector3f new_gyro_offset[INS_MAX_INSTANCES];
-    float best_diff[INS_MAX_INSTANCES];
     bool converged[INS_MAX_INSTANCES];
 #if HAL_INS_TEMPERATURE_CAL_ENABLE
     float start_temperature[INS_MAX_INSTANCES] {};
@@ -1452,7 +1503,7 @@ AP_InertialSensor::_init_gyro()
     for (uint8_t k=0; k<num_gyros; k++) {
         _gyro_offset[k].set(Vector3f());
         new_gyro_offset[k].zero();
-        best_diff[k] = -1.f;
+        _best_diff[k] = -1.f;
         last_average[k].zero();
         converged[k] = false;
     }
@@ -1520,8 +1571,8 @@ AP_InertialSensor::_init_gyro()
         }
 
         for (uint8_t k=0; k<num_gyros; k++) {
-            if (best_diff[k] < 0) {
-                best_diff[k] = diff_norm[k];
+            if (_best_diff[k] < 0) {
+                _best_diff[k] = diff_norm[k];
                 best_avg[k] = gyro_avg[k];
             } else if (gyro_diff[k].length() < ToRad(GYRO_INIT_MAX_DIFF_DPS)) {
                 // we want the average to be within 0.1 bit, which is 0.04 degrees/s
@@ -1533,8 +1584,8 @@ AP_InertialSensor::_init_gyro()
                     converged[k] = true;
                     num_converged++;
                 }
-            } else if (diff_norm[k] < best_diff[k]) {
-                best_diff[k] = diff_norm[k];
+            } else if (diff_norm[k] < _best_diff[k]) {
+                _best_diff[k] = diff_norm[k];
                 best_avg[k] = (gyro_avg[k] * 0.5f) + (last_average[k] * 0.5f);
             }
             last_average[k] = gyro_avg[k];
@@ -1548,7 +1599,7 @@ AP_InertialSensor::_init_gyro()
         if (!converged[k]) {
             hal.console->printf("gyro[%u] did not converge: diff=%f dps (expected < %f)\n",
                                 (unsigned)k,
-                                (double)ToDeg(best_diff[k]),
+                                (double)ToDeg(_best_diff[k]),
                                 (double)GYRO_INIT_MAX_DIFF_DPS);
             _gyro_offset[k] = best_avg[k];
             // flag calibration as failed for this gyro
@@ -1632,6 +1683,7 @@ void AP_InertialSensor::update(void)
             // _publish_accel()
             _gyro_healthy[i] = false;
             _accel_healthy[i] = false;
+            _high_vibes[i] = false;
             _delta_velocity_valid[i] = false;
             _delta_angle_valid[i] = false;
         }
