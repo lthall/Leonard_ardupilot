@@ -33,6 +33,15 @@ const AP_Param::GroupInfo AP_Mission::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("OPTIONS",  2, AP_Mission, _options, AP_MISSION_OPTIONS_DEFAULT),
 
+    // @Param: WP_DELAY
+    // @DisplayName: Delay time in every waypoint
+    // @Description: Defines the time (in seconds) which the aircraft will wait in every waypoint before continue to the next one
+    // @Units: seconds
+    // @Range: 0 255
+    // @Increment: 1
+    // @User: Standard
+    AP_GROUPINFO("WP_DELAY",  3, AP_Mission, _wp_delay, 0),
+
     AP_GROUPEND
 };
 
@@ -82,6 +91,9 @@ void AP_Mission::start()
 void AP_Mission::stop()
 {
     _flags.state = MISSION_STOPPED;
+
+    _first_item_index = AP_MISSION_CMD_INDEX_NONE;
+    _last_item_index = AP_MISSION_CMD_INDEX_NONE;
 }
 
 /// resume - continues the mission execution from where we last left off
@@ -206,12 +218,40 @@ bool AP_Mission::continue_after_land_check_for_takeoff()
 /// start_or_resume - if MIS_AUTORESTART=0 this will call resume(), otherwise it will call start()
 void AP_Mission::start_or_resume()
 {
+    if (_flags.state == MISSION_RUNNING) {
+        return;  // mission is already running. we don't want to run it twice...
+    }
+
     if (_restart == 1 && !_force_resume) {
         start();
     } else {
         resume();
         _force_resume = false;
     }
+}
+
+/// set_index_boundaries - sets the first and last mission command indices (inclusive). use 0 for unused indices.
+bool AP_Mission::set_index_boundaries(uint16_t first_item_index, uint16_t last_item_index)
+{
+    if ((last_item_index > 0) && (first_item_index > last_item_index)) {
+        GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "last item index must be greater (or equal) than first item");
+        return false;
+    }
+    if ((first_item_index > 0) && (_flags.state == MISSION_RUNNING)) {
+        GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "changing the first item while mission is running is not permitted");
+        return false;
+    }
+    if (first_item_index > 0) {
+        _first_item_index = first_item_index;
+    } else {
+        _first_item_index = AP_MISSION_CMD_INDEX_NONE;
+    }
+    if (last_item_index > 0) {
+        _last_item_index = last_item_index;
+    } else {
+        _last_item_index = AP_MISSION_CMD_INDEX_NONE;
+    }
+    return true;
 }
 
 /// reset - reset mission to the first command
@@ -245,6 +285,8 @@ bool AP_Mission::clear()
     // clear index to commands
     _nav_cmd.index = AP_MISSION_CMD_INDEX_NONE;
     _do_cmd.index = AP_MISSION_CMD_INDEX_NONE;
+    _first_item_index = AP_MISSION_CMD_INDEX_NONE;
+    _last_item_index = AP_MISSION_CMD_INDEX_NONE;
     _flags.nav_cmd_loaded = false;
     _flags.do_cmd_loaded = false;
 
@@ -681,6 +723,10 @@ bool AP_Mission::read_cmd_from_storage(uint16_t index, Mission_Command& cmd) con
         cmd.id = MAV_CMD_NAV_WAYPOINT;
         cmd.content.location = AP::ahrs().get_home();
         return true;
+    }
+
+    if ((_last_item_index != AP_MISSION_CMD_INDEX_NONE) && (index > _last_item_index)) {
+        return false;
     }
 
     if (index >= (unsigned)_cmd_total) {
@@ -1715,6 +1761,9 @@ void AP_Mission::complete()
 
     // callback to main program's mission complete function
     _mission_complete_fn();
+
+    _first_item_index = AP_MISSION_CMD_INDEX_NONE;
+    _last_item_index = AP_MISSION_CMD_INDEX_NONE;
 }
 
 /// advance_current_nav_cmd - moves current nav command forward
@@ -1747,12 +1796,21 @@ bool AP_Mission::advance_current_nav_cmd(uint16_t starting_index)
         // start from one position past the current nav command
         cmd_index++;
     }
+    if (_first_item_index != AP_MISSION_CMD_INDEX_NONE) {
+        cmd_index = _first_item_index;
+        _first_item_index = AP_MISSION_CMD_INDEX_NONE;
+    }
 
     // avoid endless loops
     uint8_t max_loops = 255;
 
     // search until we find next nav command or reach end of command list
     while (!_flags.nav_cmd_loaded && max_loops-- > 0) {
+        if ((_last_item_index != AP_MISSION_CMD_INDEX_NONE) && (cmd_index > _last_item_index)) {
+            _last_item_index = AP_MISSION_CMD_INDEX_NONE;
+            return false;
+        }
+
         // get next command
         Mission_Command cmd;
         if (!get_next_cmd(cmd_index, cmd, true)) {
@@ -1861,6 +1919,10 @@ bool AP_Mission::get_next_cmd(uint16_t start_index, Mission_Command& cmd, bool i
     // search until the end of the mission command list
     uint8_t max_loops = 64;
     while (cmd_index < (unsigned)_cmd_total) {
+        if ((_last_item_index != AP_MISSION_CMD_INDEX_NONE) && (cmd_index > _last_item_index)) {
+            return false;
+        }
+
         // load the next command
         if (!read_cmd_from_storage(cmd_index, temp_cmd)) {
             // this should never happen because of check above but just in case
@@ -1914,6 +1976,9 @@ bool AP_Mission::get_next_cmd(uint16_t start_index, Mission_Command& cmd, bool i
         } else {
             // this is a non-jump command so return it
             cmd = temp_cmd;
+            if (cmd.id == MAV_CMD_NAV_WAYPOINT || cmd.id == MAV_CMD_NAV_SPLINE_WAYPOINT) {
+                cmd.p1 += _wp_delay;
+            }
             return true;
         }
     }

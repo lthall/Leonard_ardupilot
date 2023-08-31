@@ -352,6 +352,9 @@ public:
         // clear commands
         _nav_cmd.index = AP_MISSION_CMD_INDEX_NONE;
         _do_cmd.index = AP_MISSION_CMD_INDEX_NONE;
+
+        _first_item_index = AP_MISSION_CMD_INDEX_NONE;
+        _last_item_index = AP_MISSION_CMD_INDEX_NONE;
     }
 
     // get singleton instance
@@ -407,6 +410,9 @@ public:
 
     /// start_or_resume - if MIS_AUTORESTART=0 this will call resume(), otherwise it will call start()
     void start_or_resume();
+
+    /// set_index_boundaries - sets the first and last mission command indices (inclusive). use 0 for unused indices.
+    bool set_index_boundaries(uint16_t first_item_index, uint16_t last_item_index);
 
     /// check mission starts with a takeoff command
     bool starts_with_takeoff_cmd();
@@ -711,6 +717,7 @@ private:
     AP_Int16                _cmd_total;  // total number of commands in the mission
     AP_Int16                _options;    // bitmask options for missions, currently for mission clearing on reboot but can be expanded as required
     AP_Int8                 _restart;   // controls mission starting point when entering Auto mode (either restart from beginning of mission or resume from last command run)
+    AP_Int16                _wp_delay;  // the time (in seconds) which the aircraft will wait in every waypoint before continue to the next one
 
     // internal variables
     bool                    _force_resume;  // when set true it forces mission to resume irrespective of MIS_RESTART param.
@@ -718,6 +725,8 @@ private:
     struct Mission_Command  _nav_cmd;   // current "navigation" command.  It's position in the command list is held in _nav_cmd.index
     struct Mission_Command  _do_cmd;    // current "do" command.  It's position in the command list is held in _do_cmd.index
     struct Mission_Command  _resume_cmd;  // virtual wp command that is used to resume mission if the mission needs to be rewound on resume.
+    uint16_t                _first_item_index; // index of first mission item
+    uint16_t                _last_item_index;  // index of last mission item
     uint16_t                _prev_nav_cmd_id;       // id of the previous "navigation" command. (WAYPOINT, LOITER_TO_ALT, ect etc)
     uint16_t                _prev_nav_cmd_index;    // index of the previous "navigation" command.  Rarely used which is why we don't store the whole command
     uint16_t                _prev_nav_cmd_wp_index; // index of the previous "navigation" command that contains a waypoint.  Rarely used which is why we don't store the whole command
