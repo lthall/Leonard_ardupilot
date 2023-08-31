@@ -37,6 +37,7 @@ public:
         ARMING_CHECK_AUX_AUTH    = (1U << 17),
         ARMING_CHECK_VISION      = (1U << 18),
         ARMING_CHECK_FFT         = (1U << 19),
+        ARMING_CHECK_PARACHUTE   = (1U << 20),
     };
 
     enum class Method {
@@ -167,6 +168,8 @@ protected:
     virtual bool mission_checks(bool report);
 
     bool rangefinder_checks(bool report);
+
+    bool parachute_checks(bool report);
 
     bool fence_checks(bool report);
 
