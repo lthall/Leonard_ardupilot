@@ -31,6 +31,11 @@ FileData *AP_Filesystem_Backend::load_file(const char *filename)
     if (fd == nullptr) {
         return nullptr;
     }
+    if (st.st_size == 0) {
+        fd->data = nullptr;
+        fd->length = 0;
+        return fd;
+    }
     void *data = malloc(st.st_size);
     if (data == nullptr) {
         delete fd;
