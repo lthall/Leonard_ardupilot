@@ -28,6 +28,10 @@ void Mode::AutoYaw::set_mode_to_default(bool rtl)
 // set rtl parameter to true if this is during an RTL
 autopilot_yaw_mode Mode::AutoYaw::default_mode(bool rtl) const
 {
+    if (AP::vehicle()->get_motor_failure()) {
+        return (autopilot_yaw_mode)copter.g.wp_yaw_behavior_mf.get();
+    }
+
     switch (copter.g.wp_yaw_behavior) {
 
     case WP_YAW_BEHAVIOR_NONE:

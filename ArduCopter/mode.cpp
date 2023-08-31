@@ -340,6 +340,10 @@ bool Copter::set_mode(const uint8_t new_mode, const ModeReason reason)
         return false;
     }
 #endif
+    if ((reason == ModeReason::GCS_COMMAND) && copter.failsafe.gcs && (g.failsafe_gcs == FS_GCS_ENABLED_ALWAYS_FALLBACK_MISSION) && motors->armed()) {
+        // don't allow mode changes during fallback mission in gcs failsafe
+        return false;
+    }
     return copter.set_mode(static_cast<Mode::Number>(new_mode), reason);
 }
 

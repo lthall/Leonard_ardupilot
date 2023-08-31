@@ -179,6 +179,9 @@ void Copter::failsafe_ekf_event()
 
     // take action based on fs_ekf_action parameter
     switch (g.fs_ekf_action) {
+        case FS_EKF_ACTION_DO_NOTHING:
+            // Do nothing    
+            break;
         case FS_EKF_ACTION_ALTHOLD:
             // AltHold
             if (failsafe.radio || !set_mode(Mode::Number::ALT_HOLD, ModeReason::EKF_FAILSAFE)) {

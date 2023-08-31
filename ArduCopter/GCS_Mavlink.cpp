@@ -59,7 +59,11 @@ MAV_MODE GCS_MAVLINK_Copter::base_mode() const
 
 uint32_t GCS_Copter::custom_mode() const
 {
+#ifdef FTS
+    return copter.parachute.mode();
+#else
     return (uint32_t)copter.flightmode->mode_number();
+#endif
 }
 
 MAV_STATE GCS_MAVLINK_Copter::vehicle_system_status() const
@@ -76,6 +80,30 @@ MAV_STATE GCS_MAVLINK_Copter::vehicle_system_status() const
     return MAV_STATE_ACTIVE;
 }
 
+// returns failsafe (each bit represents a failsafe where 0=ok, 1=failsafe active (bit0:RC, bit1:batt, bit2:GCS, bit3:EKF, bit4:terrain, bit5:adsb)
+uint8_t GCS_MAVLINK_Copter::failsafe_status() const
+{
+    uint8_t retval = 0;
+    if (copter.failsafe.radio) {
+        retval |= 0x1;
+    }
+    if (copter.battery.has_failsafed()) {
+        retval |= 0x2;
+    }
+    if (copter.failsafe.gcs) {
+        retval |= 0x4;
+    }
+    if (copter.failsafe.ekf) {
+        retval |= 0x8;
+    }
+    if (copter.failsafe.terrain) {
+        retval |= 0x10;
+    }
+    if (copter.failsafe.adsb) {
+        retval |= 0x20;
+    }
+    return retval;
+}
 
 void GCS_MAVLINK_Copter::send_attitude_target()
 {
@@ -98,6 +126,31 @@ void GCS_MAVLINK_Copter::send_attitude_target()
         ang_vel.y,              // pitch rate (rad/s)
         ang_vel.z,              // yaw rate (rad/s)
         thrust);                // Collective thrust, normalized to 0 .. 1
+}
+
+void GCS_MAVLINK_Copter::check_simulated_failsafe_gcs(mavlink_message_t msg) const
+{
+    mavlink_mission_count_t mc_packet;
+    if ((msg.msgid == MAVLINK_MSG_ID_MISSION_COUNT) && (copter.g.failsafe_gcs_sim == 1)) {
+        mavlink_msg_mission_count_decode(&msg, &mc_packet);
+        if (mc_packet.mission_type != MAV_MISSION_TYPE_FALLBACK) {
+            return;
+        }
+        copter.set_failsafe_gcs(true);
+        copter.failsafe_gcs_on_event();
+    }
+
+    mavlink_mission_item_int_t mi_packet;
+    if (msg.msgid == MAVLINK_MSG_ID_MISSION_ITEM_INT) {
+        mavlink_msg_mission_item_int_decode(&msg, &mi_packet);
+        if (mi_packet.mission_type != MAV_MISSION_TYPE_FALLBACK) {
+            return;
+        }
+        if (mi_packet.seq == (copter.g.failsafe_gcs_sim - 2)) {  // 0 is disabled and 1 for mission count so we decrease 2
+            copter.set_failsafe_gcs(true);
+            copter.failsafe_gcs_on_event();
+        }
+    }
 }
 
 void GCS_MAVLINK_Copter::send_position_target_global_int()
@@ -619,7 +672,7 @@ MAV_RESULT GCS_MAVLINK_Copter::_handle_command_preflight_calibration(const mavli
 {
     if (is_equal(packet.param6,1.0f)) {
         // compassmot calibration
-        return copter.mavlink_compassmot(*this);
+        return copter.mavlink_compassmot(*this, packet.tid);
     }
 
     return GCS_MAVLINK::_handle_command_preflight_calibration(packet);
@@ -832,10 +885,14 @@ MAV_RESULT GCS_MAVLINK_Copter::handle_command_long_packet(const mavlink_command_
 
 #if MODE_AUTO_ENABLED == ENABLED
     case MAV_CMD_MISSION_START:
-        if (copter.set_mode(Mode::Number::AUTO, ModeReason::GCS_COMMAND)) {
+        if (copter.mode_auto.mission.set_index_boundaries(packet.param1, packet.param2) &&
+            copter.set_mode(Mode::Number::AUTO, ModeReason::GCS_COMMAND)) {
             copter.set_auto_armed(true);
             if (copter.mode_auto.mission.state() != AP_Mission::MISSION_RUNNING) {
                 copter.mode_auto.mission.start_or_resume();
+            }
+            if (copter.flightmode->is_pausing() && copter.flightmode->resume()) {
+                send_text(MAV_SEVERITY_INFO, "Resumed");
             }
             return MAV_RESULT_ACCEPTED;
         }
@@ -848,19 +905,30 @@ MAV_RESULT GCS_MAVLINK_Copter::handle_command_long_packet(const mavlink_command_
         switch ((uint16_t)packet.param1) {
         case PARACHUTE_DISABLE:
             copter.parachute.enabled(false);
+            copter.parachute.safety_switch(false);
             AP::logger().Write_Event(LogEvent::PARACHUTE_DISABLED);
+            send_heartbeat();
             return MAV_RESULT_ACCEPTED;
         case PARACHUTE_ENABLE:
             copter.parachute.enabled(true);
+            copter.parachute.safety_switch(true);
             AP::logger().Write_Event(LogEvent::PARACHUTE_ENABLED);
+            send_heartbeat();
             return MAV_RESULT_ACCEPTED;
         case PARACHUTE_RELEASE:
             // treat as a manual release which performs some additional check of altitude
             copter.parachute_manual_release();
+            send_heartbeat();
             return MAV_RESULT_ACCEPTED;
         }
         return MAV_RESULT_FAILED;
 #endif
+
+    case MAV_CMD_DO_FALLBACK_MISSION:
+        if (copter.replace_mission_with_fallback_mission(ModeReason::GCS_COMMAND)) {
+            return MAV_RESULT_ACCEPTED;
+        }
+        return MAV_RESULT_FAILED;
 
     case MAV_CMD_DO_MOTOR_TEST:
         // param1 : motor sequence number (a number from 1 to max number of motors on the vehicle)
@@ -1060,6 +1128,13 @@ void GCS_MAVLINK_Copter::handleMessage(const mavlink_message_t &msg)
         POSITION_TARGET_TYPEMASK_YAW_RATE_IGNORE;
     constexpr uint32_t MAVLINK_SET_POS_TYPE_MASK_FORCE_SET =
         POSITION_TARGET_TYPEMASK_FORCE_SET;
+
+    if ((copter.failsafe.gcs) &&
+        (copter.g.failsafe_gcs == FS_GCS_ENABLED_ALWAYS_FALLBACK_MISSION) &&
+        (copter.motors->armed())) {
+        // don't allow any command during fallback mission in gcs failsafe
+        return;
+    }
 
     switch (msg.msgid) {
 
@@ -1418,6 +1493,9 @@ void GCS_MAVLINK_Copter::handleMessage(const mavlink_message_t &msg)
         handle_common_message(msg);
         break;
     }     // end switch
+    
+
+    AP::logger().Write_Mavlink_Message_Received(msg);
 } // end handle mavlink
 
 

@@ -162,6 +162,8 @@ public:
         k_param_single_servo_3,         // remove
         k_param_single_servo_4,         // 78 - remove
 
+        k_param_brake_accel_cmss,       // 79
+
         //
         // 80: Heli
         //
@@ -189,6 +191,8 @@ public:
 
         // 97: RSSI
         k_param_rssi = 97,
+
+        k_param_wp_yaw_behavior_mf,
                 
         //
         // 100: Inertial Nav
@@ -249,6 +253,7 @@ public:
         k_param_auto_slew_rate,     // deprecated - can be deleted
         k_param_rangefinder_type_old,     // deprecated
         k_param_super_simple = 155,
+        k_param_esc_telem,
         k_param_axis_enabled = 157, // deprecated - remove with next eeprom number change
         k_param_copter_leds_mode,   // deprecated - remove with next eeprom number change
         k_param_ahrs, // AHRS group // 159
@@ -299,6 +304,7 @@ public:
         k_param_radio_tuning,
         k_param_radio_tuning_high_old,   // unused
         k_param_radio_tuning_low_old,    // unused
+        k_param_failsafe_gcs_sim,
         k_param_rc_speed = 192,
         k_param_failsafe_battery_enabled, // unused - moved to AP_BattMonitor
         k_param_throttle_mid,           // remove
@@ -404,11 +410,15 @@ public:
 #endif
 
     AP_Int8         failsafe_gcs;               // ground station failsafe behavior
+    AP_Int8         failsafe_gcs_sim; // ground station failsafe simulation
     AP_Int16        gps_hdop_good;              // GPS Hdop value at or below this value represent a good position
 
     AP_Int8         super_simple;
 
     AP_Int8         wp_yaw_behavior;            // controls how the autopilot controls yaw during missions
+    AP_Int8         wp_yaw_behavior_mf;         // controls how the autopilot controls yaw during missions, in motor failure state
+
+    AP_Int16        brake_accel_cmss;           // Brake mode braking acceleration in cm/s/s
 
 #if MODE_POSHOLD_ENABLED == ENABLED
     AP_Int16        poshold_brake_rate;         // PosHold flight mode's rotation rate during braking in deg/sec
@@ -667,6 +677,8 @@ public:
     AP_Float                pilot_y_rate;
     AP_Float                pilot_y_expo;
     AP_Int8                 surftrak_mode;
+    AP_Int8 __auto_pause;
+    AP_Int8 __auto_resume;
 };
 
 extern const AP_Param::Info        var_info[];

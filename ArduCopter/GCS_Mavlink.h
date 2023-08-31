@@ -59,6 +59,8 @@ private:
 
     MAV_MODE base_mode() const override;
     MAV_STATE vehicle_system_status() const override;
+    uint8_t failsafe_status() const override; // returns failsafe (each bit represents a failsafe where 0=ok, 1=failsafe active (bit0:RC, bit1:batt, bit2:GCS, bit3:EKF, bit4:terrain, bit5:adsb)
+    void check_simulated_failsafe_gcs(mavlink_message_t msg) const override;  // check if we need to simulate gcs failsafe after receiving msg
 
     float vfr_hud_airspeed() const override;
     int16_t vfr_hud_throttle() const override;

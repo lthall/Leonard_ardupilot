@@ -10,15 +10,15 @@
 bool ModeBrake::init(bool ignore_checks)
 {
     // initialise pos controller speed and acceleration
-    pos_control->set_max_speed_accel_xy(inertial_nav.get_velocity_neu_cms().length(), BRAKE_MODE_DECEL_RATE);
-    pos_control->set_correction_speed_accel_xy(inertial_nav.get_velocity_neu_cms().length(), BRAKE_MODE_DECEL_RATE);
+    pos_control->set_max_speed_accel_xy(inertial_nav.get_velocity_neu_cms().length(), g.brake_accel_cmss);
+    pos_control->set_correction_speed_accel_xy(inertial_nav.get_velocity_neu_cms().length(), g.brake_accel_cmss);
 
     // initialise position controller
     pos_control->init_xy_controller();
 
     // set vertical speed and acceleration limits
-    pos_control->set_max_speed_accel_z(BRAKE_MODE_SPEED_Z, BRAKE_MODE_SPEED_Z, BRAKE_MODE_DECEL_RATE);
-    pos_control->set_correction_speed_accel_z(BRAKE_MODE_SPEED_Z, BRAKE_MODE_SPEED_Z, BRAKE_MODE_DECEL_RATE);
+    pos_control->set_max_speed_accel_z(BRAKE_MODE_SPEED_Z, BRAKE_MODE_SPEED_Z, g.brake_accel_cmss);
+    pos_control->set_correction_speed_accel_z(BRAKE_MODE_SPEED_Z, BRAKE_MODE_SPEED_Z, g.brake_accel_cmss);
 
     // initialise the vertical position controller
     if (!pos_control->is_active_z()) {

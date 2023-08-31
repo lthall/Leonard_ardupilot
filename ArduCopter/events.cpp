@@ -132,8 +132,13 @@ void Copter::failsafe_gcs_check()
     // Determine which event to trigger
     if (last_gcs_update_ms < gcs_timeout_ms && failsafe.gcs) {
         // Recovery from a GCS failsafe
-        set_failsafe_gcs(false);
-        failsafe_gcs_off_event();
+        // If the GCS failsafe was during a flight (motors armed) we want to continue with the fallback mission and ignore the gcs clear.
+        if (motors->armed() && (g.failsafe_gcs == FS_GCS_ENABLED_ALWAYS_FALLBACK_MISSION)) {
+            gcs().send_text(MAV_SEVERITY_WARNING, "ignoring gcs failsafe cleared");
+        } else {
+            set_failsafe_gcs(false);
+            failsafe_gcs_off_event();
+        }
 
     } else if (last_gcs_update_ms < gcs_timeout_ms && !failsafe.gcs) {
         // No problem, do nothing
@@ -175,6 +180,9 @@ void Copter::failsafe_gcs_on_event(void)
             break;
         case FS_GCS_ENABLED_AUTO_RTL_OR_RTL:
             desired_action = FailsafeAction::AUTO_DO_LAND_START;
+            break;
+        case FS_GCS_ENABLED_ALWAYS_FALLBACK_MISSION:
+            desired_action = FailsafeAction::FALLBACK_MISSION;
             break;
         default: // if an invalid parameter value is set, the fallback is RTL
             desired_action = FailsafeAction::RTL;
@@ -301,6 +309,56 @@ void Copter::gpsglitch_check()
     }
 }
 
+// replace_mission_with_fallback_mission - stop the currently running mission and replace it with fallback mission. then start the fallback mission.
+// change to loiter mode on failure
+bool Copter::replace_mission_with_fallback_mission(ModeReason reason)
+{
+    AP_Fallback_Mission *fallback_mission = AP::fallback_mission();
+    AP_Mission *mission = AP::mission();
+
+    if (fallback_mission->num_commands() == 0) {
+        gcs().send_text(MAV_SEVERITY_WARNING, "No fallback mission in memory");
+        return false;
+    }
+
+    copter.set_mode(Mode::Number::BRAKE, reason);
+
+    mission->stop();
+    mission->clear();
+    for (uint16_t command_index = 0; command_index < fallback_mission->num_commands(); ++command_index) {
+        AP_Mission::Mission_Command command;
+        bool success = fallback_mission->read_cmd_from_storage(command_index, command);
+        if ((!success) || (!mission->add_cmd(command))) {
+            copter.set_mode(Mode::Number::LOITER, reason);
+            mission->clear();
+            return false;            
+        }
+    }
+    fallback_mission->clear();
+
+    // calculate stopping point
+    Vector3f stopping_point;
+    copter.wp_nav->get_wp_stopping_point(stopping_point);
+    // initialise waypoint controller target to stopping point
+    copter.wp_nav->set_wp_destination(stopping_point);
+
+    copter.set_mode(Mode::Number::AUTO, reason);
+    if (copter.mode_auto.mission.state() != AP_Mission::MISSION_RUNNING) {
+        copter.mode_auto.mission.start_or_resume();
+    }
+    return true;
+}
+
+// set_fallback_mission - replace the current mission with fallback mission
+//  this is always called from a failsafe so we trigger notification to pilot
+void Copter::set_fallback_mission(ModeReason reason)
+{
+    if (!replace_mission_with_fallback_mission(reason)) {
+        AP::logger().Write_Error(LogErrorSubsystem::FAILSAFE_GCS, LogErrorCode::FAILED_TO_SET_DESTINATION);
+    }
+    AP_Notify::events.failsafe_mode_change = 1;
+}
+
 // set_mode_RTL_or_land_with_pause - sets mode to RTL if possible or LAND with 4 second delay before descent starts
 //  this is always called from a failsafe so we trigger notification to pilot
 void Copter::set_mode_RTL_or_land_with_pause(ModeReason reason)
@@ -358,6 +416,10 @@ void Copter::set_mode_auto_do_land_start_or_RTL(ModeReason reason)
 }
 
 bool Copter::should_disarm_on_failsafe() {
+#ifdef FTS
+    return false; // In FTS mode, we don't want to disarm, unless we specifically initiated disarm command
+#endif
+
     if (ap.in_arming_delay) {
         return true;
     }
@@ -378,8 +440,11 @@ bool Copter::should_disarm_on_failsafe() {
     }
 }
 
-
 void Copter::do_failsafe_action(FailsafeAction action, ModeReason reason){
+#ifdef FTS
+    // In FTS mode, we don't want to disarm unless we specifically initiated it by command
+    return;
+#endif
 
     // Execute the specified desired_action
     switch (action) {
@@ -407,6 +472,9 @@ void Copter::do_failsafe_action(FailsafeAction action, ModeReason reason){
         }
         case FailsafeAction::AUTO_DO_LAND_START:
             set_mode_auto_do_land_start_or_RTL(reason);
+            break;
+        case FailsafeAction::FALLBACK_MISSION:
+            set_fallback_mission(reason);
             break;
     }
 

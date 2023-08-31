@@ -2,6 +2,8 @@
 
 #if MODE_AUTO_ENABLED == ENABLED
 
+#define PAUSE_MAX_SPEED_FOR_LOITER_CMS  100.0f
+
 /*
  * Init and run calls for auto flight mode
  *
@@ -40,12 +42,13 @@ bool ModeAuto::init(bool ignore_checks)
 
         // initialise waypoint and spline controller
         wp_nav->wp_and_spline_init();
+        _pause_state = PauseState::NONE;
 
         // set flag to start mission
         waiting_to_start = true;
 
         // initialise mission change check (ignore results)
-        IGNORE_RETURN(mis_change_detector.check_for_mission_change());
+        IGNORE_RETURN(mis_change_detector.check_for_mission_change(false));
 
         // clear guided limits
         copter.mode_guided.limit_clear();
@@ -91,19 +94,33 @@ void ModeAuto::run()
             waiting_to_start = false;
 
             // initialise mission change check (ignore results)
-            IGNORE_RETURN(mis_change_detector.check_for_mission_change());
+            IGNORE_RETURN(mis_change_detector.check_for_mission_change(false));
         }
     } else {
         // check for mission changes
-        if (mis_change_detector.check_for_mission_change()) {
-            // if mission is running restart the current command if it is a waypoint or spline command
-            if ((mission.state() == AP_Mission::MISSION_RUNNING) && (_mode == SubMode::WP)) {
+        const AP_Mission_ChangeDetector_Copter::ChangeResponseType mis_chg_resp = mis_change_detector.check_for_mission_change(wp_nav->using_next_waypoint());
+
+        // if mission is running restart the current command if it is a waypoint or spline command
+        if ((mission.state() == AP_Mission::MISSION_RUNNING) && (_mode == SubMode::WP)) {
+            switch (mis_chg_resp) {
+            case AP_Mission_ChangeDetector_Copter::ChangeResponseType::NONE:
+                // no action required
+                break;
+            case AP_Mission_ChangeDetector_Copter::ChangeResponseType::ADD_NEXT_WAYPOINT:
+                if (mission_changed_add_next_wp()) {
+                    gcs().send_text(MAV_SEVERITY_DEBUG, "mission changed, added next waypoint");
+                } else {
+                    gcs().send_text(MAV_SEVERITY_ERROR, "mission changed, failed to add next waypoint");
+                }
+                break;
+            case AP_Mission_ChangeDetector_Copter::ChangeResponseType::RESET_REQUIRED:
                 if (mission.restart_current_nav_cmd()) {
-                    gcs().send_text(MAV_SEVERITY_CRITICAL, "Auto mission changed, restarted command");
+                    gcs().send_text(MAV_SEVERITY_WARNING, "Auto mission changed, restarted command");
                 } else {
                     // failed to restart mission for some reason
-                    gcs().send_text(MAV_SEVERITY_CRITICAL, "Auto mission changed but failed to restart command");
+                    gcs().send_text(MAV_SEVERITY_ERROR, "Auto mission changed but failed to restart command");
                 }
+                break;
             }
         }
 
@@ -152,6 +169,11 @@ void ModeAuto::run()
     case SubMode::NAV_PAYLOAD_PLACE:
         payload_place_run();
         break;
+    }
+
+    if ((_pause_state == PauseState::PAUSING) && (wp_nav->get_pause_success())) {
+        gcs().send_mission_item_reached_message(UINT16_MAX);  // UINT16_MAX will be used as a signal for the special command finished
+        _pause_state = PauseState::PAUSED;
     }
 
     // only pretend to be in auto RTL so long as mission still thinks its in a landing sequence or the mission has completed
@@ -347,8 +369,8 @@ void ModeAuto::land_start()
     _mode = SubMode::LAND;
 
     // set horizontal speed and acceleration limits
-    pos_control->set_max_speed_accel_xy(wp_nav->get_default_speed_xy(), wp_nav->get_wp_acceleration());
-    pos_control->set_correction_speed_accel_xy(wp_nav->get_default_speed_xy(), wp_nav->get_wp_acceleration());
+    pos_control->set_max_speed_accel_xy(wp_nav->get_default_speed_xy_cms(), wp_nav->get_wp_acceleration());
+    pos_control->set_correction_speed_accel_xy(wp_nav->get_default_speed_xy_cms(), wp_nav->get_wp_acceleration());
 
     // initialise the vertical position controller
     if (!pos_control->is_active_xy()) {
@@ -478,7 +500,7 @@ bool ModeAuto::is_landing() const
 
 bool ModeAuto::is_taking_off() const
 {
-    return ((_mode == SubMode::TAKEOFF) && !wp_nav->reached_wp_destination());
+    return ((_mode == SubMode::TAKEOFF) && !auto_takeoff_complete);
 }
 
 // auto_payload_place_start - initialises controller to implement a placing
@@ -488,8 +510,8 @@ void ModeAuto::payload_place_start()
     nav_payload_place.state = PayloadPlaceStateType_Calibrating_Hover_Start;
 
     // set horizontal speed and acceleration limits
-    pos_control->set_max_speed_accel_xy(wp_nav->get_default_speed_xy(), wp_nav->get_wp_acceleration());
-    pos_control->set_correction_speed_accel_xy(wp_nav->get_default_speed_xy(), wp_nav->get_wp_acceleration());
+    pos_control->set_max_speed_accel_xy(wp_nav->get_default_speed_xy_cms(), wp_nav->get_wp_acceleration());
+    pos_control->set_correction_speed_accel_xy(wp_nav->get_default_speed_xy_cms(), wp_nav->get_wp_acceleration());
 
     // initialise the vertical position controller
     if (!pos_control->is_active_xy()) {
@@ -1032,8 +1054,8 @@ void ModeAuto::loiter_to_alt_run()
 
     if (!loiter_to_alt.loiter_start_done) {
         // set horizontal speed and acceleration limits
-        pos_control->set_max_speed_accel_xy(wp_nav->get_default_speed_xy(), wp_nav->get_wp_acceleration());
-        pos_control->set_correction_speed_accel_xy(wp_nav->get_default_speed_xy(), wp_nav->get_wp_acceleration());
+        pos_control->set_max_speed_accel_xy(wp_nav->get_default_speed_xy_cms(), wp_nav->get_wp_acceleration());
+        pos_control->set_correction_speed_accel_xy(wp_nav->get_default_speed_xy_cms(), wp_nav->get_wp_acceleration());
 
         if (!pos_control->is_active_xy()) {
             pos_control->init_xy_controller();
@@ -1307,6 +1329,22 @@ bool ModeAuto::set_next_wp(const AP_Mission::Mission_Command& current_cmd, const
     default:
         // for unsupported commands it is safer to stop
         break;
+    }
+
+    return true;
+}
+
+// add next waypoint - special case handling of a mission change in which a next waypoint is added
+bool ModeAuto::mission_changed_add_next_wp()
+{
+    const AP_Mission::Mission_Command& curr_cmd = mission.get_current_nav_cmd();
+    const Location dest_loc = loc_from_cmd(curr_cmd, copter.current_loc);
+
+    // set next destination if necessary
+    if (!set_next_wp(curr_cmd, dest_loc)) {
+        // failure to set next destination can only be because of missing terrain data
+        copter.failsafe_terrain_on_event();
+        return false;
     }
 
     return true;
@@ -2108,6 +2146,7 @@ bool ModeAuto::pause()
     }
 
     wp_nav->set_pause();
+    _pause_state = PauseState::PAUSING;
     return true;
 }
 

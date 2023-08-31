@@ -602,21 +602,39 @@
 
 // Default logging bitmask
 #ifndef DEFAULT_LOG_BITMASK
- # define DEFAULT_LOG_BITMASK \
-    MASK_LOG_ATTITUDE_MED | \
-    MASK_LOG_GPS | \
-    MASK_LOG_PM | \
-    MASK_LOG_CTUN | \
-    MASK_LOG_NTUN | \
-    MASK_LOG_RCIN | \
-    MASK_LOG_IMU | \
-    MASK_LOG_CMD | \
-    MASK_LOG_CURRENT | \
-    MASK_LOG_RCOUT | \
-    MASK_LOG_OPTFLOW | \
-    MASK_LOG_COMPASS | \
-    MASK_LOG_CAMERA | \
-    MASK_LOG_MOTBATT
+ #ifndef FTS
+  # define DEFAULT_LOG_BITMASK \
+      MASK_LOG_ATTITUDE_MED | \
+      MASK_LOG_GPS | \
+      MASK_LOG_PM | \
+      MASK_LOG_CTUN | \
+      MASK_LOG_NTUN | \
+      MASK_LOG_RCIN | \
+      MASK_LOG_IMU | \
+      MASK_LOG_CMD | \
+      MASK_LOG_CURRENT | \
+      MASK_LOG_RCOUT | \
+      MASK_LOG_OPTFLOW | \
+      MASK_LOG_COMPASS | \
+      MASK_LOG_CAMERA | \
+      MASK_LOG_MOTBATT | \
+      MASK_LOG_THRUST_BOOST | \
+      MASK_LOG_ESC
+ #else
+  # define DEFAULT_LOG_BITMASK \
+      MASK_LOG_ATTITUDE_MED | \
+      MASK_LOG_GPS | \
+      MASK_LOG_PM | \
+      MASK_LOG_CTUN | \
+      MASK_LOG_NTUN | \
+      MASK_LOG_RCIN | \
+      MASK_LOG_IMU | \
+      MASK_LOG_CMD | \
+      MASK_LOG_CURRENT | \
+      MASK_LOG_OPTFLOW | \
+      MASK_LOG_COMPASS | \
+      MASK_LOG_CAMERA
+ #endif
 #endif
 
 //////////////////////////////////////////////////////////////////////////////

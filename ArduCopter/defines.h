@@ -144,6 +144,9 @@ enum LoggingParameters {
 #define MASK_LOG_IMU_FAST               (1UL<<18)
 #define MASK_LOG_IMU_RAW                (1UL<<19)
 #define MASK_LOG_VIDEO_STABILISATION    (1UL<<20)
+#define MASK_LOG_NOTCH                  (1UL<<21)
+#define MASK_LOG_THRUST_BOOST           (1UL<<22)
+#define MASK_LOG_ESC                    (1UL<<23)
 #define MASK_LOG_ANY                    0xFFFF
 
 // Radio failsafe definitions (FS_THR parameter)
@@ -163,8 +166,10 @@ enum LoggingParameters {
 #define FS_GCS_ENABLED_ALWAYS_SMARTRTL_OR_LAND 4
 #define FS_GCS_ENABLED_ALWAYS_LAND             5
 #define FS_GCS_ENABLED_AUTO_RTL_OR_RTL         6
+#define FS_GCS_ENABLED_ALWAYS_FALLBACK_MISSION 7
 
 // EKF failsafe definitions (FS_EKF_ACTION parameter)
+#define FS_EKF_ACTION_DO_NOTHING            0       // do nothing on EKF failsafe
 #define FS_EKF_ACTION_LAND                  1       // switch to LAND mode on EKF failsafe
 #define FS_EKF_ACTION_ALTHOLD               2       // switch to ALTHOLD mode on EKF failsafe
 #define FS_EKF_ACTION_LAND_EVEN_STABILIZE   3       // switch to Land mode on EKF failsafe even if in a manual flight mode like stabilize

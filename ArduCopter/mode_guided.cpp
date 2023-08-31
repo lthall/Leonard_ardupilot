@@ -220,8 +220,8 @@ void ModeGuided::wp_control_run()
 void ModeGuided::pva_control_start()
 {
     // initialise horizontal speed, acceleration
-    pos_control->set_max_speed_accel_xy(wp_nav->get_default_speed_xy(), wp_nav->get_wp_acceleration());
-    pos_control->set_correction_speed_accel_xy(wp_nav->get_default_speed_xy(), wp_nav->get_wp_acceleration());
+    pos_control->set_max_speed_accel_xy(wp_nav->get_default_speed_xy_cms(), wp_nav->get_wp_acceleration());
+    pos_control->set_correction_speed_accel_xy(wp_nav->get_default_speed_xy_cms(), wp_nav->get_wp_acceleration());
 
     // initialize vertical speeds and acceleration
     pos_control->set_max_speed_accel_z(wp_nav->get_default_speed_down(), wp_nav->get_default_speed_up(), wp_nav->get_accel_z());
@@ -1216,6 +1216,13 @@ bool ModeGuided::resume()
 {
     _paused = false;
     return true;
+}
+
+// exit guided mode
+void ModeGuided::exit()
+{
+    // clear pause state when exiting guided mode
+    _paused = false;
 }
 
 #endif

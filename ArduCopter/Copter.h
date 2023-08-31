@@ -41,7 +41,7 @@
 #include <AP_InertialSensor/AP_InertialSensor.h>                // ArduPilot Mega Inertial Sensor (accel & gyro) Library
 #include <AP_AHRS/AP_AHRS.h>                                    // AHRS (Attitude Heading Reference System) interface library for ArduPilot
 #include <AP_Mission/AP_Mission.h>                              // Mission command library
-#include <AP_Mission/AP_Mission_ChangeDetector.h>               // Mission command change detection library
+#include <AP_Mission/AP_Mission_ChangeDetector_Copter.h>        // Mission command change detection library
 #include <AC_AttitudeControl/AC_AttitudeControl_Multi.h>        // Attitude control library
 #include <AC_AttitudeControl/AC_AttitudeControl_Multi_6DoF.h>   // 6DoF Attitude control library
 #include <AC_AttitudeControl/AC_AttitudeControl_Heli.h>         // Attitude control library for traditional helicopter
@@ -219,6 +219,9 @@ public:
     friend class ModeTurtle;
 
     Copter(void);
+
+    virtual void set_motor_failure() override;
+    virtual void set_battery_failure() override;
 
 private:
 
@@ -591,7 +594,8 @@ private:
         SMARTRTL           = 3,
         SMARTRTL_LAND      = 4,
         TERMINATE          = 5,
-        AUTO_DO_LAND_START = 6
+        AUTO_DO_LAND_START = 6,
+        FALLBACK_MISSION   = 7
     };
 
     enum class FailsafeOption {
@@ -698,7 +702,7 @@ private:
     bool far_from_EKF_origin(const Location& loc);
 
     // compassmot.cpp
-    MAV_RESULT mavlink_compassmot(const GCS_MAVLINK &gcs_chan);
+    MAV_RESULT mavlink_compassmot(const GCS_MAVLINK &gcs_chan, uint8_t tid);
 
     // crash_check.cpp
     void crash_check();
@@ -706,9 +710,13 @@ private:
     void yaw_imbalance_check();
     LowPassFilterFloat yaw_I_filt{0.05f};
     uint32_t last_yaw_warn_ms;
+    float calculate_sink_rate();
     void parachute_check();
     void parachute_release();
     void parachute_manual_release();
+#ifdef FTS
+    bool can_arm_fts();
+#endif
 
     // ekf_check.cpp
     void ekf_check();
@@ -741,6 +749,8 @@ private:
     void set_mode_SmartRTL_or_RTL(ModeReason reason);
     void set_mode_SmartRTL_or_land_with_pause(ModeReason reason);
     void set_mode_auto_do_land_start_or_RTL(ModeReason reason);
+    bool replace_mission_with_fallback_mission(ModeReason reason);
+    void set_fallback_mission(ModeReason reason);
     bool should_disarm_on_failsafe();
     void do_failsafe_action(FailsafeAction action, ModeReason reason);
 

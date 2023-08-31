@@ -122,7 +122,10 @@ const AP_Scheduler::Task Copter::scheduler_tasks[] = {
 #if TOY_MODE_ENABLED == ENABLED
     SCHED_TASK_CLASS(ToyMode,              &copter.g2.toy_mode,         update,          10,  50,  24),
 #endif
+#ifndef FTS
+    // In FTS mode, we don't want the fts will disarm after we set it to armed
     SCHED_TASK(auto_disarm_check,     10,     50,  27),
+#endif
     SCHED_TASK(auto_trim,             10,     75,  30),
 #if RANGEFINDER_ENABLED == ENABLED
     SCHED_TASK(read_rangefinder,      20,    100,  33),
@@ -531,7 +534,7 @@ void Copter::ten_hz_logging_loop()
     if (should_log(MASK_LOG_MOTBATT)) {
         motors->Log_Write();
     }
-    if (should_log(MASK_LOG_RCIN)) {
+    if (should_log(MASK_LOG_RCIN) && ap.rc_receiver_present) {
         logger.Write_RCIN();
         if (rssi.enabled()) {
             logger.Write_RSSI();
@@ -563,6 +566,9 @@ void Copter::ten_hz_logging_loop()
         g2.winch.write_log();
     }
 #endif
+    if (should_log(MASK_LOG_THRUST_BOOST)) {
+        logger.Write_TB();
+    }
 }
 
 // twentyfive_hz_logging - should be run at 25hz
@@ -641,6 +647,7 @@ void Copter::one_hz_loop()
 #endif
 
     AP_Notify::flags.flying = !ap.land_complete;
+    AP_Notify::flags.in_arming_delay = ap.in_arming_delay;
 }
 
 void Copter::init_simple_bearing()
@@ -728,7 +735,9 @@ void Copter::update_altitude()
 
     if (should_log(MASK_LOG_CTUN)) {
         Log_Write_Control_Tuning();
-        AP::ins().write_notch_log_messages();
+        if (should_log(MASK_LOG_NOTCH)){
+            AP::ins().write_notch_log_messages();
+        }
 #if HAL_GYROFFT_ENABLED
         gyro_fft.write_log_messages();
 #endif
@@ -757,6 +766,17 @@ bool Copter::get_wp_crosstrack_error_m(float &xtrack_error) const
     // see GCS_MAVLINK_Copter::send_nav_controller_output()
     xtrack_error = flightmode->crosstrack_error() * 0.01;
     return true;
+}
+
+void Copter::set_motor_failure()
+{
+    AP_Vehicle::set_motor_failure();
+    flightmode->auto_yaw.set_mode((autopilot_yaw_mode)g.wp_yaw_behavior_mf.get());
+}
+
+void Copter::set_battery_failure()
+{
+    AP_Vehicle::set_battery_failure();
 }
 
 /*

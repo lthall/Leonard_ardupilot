@@ -13,8 +13,8 @@ bool ModeCircle::init(bool ignore_checks)
     speed_changing = false;
 
     // set speed and acceleration limits
-    pos_control->set_max_speed_accel_xy(wp_nav->get_default_speed_xy(), wp_nav->get_wp_acceleration());
-    pos_control->set_correction_speed_accel_xy(wp_nav->get_default_speed_xy(), wp_nav->get_wp_acceleration());
+    pos_control->set_max_speed_accel_xy(wp_nav->get_default_speed_xy_cms(), wp_nav->get_wp_acceleration());
+    pos_control->set_correction_speed_accel_xy(wp_nav->get_default_speed_xy_cms(), wp_nav->get_wp_acceleration());
     pos_control->set_max_speed_accel_z(-get_pilot_speed_dn(), g.pilot_speed_up, g.pilot_accel_z);
     pos_control->set_correction_speed_accel_z(-get_pilot_speed_dn(), g.pilot_speed_up, g.pilot_accel_z);
 
@@ -29,7 +29,7 @@ bool ModeCircle::init(bool ignore_checks)
 void ModeCircle::run()
 {
     // set speed and acceleration limits
-    pos_control->set_max_speed_accel_xy(wp_nav->get_default_speed_xy(), wp_nav->get_wp_acceleration());
+    pos_control->set_max_speed_accel_xy(wp_nav->get_default_speed_xy_cms(), wp_nav->get_wp_acceleration());
     pos_control->set_max_speed_accel_z(-get_pilot_speed_dn(), g.pilot_speed_up, g.pilot_accel_z);
 
     // get pilot's desired yaw rate (or zero if in radio failsafe)
@@ -47,7 +47,7 @@ void ModeCircle::run()
         // update the circle controller's radius target based on pilot pitch stick inputs
         const float radius_current = copter.circle_nav->get_radius();           // circle controller's radius target, which begins as the circle_radius parameter
         const float pitch_stick = channel_pitch->norm_input_dz();               // pitch stick normalized -1 to 1
-        const float nav_speed = copter.wp_nav->get_default_speed_xy();          // copter WP_NAV parameter speed
+        const float nav_speed = copter.wp_nav->get_default_speed_xy_cms();          // copter WP_NAV parameter speed
         const float radius_pilot_change = (pitch_stick * nav_speed) * G_Dt;     // rate of change (pitch stick up reduces the radius, as in moving forward)
         const float radius_new = MAX(radius_current + radius_pilot_change,0);   // new radius target
 

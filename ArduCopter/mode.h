@@ -112,8 +112,9 @@ public:
     virtual bool use_pilot_yaw() const {return true; }
 
     // pause and resume a mode
-    virtual bool pause() { return false; };
-    virtual bool resume() { return false; };
+    virtual bool pause() { return false; }
+    virtual bool resume() { return false; }
+    virtual bool is_pausing() const { return false; }
 
 protected:
 
@@ -421,6 +422,12 @@ public:
         NAV_SCRIPT_TIME,
     };
 
+    enum class PauseState : uint8_t {
+        NONE,
+        PAUSING,
+        PAUSED,
+    };
+
     // Auto
     SubMode mode() const { return _mode; }
 
@@ -438,6 +445,8 @@ public:
     void nav_guided_start();
 
     bool is_landing() const override;
+
+    virtual bool is_pausing() const override { return _pause_state != PauseState::NONE; }
 
     bool is_taking_off() const override;
     bool use_pilot_yaw() const override;
@@ -466,7 +475,8 @@ public:
         FUNCTOR_BIND_MEMBER(&ModeAuto::exit_mission, void)};
 
     // Mission change detector
-    AP_Mission_ChangeDetector mis_change_detector;
+    AP_Mission_ChangeDetector_Copter mis_change_detector;
+    AP_Fallback_Mission fallback_mission;
 
 protected:
 
@@ -490,8 +500,6 @@ private:
     bool verify_command(const AP_Mission::Mission_Command& cmd);
     void exit_mission();
 
-    bool check_for_mission_change();    // detect external changes to mission
-
     void takeoff_run();
     void wp_run();
     void land_run();
@@ -511,11 +519,16 @@ private:
 
     SubMode _mode = SubMode::TAKEOFF;   // controls which auto controller is run
 
+    PauseState _pause_state = PauseState::NONE;
+
     bool shift_alt_to_current_alt(Location& target_loc) const;
+    
+    Location terrain_adjusted_location(const AP_Mission::Mission_Command& cmd) const;
 
     void do_takeoff(const AP_Mission::Mission_Command& cmd);
     void do_nav_wp(const AP_Mission::Mission_Command& cmd);
     bool set_next_wp(const AP_Mission::Mission_Command& current_cmd, const Location &default_loc);
+    bool mission_changed_add_next_wp();
     void do_land(const AP_Mission::Mission_Command& cmd);
     void do_loiter_unlimited(const AP_Mission::Mission_Command& cmd);
     void do_circle(const AP_Mission::Mission_Command& cmd);
@@ -908,6 +921,7 @@ public:
     Number mode_number() const override { return Number::GUIDED; }
 
     bool init(bool ignore_checks) override;
+    void exit() override;
     void run() override;
 
     bool requires_GPS() const override { return true; }

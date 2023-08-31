@@ -5,7 +5,7 @@
  */
 
 // setup_compassmot - sets compass's motor interference parameters
-MAV_RESULT Copter::mavlink_compassmot(const GCS_MAVLINK &gcs_chan)
+MAV_RESULT Copter::mavlink_compassmot(const GCS_MAVLINK &gcs_chan, uint8_t tid)
 {
 #if FRAME_CONFIG == HELI_FRAME
     // compassmot not implemented for tradheli
@@ -86,7 +86,7 @@ MAV_RESULT Copter::mavlink_compassmot(const GCS_MAVLINK &gcs_chan)
 
     // send back initial ACK
     mavlink_msg_command_ack_send(gcs_chan.get_chan(), MAV_CMD_PREFLIGHT_CALIBRATION,0,
-                                 0, 0, 0, 0);
+                                 0, 0, 0, 0, tid);
 
     // flash leds
     AP_Notify::flags.esc_calibration = true;

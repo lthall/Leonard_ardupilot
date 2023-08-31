@@ -393,8 +393,10 @@ bool AP_Arming_Copter::gps_checks(bool display_failure)
     // check if flight mode requires GPS
     bool mode_requires_gps = copter.flightmode->requires_GPS() || fence_requires_gps || (copter.simple_mode == Copter::SimpleMode::SUPERSIMPLE);
 
+    bool force_all_gps_checks = copter.gps.force_all_arming_checks();
+
     // call parent gps checks
-    if (mode_requires_gps) {
+    if (force_all_gps_checks || mode_requires_gps) {
         if (!AP_Arming::gps_checks(display_failure)) {
             AP_Notify::flags.pre_arm_gps_check = false;
             return false;
@@ -477,10 +479,12 @@ bool AP_Arming_Copter::mandatory_gps_checks(bool display_failure)
     // check if flight mode requires GPS
     bool mode_requires_gps = copter.flightmode->requires_GPS();
 
+    bool force_all_gps_checks = copter.gps.force_all_arming_checks();
+
     // always check if inertial nav has started and is ready
     const auto &ahrs = AP::ahrs();
     char failure_msg[50] = {};
-    if (!ahrs.pre_arm_check(mode_requires_gps, failure_msg, sizeof(failure_msg))) {
+    if (!ahrs.pre_arm_check(force_all_gps_checks || mode_requires_gps, failure_msg, sizeof(failure_msg))) {
         check_failed(display_failure, "AHRS: %s", failure_msg);
         return false;
     }
@@ -492,7 +496,7 @@ bool AP_Arming_Copter::mandatory_gps_checks(bool display_failure)
     fence_requires_gps = (copter.fence.get_enabled_fences() & (AC_FENCE_TYPE_CIRCLE | AC_FENCE_TYPE_POLYGON)) > 0;
     #endif
 
-    if (mode_requires_gps) {
+    if (force_all_gps_checks || mode_requires_gps) {
         if (!copter.position_ok()) {
             // vehicle level position estimate checks
             check_failed(display_failure, "Need Position Estimate");
@@ -724,6 +728,12 @@ bool AP_Arming_Copter::mandatory_checks(bool display_failure)
     if (!alt_checks(display_failure)) {
         result = false;
     }
+
+#ifdef FTS
+    if (!AP_Arming::parachute_checks(display_failure)){
+        result = false;
+    }
+#endif
 
     return result & AP_Arming::mandatory_checks(display_failure);
 }

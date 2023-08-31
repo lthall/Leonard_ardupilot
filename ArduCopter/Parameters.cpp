@@ -170,9 +170,16 @@ const AP_Param::Info Copter::var_info[] = {
     // @Param: FS_GCS_ENABLE
     // @DisplayName: Ground Station Failsafe Enable
     // @Description: Controls whether failsafe will be invoked (and what action to take) when connection with Ground station is lost for at least 5 seconds. See FS_OPTIONS param for additional actions, or for cases allowing Mission continuation, when GCS failsafe is enabled.
-    // @Values: 0:Disabled/NoAction,1:RTL,2:RTL or Continue with Mission in Auto Mode (Removed in 4.0+-see FS_OPTIONS),3:SmartRTL or RTL,4:SmartRTL or Land,5:Land,6:Auto DO_LAND_START or RTL
+    // @Values: 0:Disabled/NoAction,1:RTL,2:RTL or Continue with Mission in Auto Mode (Removed in 4.0+-see FS_OPTIONS),3:SmartRTL or RTL,4:SmartRTL or Land,5:Land (4.0+ Only),6:Auto DO_LAND_START or RTL,7:Enabled always fallback mission
     // @User: Standard
     GSCALAR(failsafe_gcs, "FS_GCS_ENABLE", FS_GCS_DISABLED),
+
+    // @Param: FS_GCS_SIM
+    // @DisplayName: Simulate Ground Station Failsafe
+    // @Description: Simulate Ground Station Failsafe in a specific timing
+    // @Values: 0:Disabled,1:Enabled right after fallback mission MISSION_COUNT,2:Enabled right after fallback mission first waypoint upload,3:Enabled right after fallback mission second waypoint upload,4:Enabled right after fallback mission third waypoint upload
+    // @User: Standard
+    GSCALAR(failsafe_gcs_sim, "FS_GCS_SIM", 0),
 
     // @Param: GPS_HDOP_GOOD
     // @DisplayName: GPS Hdop Good
@@ -194,6 +201,14 @@ const AP_Param::Info Copter::var_info[] = {
     // @Values: 0:Never change yaw, 1:Face next waypoint, 2:Face next waypoint except RTL, 3:Face along GPS course
     // @User: Standard
     GSCALAR(wp_yaw_behavior,  "WP_YAW_BEHAVIOR",    WP_YAW_BEHAVIOR_DEFAULT),
+
+    // @Param: WP_YAW_BHVR_MF
+    // @DisplayName: Yaw behaviour during missions, in motor failure state
+    // @Description: Determines how the autopilot controls the yaw during missions and RTL, in motor failure state
+    // @Values: 0:Never change yaw, 1:Face next waypoint, 2:Face next waypoint except RTL, 3:Face along GPS course
+    // @Values: 0:pilot controls the heading, 1:point towards next waypoint (no pilot input accepted), 2:point towards a location held in roi (no pilot input accepted), 3:point towards a particular angle (no pilot input accepted), 4:point in the direction the copter is moving, 5:point towards heading at time motors were armed, 6:turn at a specified rate from a starting angle, 7:turn at a specified rate (held in auto_yaw_rate), 8:use AC_Circle's provided yaw (used during Loiter-Turns commands)
+    // @User: Standard
+    GSCALAR(wp_yaw_behavior_mf,  "WP_AUTOYAW_MF",    AUTO_YAW_HOLD),
 
     // @Param: LAND_SPEED
     // @DisplayName: Land speed
@@ -369,6 +384,15 @@ const AP_Param::Info Copter::var_info[] = {
     // @User: Advanced
     ASCALAR(angle_max, "ANGLE_MAX",                 DEFAULT_ANGLE_MAX),
 
+    // @Param: BRAKE_ACCEL
+    // @DisplayName: Brake mode braking acceleration
+    // @Description: Brake mode braking acceleration in cm/s/s. Higher values stop the copter more quickly.
+    // @Units: cm/s/s
+    // @Range: 250 750
+    // @Increment: 1
+    // @User: Advanced
+    GSCALAR(brake_accel_cmss, "BRAKE_ACCEL",        BRAKE_MODE_DECEL_RATE),
+
 #if MODE_POSHOLD_ENABLED == ENABLED
     // @Param: PHLD_BRAKE_RATE
     // @DisplayName: PosHold braking rate
@@ -398,7 +422,7 @@ const AP_Param::Info Copter::var_info[] = {
     // @Param: FS_EKF_ACTION
     // @DisplayName: EKF Failsafe Action
     // @Description: Controls the action that will be taken when an EKF failsafe is invoked
-    // @Values: 1:Land, 2:AltHold, 3:Land even in Stabilize
+    // @Values: 0:Do nothing, 1:Land, 2:AltHold, 3:Land even in Stabilize
     // @User: Advanced
     GSCALAR(fs_ekf_action, "FS_EKF_ACTION",    FS_EKF_ACTION_DEFAULT),
 
@@ -473,9 +497,9 @@ const AP_Param::Info Copter::var_info[] = {
     GOBJECT(relay,                  "RELAY_", AP_Relay),
 
 #if PARACHUTE == ENABLED
-    // @Group: CHUTE_
+    // @Group: FTS_
     // @Path: ../libraries/AP_Parachute/AP_Parachute.cpp
-    GOBJECT(parachute, "CHUTE_", AP_Parachute),
+    GOBJECT(parachute, "FTS_", AP_Parachute),
 #endif
 
 #if LANDING_GEAR_ENABLED == ENABLED
@@ -616,6 +640,12 @@ const AP_Param::Info Copter::var_info[] = {
     // @Group: SCHED_
     // @Path: ../libraries/AP_Scheduler/AP_Scheduler.cpp
     GOBJECT(scheduler, "SCHED_", AP_Scheduler),
+
+#if HAL_WITH_ESC_TELEM
+    // @Group: ESC_
+    // @Path: ../libraries/AP_ESC_Telem/AP_ESC_Telem.cpp
+    GOBJECT(esc_telem,      "ESC_",   AP_ESC_Telem),
+#endif
 
 #if AC_FENCE == ENABLED
     // @Group: FENCE_
@@ -1098,6 +1128,10 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     // @Values: 0:Do not track, 1:Ground, 2:Ceiling
     // @User: Advanced
     AP_GROUPINFO("SURFTRAK_MODE", 51, ParametersG2, surftrak_mode, (uint8_t)Copter::SurfaceTracking::Surface::GROUND),
+////////////////////FOR TESTING PURPOSES ONLY///////////////////////////////
+    AP_GROUPINFO("AUTO_PAUSE", 52, ParametersG2, __auto_pause, 0),
+    AP_GROUPINFO("AUTO_RESUME", 53, ParametersG2, __auto_resume, 0),
+////////////////////FOR TESTING PURPOSES ONLY///////////////////////////////
 
     AP_GROUPEND
 };
