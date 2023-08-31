@@ -11,11 +11,19 @@
 #include <AP_Math/AP_Math.h>
 #include <AP_UAVCAN/AP_UAVCAN.h>
 #include <AP_BoardConfig/AP_BoardConfig.h>
+#include <AP_Logger/AP_Logger.h>
+#include <AP_Vehicle/AP_Vehicle.h>
+#include <AP_Motors/AP_Motors.h>
 
 #include <uavcan/equipment/power/BatteryInfo.hpp>
+#include <uavcan/equipment/power/BatteryInfoEx.hpp>
 #include <ardupilot/equipment/power/BatteryInfoAux.hpp>
 #include <mppt/Stream.hpp>
 #include <mppt/OutputEnable.hpp>
+#include <uavcan/equipment/power/SmartBatteryInfo.hpp>
+#include <uavcan/equipment/power/SmartBatteryStatus.hpp>
+
+#include <GCS_MAVLink/GCS.h>
 
 #define LOG_TAG "BattMon"
 
@@ -36,12 +44,15 @@ const AP_Param::GroupInfo AP_BattMonitor_UAVCAN::var_info[] = {
 };
 
 UC_REGISTRY_BINDER(BattInfoCb, uavcan::equipment::power::BatteryInfo);
+UC_REGISTRY_BINDER(BattInfoExCb, uavcan::equipment::power::BatteryInfoEx);
 UC_REGISTRY_BINDER(BattInfoAuxCb, ardupilot::equipment::power::BatteryInfoAux);
 UC_REGISTRY_BINDER(MpptStreamCb, mppt::Stream);
+UC_REGISTRY_BINDER(SmartBattInfoCb, uavcan::equipment::power::SmartBatteryInfo);
+UC_REGISTRY_BINDER(SmartBattStatusCb, uavcan::equipment::power::SmartBatteryStatus);
 
 /// Constructor
-AP_BattMonitor_UAVCAN::AP_BattMonitor_UAVCAN(AP_BattMonitor &mon, AP_BattMonitor::BattMonitor_State &mon_state, BattMonitor_UAVCAN_Type type, AP_BattMonitor_Params &params) :
-    AP_BattMonitor_Backend(mon, mon_state, params),
+AP_BattMonitor_UAVCAN::AP_BattMonitor_UAVCAN(AP_BattMonitor &mon, AP_BattMonitor::BattMonitor_State &mon_state, BattMonitor_UAVCAN_Type type, AP_BattMonitor_Params &params, uint8_t instance_number) :
+    AP_BattMonitor_Backend(mon, mon_state, params, instance_number),
     _type(type)
 {
     AP_Param::setup_object_defaults(this,var_info);
@@ -68,6 +79,15 @@ void AP_BattMonitor_UAVCAN::subscribe_msgs(AP_UAVCAN* ap_uavcan)
         return;
     }
 
+    uavcan::Subscriber<uavcan::equipment::power::BatteryInfoEx, BattInfoExCb> *battinfo_ex_listener;
+    battinfo_ex_listener = new uavcan::Subscriber<uavcan::equipment::power::BatteryInfoEx, BattInfoExCb>(*node);
+    // Backend Msg Handler
+    const int battinfo_ex_listener_res = battinfo_ex_listener->start(BattInfoExCb(ap_uavcan, &handle_battery_info_extended_trampoline));
+    if (battinfo_ex_listener_res < 0) {
+        AP_BoardConfig::allocation_error("UAVCAN BatteryInfoEx subscriber start problem\n\r");
+        return;
+    }
+
     uavcan::Subscriber<ardupilot::equipment::power::BatteryInfoAux, BattInfoAuxCb> *battinfo_aux_listener;
     battinfo_aux_listener = new uavcan::Subscriber<ardupilot::equipment::power::BatteryInfoAux, BattInfoAuxCb>(*node);
     // Backend Msg Handler
@@ -85,6 +105,41 @@ void AP_BattMonitor_UAVCAN::subscribe_msgs(AP_UAVCAN* ap_uavcan)
         AP_BoardConfig::allocation_error("UAVCAN Mppt::Stream subscriber start problem");
         return;
     }
+
+    uavcan::Subscriber<uavcan::equipment::power::SmartBatteryInfo, SmartBattInfoCb> *smartbattinfo_listener;
+    smartbattinfo_listener = new uavcan::Subscriber<uavcan::equipment::power::SmartBatteryInfo, SmartBattInfoCb>(*node);
+    // Backend Msg Handler
+    const int smartbattinfo_listener_res = smartbattinfo_listener->start(SmartBattInfoCb(ap_uavcan, &handle_smart_battery_info_trampoline));
+    if (smartbattinfo_listener_res < 0) {
+        AP_HAL::panic("UAVCAN SmartBatteryInfo subscriber start problem\n\r");
+        return;
+    }
+
+    uavcan::Subscriber<uavcan::equipment::power::SmartBatteryStatus, SmartBattStatusCb> *smartbattstatus_listener;
+    smartbattstatus_listener = new uavcan::Subscriber<uavcan::equipment::power::SmartBatteryStatus, SmartBattStatusCb>(*node);
+    // Backend Msg Handler
+    const int smartbattstatus_listener_res = smartbattstatus_listener->start(SmartBattStatusCb(ap_uavcan, &handle_smart_battery_status_trampoline));
+    if (smartbattstatus_listener_res < 0) {
+        AP_HAL::panic("UAVCAN SmartBatteryStatus subscriber start problem\n\r");
+        return;
+    }
+}
+
+bool AP_BattMonitor_UAVCAN::is_type_uavcan(uint8_t i)
+{
+    if (AP::battery().drivers[i] == nullptr) {
+        return false;
+    }
+
+    switch (AP::battery().get_type(i)) {
+        case AP_BattMonitor::Type::UAVCAN_BatteryInfo:
+            FALLTHROUGH;
+        case AP_BattMonitor::Type::UAVCAN_FlyhawkSmartBattery:
+            return true;
+        default:
+            return false;
+            break;
+    }
 }
 
 AP_BattMonitor_UAVCAN* AP_BattMonitor_UAVCAN::get_uavcan_backend(AP_UAVCAN* ap_uavcan, uint8_t node_id, uint8_t battery_id)
@@ -93,8 +148,7 @@ AP_BattMonitor_UAVCAN* AP_BattMonitor_UAVCAN::get_uavcan_backend(AP_UAVCAN* ap_u
         return nullptr;
     }
     for (uint8_t i = 0; i < AP::battery()._num_instances; i++) {
-        if (AP::battery().drivers[i] == nullptr ||
-            AP::battery().get_type(i) != AP_BattMonitor::Type::UAVCAN_BatteryInfo) {
+        if (!is_type_uavcan(i)) {
             continue;
         }
         AP_BattMonitor_UAVCAN* driver = (AP_BattMonitor_UAVCAN*)AP::battery().drivers[i];
@@ -104,8 +158,7 @@ AP_BattMonitor_UAVCAN* AP_BattMonitor_UAVCAN::get_uavcan_backend(AP_UAVCAN* ap_u
     }
     // find empty uavcan driver
     for (uint8_t i = 0; i < AP::battery()._num_instances; i++) {
-        if (AP::battery().drivers[i] != nullptr &&
-            AP::battery().get_type(i) == AP_BattMonitor::Type::UAVCAN_BatteryInfo &&
+        if (is_type_uavcan(i) && 
             match_battery_id(i, battery_id)) {
 
             AP_BattMonitor_UAVCAN* batmon = (AP_BattMonitor_UAVCAN*)AP::battery().drivers[i];
@@ -128,13 +181,170 @@ AP_BattMonitor_UAVCAN* AP_BattMonitor_UAVCAN::get_uavcan_backend(AP_UAVCAN* ap_u
     return nullptr;
 }
 
+void AP_BattMonitor_UAVCAN::handle_smart_battery_info(const SmartBattInfoCb &cb)
+{
+    WITH_SEMAPHORE(_sem_battmon);
+
+    _interim_state.info.capacity_initial_mah = cb.msg->capacity_initial;
+    _interim_state.info.capacity_current_mah = cb.msg->capacity_current;
+    _interim_state.info.cycles = cb.msg->cycles;
+
+    memset(_interim_state.info.serial_num, 0, ARRAY_SIZE(_interim_state.info.serial_num));
+    memcpy(_interim_state.info.serial_num, cb.msg->serial_num.begin(), MIN(ARRAY_SIZE(_interim_state.info.serial_num), cb.msg->serial_num.size()));
+
+    memset(_interim_state.info.model_name, 0, ARRAY_SIZE(_interim_state.info.model_name));
+    memcpy(_interim_state.info.model_name, cb.msg->model_name.begin(), MIN(ARRAY_SIZE(_interim_state.info.model_name), cb.msg->model_name.size()));
+
+    memset(_interim_state.info.firmware_id, 0, ARRAY_SIZE(_interim_state.info.firmware_id));
+    memcpy(_interim_state.info.firmware_id, cb.msg->firmware_id.begin(), MIN(ARRAY_SIZE(_interim_state.info.firmware_id), cb.msg->firmware_id.size()));
+
+    _interim_state.info.lifetime_pct = cb.msg->lifetime;
+    _interim_state.info.made_year = cb.msg->made_year;
+    _interim_state.info.info_unk1 = cb.msg->info_unk1;
+    _interim_state.info.info_unk2 = cb.msg->info_unk2;
+    _interim_state.info.info_unk3 = cb.msg->info_unk3;
+    _interim_state.info.info_serial = cb.msg->info_serial;
+
+    memset(_interim_state.info.info_unk4, 0, ARRAY_SIZE(_interim_state.info.info_unk4));
+    memcpy(_interim_state.info.info_unk4, cb.msg->info_unk4.begin(), MIN(ARRAY_SIZE(_interim_state.info.info_unk4), cb.msg->info_unk4.size()));
+
+    memset(_interim_state.info.info_unk5, 0, ARRAY_SIZE(_interim_state.info.info_unk5));
+    memcpy(_interim_state.info.info_unk5, cb.msg->info_unk5.begin(), MIN(ARRAY_SIZE(_interim_state.info.info_unk5), cb.msg->info_unk5.size()));
+
+    _interim_state.info.version_unk1 = cb.msg->version_unk1;
+
+    memset(_interim_state.info.version_unk2, 0, ARRAY_SIZE(_interim_state.info.version_unk2));
+    memcpy(_interim_state.info.version_unk2, cb.msg->version_unk2.begin(), MIN(ARRAY_SIZE(_interim_state.info.version_unk2), cb.msg->version_unk2.size()));
+}
+
+
+void AP_BattMonitor_UAVCAN::handle_smart_battery_status(const SmartBattStatusCb &cb)
+{
+    WITH_SEMAPHORE(_sem_battmon);
+    _interim_state.battery_id = cb.msg->battery_id;
+    _interim_state.voltage = (float)(cb.msg->Vpack / 1000.0);
+    _interim_state.current_amps = (float)(cb.msg->current1 / 1000.0);
+    _interim_state.current2_amps = (float)(cb.msg->current2 / 1000.0);
+    _interim_state.capacity_pct = cb.msg->state_of_charge_pct;
+
+    for (size_t cell = 0; cell < cb.msg->Vcell.size(); ++cell) {
+        _interim_state.cell_voltages.cells[cell] = cb.msg->Vcell[cell];
+    }
+    for (size_t cell = cb.msg->Vcell.size(); cell < ARRAY_SIZE(_interim_state.cell_voltages.cells); ++cell) {
+        _interim_state.cell_voltages.cells[cell] = UINT16_MAX;
+    }
+    _has_cell_voltages = true;
+    
+    _interim_state.is_powering_off = cb.msg->is_shutting_down;
+    _interim_state.is_on = cb.msg->is_on;
+
+    _interim_state.info.unk1 = cb.msg->unk1;
+    _interim_state.info.unk2 = cb.msg->unk2;
+    _interim_state.info.unk3 = cb.msg->unk3;
+    _interim_state.info.unk4 = cb.msg->unk4;
+    _interim_state.info.unk5 = cb.msg->unk5;
+
+    if (!isnanf(cb.msg->temperature) && cb.msg->temperature > 0) {
+        // Temperature reported from battery in kelvin and stored internally in Celsius.
+        _interim_state.temperature = KELVIN_TO_C(cb.msg->temperature / 10.0);
+        _interim_state.temperature_time = AP_HAL::millis();
+    }
+
+    _interim_state.last_time_micros = AP_HAL::micros();
+
+    _interim_state.healthy = true;
+}
+
+void AP_BattMonitor_UAVCAN::report_charging_status(const BattInfoCb &cb)
+{
+    static uint16_t last_status_flags[AP_BATT_MONITOR_MAX_INSTANCES] = { 0 };
+    const char *charging_debug_message = nullptr;
+    bool healthy;
+    if (cb.msg->status_flags & uavcan::equipment::power::BatteryInfo::STATUS_FLAG_IN_USE) {
+        charging_debug_message = "IN_USE";
+        _interim_state.charge_state = MAV_BATTERY_CHARGE_STATE_OK;
+        healthy = true;
+    } else {
+        healthy = false;
+    }
+    if (cb.msg->status_flags & uavcan::equipment::power::BatteryInfo::STATUS_FLAG_CHARGING) {
+        charging_debug_message = "CHARGING";
+        _interim_state.charge_state = MAV_BATTERY_CHARGE_STATE_CHARGING;
+    }
+    if (cb.msg->status_flags & uavcan::equipment::power::BatteryInfo::STATUS_FLAG_CHARGED) {
+        charging_debug_message = "CHARGED";
+        _interim_state.charge_state = MAV_BATTERY_CHARGE_STATE_CHARGING;
+    }
+    if (cb.msg->status_flags & uavcan::equipment::power::BatteryInfo::STATUS_FLAG_NEED_SERVICE) {
+        if (!(last_status_flags[_instance_number] & uavcan::equipment::power::BatteryInfo::STATUS_FLAG_NEED_SERVICE)) {
+            GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Battery %u need service!", _instance_number);
+        }
+        if (!AP::motors()->armed()) {
+            healthy = false;
+        }
+    }
+    if (cb.msg->status_flags & (uavcan::equipment::power::BatteryInfo::STATUS_FLAG_BMS_ERROR |
+                                uavcan::equipment::power::BatteryInfo::STATUS_FLAG_TEMP_HOT |
+                                uavcan::equipment::power::BatteryInfo::STATUS_FLAG_TEMP_COLD |
+                                uavcan::equipment::power::BatteryInfo::STATUS_FLAG_OVERLOAD |
+                                uavcan::equipment::power::BatteryInfo::STATUS_FLAG_BAD_BATTERY)) {
+        _interim_state.charge_state = MAV_BATTERY_CHARGE_STATE_UNHEALTHY;
+        if (last_status_flags[_instance_number] != cb.msg->status_flags) {
+            GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "battery %u status: %u", cb.msg->status_flags, _instance_number);
+        }
+        healthy = false;
+    }
+    _interim_state.healthy = healthy;
+    if ((!healthy) && AP::motors()->armed()) {
+        AP::vehicle()->set_battery_failure();
+    }
+    if (last_status_flags[_instance_number] != cb.msg->status_flags) {
+        last_status_flags[_instance_number] = cb.msg->status_flags;
+        if (charging_debug_message != nullptr) {
+            GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "battery %u status: %s", _instance_number, charging_debug_message);
+        }
+    }
+}
+
 void AP_BattMonitor_UAVCAN::handle_battery_info(const BattInfoCb &cb)
 {
-    update_interim_state(cb.msg->voltage, cb.msg->current, cb.msg->temperature, cb.msg->state_of_charge_pct); 
+    update_interim_state(cb.msg->voltage, cb.msg->current, cb.msg->temperature, cb.msg->state_of_charge_pct, cb.msg->remaining_capacity_wh, cb.msg->average_power_10sec); 
 
     WITH_SEMAPHORE(_sem_battmon);
     _remaining_capacity_wh = cb.msg->remaining_capacity_wh;
     _full_charge_capacity_wh = cb.msg->full_charge_capacity_wh;
+
+    report_charging_status(cb);
+}
+
+void AP_BattMonitor_UAVCAN::handle_battery_info_extended(const BattInfoExCb &cb)
+{
+    const struct log_BIX pkt{
+        LOG_PACKET_HEADER_INIT(LOG_BIX_MSG),
+        time_us                 : AP_HAL::micros64(),
+        instance                : get_batt_log_id(),
+        charge_intergrator_ah   : cb.msg->charge_intergrator_ah,
+        cfet_temp_dc            : cb.msg->cfet_temp_dc,
+        dfet_temp_dc            : cb.msg->dfet_temp_dc,
+        pcb_temp_bq_dc          : cb.msg->pcb_temp_bq_dc,
+        rear_cell_temp_dc       : cb.msg->rear_cell_temp_dc,
+        cell_board_temp_dc      : cb.msg->cell_board_temp_dc,
+        front_cell_temp_dc      : cb.msg->front_cell_temp_dc,
+        load_voltage_v          : cb.msg->load_voltage_v,
+        charger_voltage_v       : cb.msg->charger_voltage_v,
+        non_clamped_soc         : cb.msg->non_clamped_soc,
+        active_faults           : cb.msg->active_faults,
+        balanced_cells          : cb.msg->balanced_cells,
+        lifetime_charge_ah      : cb.msg->lifetime_charge_ah
+    };
+    AP::logger().WriteBlock(&pkt, sizeof(pkt));
+
+    WITH_SEMAPHORE(_sem_battmon);
+    uint8_t cell_count = MIN(ARRAY_SIZE(_interim_state.cell_voltages.cells), cb.msg->cell_voltage_v.size());
+    for (uint8_t i = 0; i < cell_count; i++) {
+        _interim_state.cell_voltages.cells[i] = cb.msg->cell_voltage_v[i] * 1000;
+    }
+    _has_cell_voltages = true;
 }
 
 void AP_BattMonitor_UAVCAN::update_interim_state(const float voltage, const float current, const float temperature_K, const uint8_t soc)
@@ -143,7 +353,7 @@ void AP_BattMonitor_UAVCAN::update_interim_state(const float voltage, const floa
 
     _interim_state.voltage = voltage;
     _interim_state.current_amps = _curr_mult * current;
-    _soc = soc;
+    _interim_state.capacity_pct = soc;
 
     if (!isnanf(temperature_K) && temperature_K > 0) {
         // Temperature reported from battery in kelvin and stored internally in Celsius.
@@ -162,7 +372,13 @@ void AP_BattMonitor_UAVCAN::update_interim_state(const float voltage, const floa
 
     // record time
     _interim_state.last_time_micros = tnow;
-    _interim_state.healthy = true;
+}
+
+void AP_BattMonitor_UAVCAN::update_interim_state(const float voltage, const float current, const float temperature_K, const uint8_t soc, const float remaining_capacity_wh, const float average_power_10sec)
+{
+    _interim_state.remaining_capacity_wh = remaining_capacity_wh;
+    _interim_state.average_power_10sec = average_power_10sec;
+    update_interim_state(voltage, current, temperature_K, soc);
 }
 
 void AP_BattMonitor_UAVCAN::handle_battery_info_aux(const BattInfoAuxCb &cb)
@@ -221,6 +437,24 @@ void AP_BattMonitor_UAVCAN::handle_battery_info_trampoline(AP_UAVCAN* ap_uavcan,
     driver->handle_battery_info(cb);
 }
 
+void AP_BattMonitor_UAVCAN::handle_battery_info_extended_trampoline(AP_UAVCAN* ap_uavcan, uint8_t node_id, const BattInfoExCb &cb)
+{
+    AP_BattMonitor_UAVCAN* driver = get_uavcan_backend(ap_uavcan, node_id, 0);
+    if (driver == nullptr) {
+        return;
+    }
+    driver->handle_battery_info_extended(cb);
+}
+
+void AP_BattMonitor_UAVCAN::handle_smart_battery_info_trampoline(AP_UAVCAN* ap_uavcan, uint8_t node_id, const SmartBattInfoCb &cb)
+{
+    AP_BattMonitor_UAVCAN* driver = get_uavcan_backend(ap_uavcan, node_id, cb.msg->battery_id);
+    if (driver == nullptr) {
+        return;
+    }
+    driver->handle_smart_battery_info(cb);
+}
+
 void AP_BattMonitor_UAVCAN::handle_battery_info_aux_trampoline(AP_UAVCAN* ap_uavcan, uint8_t node_id, const BattInfoAuxCb &cb)
 {
     AP_BattMonitor_UAVCAN* driver = get_uavcan_backend(ap_uavcan, node_id, cb.msg->battery_id);
@@ -239,29 +473,59 @@ void AP_BattMonitor_UAVCAN::handle_mppt_stream_trampoline(AP_UAVCAN* ap_uavcan, 
     driver->handle_mppt_stream(cb);
 }
 
+void AP_BattMonitor_UAVCAN::handle_smart_battery_status_trampoline(AP_UAVCAN* ap_uavcan, uint8_t node_id, const SmartBattStatusCb &cb)
+{
+    AP_BattMonitor_UAVCAN* driver = get_uavcan_backend(ap_uavcan, node_id, cb.msg->battery_id);
+    if (driver == nullptr) {
+        return;
+    }
+    driver->handle_smart_battery_status(cb);
+}
+
 // read - read the voltage and current
 void AP_BattMonitor_UAVCAN::read()
 {
+    static uint32_t last_timeout_log[AP_BATT_MONITOR_MAX_INSTANCES] = { };
     uint32_t tnow = AP_HAL::micros();
 
     // timeout after 5 seconds
-    if ((tnow - _interim_state.last_time_micros) > AP_BATTMONITOR_UAVCAN_TIMEOUT_MICROS) {
+    if ((tnow - _interim_state.last_time_micros) > _params._batt_uavcan_timeout_secs * 1e6) {
+        if ((tnow - last_timeout_log[_instance_number]) > _params._batt_uavcan_timeout_secs * 1e6) {
+            GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "battery monitor %u uavcan timeout (%lu)",
+                            _instance_number, (long unsigned int)(tnow - _interim_state.last_time_micros));
+            last_timeout_log[_instance_number] = tnow;
+        }
         _interim_state.healthy = false;
+        if (AP::motors()->armed()) {
+            AP::vehicle()->set_battery_failure();
+        }
     }
     // Copy over relevant states over to main state
     WITH_SEMAPHORE(_sem_battmon);
+    _state.battery_id = _interim_state.battery_id;
     _state.temperature = _interim_state.temperature;
     _state.temperature_time = _interim_state.temperature_time;
     _state.voltage = _interim_state.voltage;
     _state.current_amps = _interim_state.current_amps;
+    _state.current2_amps = _interim_state.current2_amps;
     _state.consumed_mah = _interim_state.consumed_mah;
+    _state.capacity_pct = _interim_state.capacity_pct;
     _state.consumed_wh = _interim_state.consumed_wh;
+    _state.remaining_capacity_wh = _interim_state.remaining_capacity_wh;
+    _state.is_powering_off = _interim_state.is_powering_off;
+    _state.is_on = _interim_state.is_on;
     _state.last_time_micros = _interim_state.last_time_micros;
     _state.healthy = _interim_state.healthy;
     _state.time_remaining = _interim_state.time_remaining;
     _state.has_time_remaining = _interim_state.has_time_remaining;
     _state.is_powering_off = _interim_state.is_powering_off;
     memcpy(_state.cell_voltages.cells, _interim_state.cell_voltages.cells, sizeof(_state.cell_voltages));
+    _state.charge_state = _interim_state.charge_state;
+    _state.average_power_10sec = _interim_state.average_power_10sec;
+
+    for (size_t cell = 0; cell < ARRAY_SIZE(_interim_state.cell_voltages.cells); ++cell) {
+        _state.cell_voltages.cells[cell] = _interim_state.cell_voltages.cells[cell];
+    }
 
     _has_temperature = (AP_HAL::millis() - _state.temperature_time) <= AP_BATT_MONITOR_TIMEOUT;
 
@@ -269,6 +533,7 @@ void AP_BattMonitor_UAVCAN::read()
     if (_mppt.is_detected) {
         mppt_set_armed_powered_state();
     }
+    memcpy(&(_state.info), &(_interim_state.info), sizeof(_state.info));
 }
 
 /// capacity_remaining_pct - returns true if the percentage is valid and writes to percentage argument
@@ -276,19 +541,13 @@ bool AP_BattMonitor_UAVCAN::capacity_remaining_pct(uint8_t &percentage) const
 {
     if ((uint32_t(_params._options.get()) & uint32_t(AP_BattMonitor_Params::Options::Ignore_UAVCAN_SoC)) ||
         _mppt.is_detected ||
-        _soc == 127) {
+        _state.capacity_pct > 100) {
         // a UAVCAN battery monitor may not be able to supply a state of charge. If it can't then
         // the user can set the option to use current integration in the backend instead.
-        // SOC of 127 is used as an invalid SOC flag ie system configuration errors or SOC estimation unavailable
         return AP_BattMonitor_Backend::capacity_remaining_pct(percentage);
     }
 
-    // the monitor must have current readings in order to estimate consumed_mah and be healthy
-    if (!has_current() || !_state.healthy) {
-        return false;
-    }
-
-    percentage = _soc;
+    percentage = _state.capacity_pct;
     return true;
 }
 

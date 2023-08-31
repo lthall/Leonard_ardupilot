@@ -23,10 +23,11 @@
   This incorporates initialisation as well.
 */
 AP_BattMonitor_Backend::AP_BattMonitor_Backend(AP_BattMonitor &mon, AP_BattMonitor::BattMonitor_State &mon_state,
-                                               AP_BattMonitor_Params &params) :
+                                               AP_BattMonitor_Params &params, uint8_t instance_number) :
         _mon(mon),
         _state(mon_state),
-        _params(params)
+        _params(params),
+        _instance_number(instance_number)
 {
 }
 
@@ -110,8 +111,8 @@ AP_BattMonitor::Failsafe AP_BattMonitor_Backend::update_failsafes(void)
 {
     const uint32_t now = AP_HAL::millis();
 
-    bool low_voltage, low_capacity, critical_voltage, critical_capacity;
-    check_failsafe_types(low_voltage, low_capacity, critical_voltage, critical_capacity);
+    bool low_voltage, low_capacity, low_soc, critical_voltage, critical_capacity, critical_soc, high_current, high_temperature;
+    check_failsafe_types(low_voltage, low_capacity, low_soc, critical_voltage, critical_capacity, critical_soc, high_current, high_temperature);
 
     if (critical_voltage) {
         // this is the first time our voltage has dropped below minimum so start timer
@@ -126,7 +127,7 @@ AP_BattMonitor::Failsafe AP_BattMonitor_Backend::update_failsafes(void)
         _state.critical_voltage_start_ms = 0;
     }
 
-    if (critical_capacity) {
+    if (critical_capacity || critical_soc) {
         return AP_BattMonitor::Failsafe::Critical;
     }
 
@@ -143,7 +144,33 @@ AP_BattMonitor::Failsafe AP_BattMonitor_Backend::update_failsafes(void)
         _state.low_voltage_start_ms = 0;
     }
 
-    if (low_capacity) {
+    if (high_temperature) {
+        // this is the first time our temperature has climbed above maximum so start timer
+        if (_state.high_temperature_start_ms == 0) {
+            _state.high_temperature_start_ms = now;
+        } else if (_params._high_temperature_timeout > 0 &&
+                   now - _state.high_temperature_start_ms > uint32_t(_params._high_temperature_timeout)*1000U) {
+            return AP_BattMonitor::Failsafe::HighTemperature;
+        }
+    } else {
+        // acceptable temperature so reset timer
+        _state.high_temperature_start_ms = 0;
+    }
+
+    if (high_current) {
+        // this is the first time our current has climbed above maximum so start timer
+        if (_state.high_current_start_ms == 0) {
+            _state.high_current_start_ms = now;
+        } else if (_params._high_current_timeout > 0 &&
+                   now - _state.high_current_start_ms > uint32_t(_params._high_current_timeout)*1000U) {
+            return AP_BattMonitor::Failsafe::HighCurrent;
+        }
+    } else {
+        // acceptable current so reset timer
+        _state.high_current_start_ms = 0;
+    }
+
+    if (low_capacity || low_soc) {
         return AP_BattMonitor::Failsafe::Low;
     }
 
@@ -162,8 +189,8 @@ static bool update_check(size_t buflen, char *buffer, bool failed, const char *m
 
 bool AP_BattMonitor_Backend::arming_checks(char * buffer, size_t buflen) const
 {
-    bool low_voltage, low_capacity, critical_voltage, critical_capacity;
-    check_failsafe_types(low_voltage, low_capacity, critical_voltage, critical_capacity);
+    bool low_voltage, low_capacity, low_soc, critical_voltage, critical_capacity, critical_soc, high_current, high_temperature;
+    check_failsafe_types(low_voltage, low_capacity, low_soc, critical_voltage, critical_capacity, critical_soc, high_current, high_temperature);
 
     bool below_arming_voltage = is_positive(_params._arming_minimum_voltage) &&
                                 (_state.voltage < _params._arming_minimum_voltage);
@@ -175,6 +202,9 @@ bool AP_BattMonitor_Backend::arming_checks(char * buffer, size_t buflen) const
     bool fs_voltage_inversion = is_positive(_params._critical_voltage) &&
                                 is_positive(_params._low_voltage) &&
                                 (_params._low_voltage < _params._critical_voltage);
+    bool fs_soc_inversion = is_positive(_params._critical_soc) &&
+                            is_positive(_params._low_soc) &&
+                            (_params._low_soc < _params._critical_soc);
 
     bool result = update_check(buflen, buffer, !_state.healthy, "unhealthy");
     result = result && update_check(buflen, buffer, below_arming_voltage, "below minimum arming voltage");
@@ -185,11 +215,12 @@ bool AP_BattMonitor_Backend::arming_checks(char * buffer, size_t buflen) const
     result = result && update_check(buflen, buffer, critical_capacity, "critical capacity failsafe");
     result = result && update_check(buflen, buffer, fs_capacity_inversion, "capacity failsafe critical > low");
     result = result && update_check(buflen, buffer, fs_voltage_inversion, "voltage failsafe critical > low");
+    result = result && update_check(buflen, buffer, fs_soc_inversion, "soc failsafe critical > low");
 
     return result;
 }
 
-void AP_BattMonitor_Backend::check_failsafe_types(bool &low_voltage, bool &low_capacity, bool &critical_voltage, bool &critical_capacity) const
+void AP_BattMonitor_Backend::check_failsafe_types(bool &low_voltage, bool &low_capacity, bool &low_soc, bool &critical_voltage, bool &critical_capacity, bool &critical_soc, bool &high_current, bool &high_temperature) const
 {
     // use voltage or sag compensated voltage
     float voltage_used;
@@ -218,6 +249,12 @@ void AP_BattMonitor_Backend::check_failsafe_types(bool &low_voltage, bool &low_c
         critical_capacity = false;
     }
 
+    if ((_params._critical_soc > 0) && (_state.capacity_pct < _params._critical_soc)) {
+        critical_soc = true;
+    } else {
+        critical_soc = false;
+    }
+
     if ((voltage_used > 0) && (_params._low_voltage > 0) && (voltage_used < _params._low_voltage)) {
         low_voltage = true;
     } else {
@@ -231,6 +268,25 @@ void AP_BattMonitor_Backend::check_failsafe_types(bool &low_voltage, bool &low_c
     } else {
         low_capacity = false;
     }
+
+    if ((_params._low_soc > 0) && (_state.capacity_pct < _params._low_soc)) {
+        low_soc = true;
+    } else {
+        low_soc = false;
+    }
+
+    if ((_params._high_current > 0) && (fabs(_state.current_amps) > _params._high_current)) {
+        high_current = true;
+    } else {
+        high_current = false;
+    }
+
+    if ((_params._high_temperature > 0) && (_state.temperature > _params._high_temperature)) {
+        high_temperature = true;
+    } else {
+        high_temperature = false;
+    }
+
 }
 
 /*

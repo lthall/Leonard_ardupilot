@@ -147,6 +147,79 @@ const AP_Param::GroupInfo AP_BattMonitor_Params::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("OPTIONS", 21, AP_BattMonitor_Params, _options, 0),
 
+    // @Param: LOW_SOC
+    // @DisplayName: Low battery state of charge
+    // @Description: Battery state of charge at which the low battery failsafe is triggered. Set to 0 to disable battery remaining failsafe. If the battery state of charge drops below this level the vehicle will perform the failsafe specified by the @PREFIX@FS_LOW_ACT parameter.
+    // @Units: %
+    // @Increment: 1
+    // @User: Standard
+    AP_GROUPINFO("LOW_SOC", 22, AP_BattMonitor_Params, _low_soc, 0),
+
+    // @Param: CRT_SOC
+    // @DisplayName: Critical battery state of charge
+    // @Description: Battery state of charge at which the critical battery failsafe is triggered. Set to 0 to disable battery remaining failsafe. If the battery capacity drops below this level the vehicle will perform the failsafe specified by the @PREFIX@_FS_CRT_ACT parameter.
+    // @Units: %
+    // @Increment: 1
+    // @User: Standard
+    AP_GROUPINFO("CRT_SOC", 23, AP_BattMonitor_Params, _critical_soc, 0),
+
+    // @Param: CHRG_STT
+    // @DisplayName: Simulated charging state
+    // @Description: If Unused - the vehicle will report the real charging status. If Charging the vehicle will report it's in charging status. If Error the vehicle will report error charging status.
+    // @Values: 0:Unused,1:Charging,2:Error
+    // @User: Standard
+    AP_GROUPINFO("CHRG_STT", 24, AP_BattMonitor_Params, _simulated_charge_state, 0),
+
+    // @Param: HIGH_CUR
+    // @DisplayName: Critical high battery current
+    // @Description: Battery current at which the critical battery failsafe is triggered. Set to 0 to disable battery current failsafe.
+    // @Units: Ampere
+    // @Increment: 0.1
+    // @User: Standard
+    AP_GROUPINFO("HIGH_CUR", 25, AP_BattMonitor_Params, _high_current, 25),
+
+    // @Param: HIGH_TEMP
+    // @DisplayName: Critical high battery temperature
+    // @Description: Battery temperature at which the critical battery failsafe is triggered. Set to 0 to disable battery temperature failsafe.
+    // @Units: degrees Celsius
+    // @Increment: 0.1
+    // @User: Standard
+    AP_GROUPINFO("HIGH_TEMP", 26, AP_BattMonitor_Params, _high_temperature, 55),
+
+    // @Param: HIGH_T_TIM
+    // @DisplayName: High temperature timeout
+    // @Description: This is the timeout in seconds before a high temperature event will be triggered. A value of zero disables high temperture errors.
+    // @Units: s
+    // @Increment: 1
+    // @Range: 0 120
+    // @User: Advanced
+    AP_GROUPINFO("HIGH_T_TIM", 27, AP_BattMonitor_Params, _high_temperature_timeout, 10),
+
+    // @Param: HIGH_C_TIM
+    // @DisplayName: High current timeout
+    // @Description: This is the timeout in seconds before a high current event will be triggered. A value of zero disables high current errors.
+    // @Units: s
+    // @Increment: 1
+    // @Range: 0 120
+    // @User: Advanced
+    AP_GROUPINFO("HIGH_C_TIM", 28, AP_BattMonitor_Params, _high_current_timeout, 10),
+
+    // @Param: CAN_TIM
+    // @DisplayName: UAVCAN battery timeout
+    // @Description: This is the timeout in seconds before a a battery declared unhealthy.
+    // @Units: s
+    // @Increment: 1
+    // @Range: 0 120
+    // @User: Advanced
+    AP_GROUPINFO("CAN_TIM", 29, AP_BattMonitor_Params, _batt_uavcan_timeout_secs, 5),
+
+    // @Param: ARM_CHRG
+    // @DisplayName: Fail pre-arm checks if battery is charging
+    // @Description: If set to 1 (the default) it will fail pre-arm checks if battery is charging.
+    // @Range: 0 1
+    // @User: Advanced
+    AP_GROUPINFO("ARM_CHRG", 30, AP_BattMonitor_Params, _fail_arm_checks_on_charging, 1),
+
     AP_GROUPEND
 
 };

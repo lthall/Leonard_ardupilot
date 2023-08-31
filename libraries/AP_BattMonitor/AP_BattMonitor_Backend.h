@@ -22,7 +22,7 @@ class AP_BattMonitor_Backend
 {
 public:
     // constructor. This incorporates initialisation as well.
-    AP_BattMonitor_Backend(AP_BattMonitor &mon, AP_BattMonitor::BattMonitor_State &mon_state, AP_BattMonitor_Params &params);
+    AP_BattMonitor_Backend(AP_BattMonitor &mon, AP_BattMonitor::BattMonitor_State &mon_state, AP_BattMonitor_Params &params, uint8_t instance_number);
 
     // we declare a virtual destructor so that BattMonitor driver can
     // override with a custom destructor if need be
@@ -83,13 +83,17 @@ public:
     // dt_us: time between samples (micro-seconds)
     static float calculate_mah(float amps, float dt_us) { return (float) (amps * dt_us * AUS_TO_MAH); }
 
+    virtual uint8_t get_batt_log_id() const { return _instance_number; }
+
 protected:
     AP_BattMonitor                      &_mon;      // reference to front-end
     AP_BattMonitor::BattMonitor_State   &_state;    // reference to this instances state (held in the front-end)
     AP_BattMonitor_Params               &_params;   // reference to this instances parameters (held in the front-end)
 
+    uint8_t     _instance_number;                   // the instance number of this battery out of all batteries in the system
+
     // checks what failsafes could be triggered
-    void check_failsafe_types(bool &low_voltage, bool &low_capacity, bool &critical_voltage, bool &critical_capacity) const;
+    void check_failsafe_types(bool &low_voltage, bool &low_capacity, bool &low_soc, bool &critical_voltage, bool &critical_capacity, bool &critical_soc, bool &high_current, bool &high_temperature) const;
     void update_consumed(AP_BattMonitor::BattMonitor_State &state, uint32_t dt_us);
 
 private:

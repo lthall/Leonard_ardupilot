@@ -58,8 +58,9 @@ const AP_Param::GroupInfo AP_BattMonitor_Analog::var_info[] = {
 /// Constructor
 AP_BattMonitor_Analog::AP_BattMonitor_Analog(AP_BattMonitor &mon,
                                              AP_BattMonitor::BattMonitor_State &mon_state,
-                                             AP_BattMonitor_Params &params) :
-    AP_BattMonitor_Backend(mon, mon_state, params)
+                                             AP_BattMonitor_Params &params,
+                                             uint8_t instance_number) :
+    AP_BattMonitor_Backend(mon, mon_state, params, instance_number)
 {
     AP_Param::setup_object_defaults(this, var_info);
     _state.var_info = var_info;

@@ -11,8 +11,8 @@ public:
     AP_BattMonitor_SMBus_SUI(AP_BattMonitor &mon,
                              AP_BattMonitor::BattMonitor_State &mon_state,
                              AP_BattMonitor_Params &params,
-                             uint8_t cell_count
-                            );
+                             uint8_t cell_count,
+                             uint8_t instance_number);
 
     void init(void) override;
 

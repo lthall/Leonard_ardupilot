@@ -27,6 +27,10 @@
 #define AP_BATT_MONITOR_CELLS_MAX           12
 #endif
 
+#define AP_BATT_MONITOR_SERIAL_LEN          14
+#define AP_BATT_MONITOR_MODEL_NAME_LEN      32
+#define AP_BATT_MONITOR_FIRMWARE_ID_LEN     15
+
 #ifndef AP_BATTMON_SMBUS_ENABLE
 #define AP_BATTMON_SMBUS_ENABLE 1
 #endif
@@ -73,8 +77,10 @@ public:
     // battery failsafes must be defined in levels of severity so that vehicles wont fall backwards
     enum class Failsafe : uint8_t {
         None = 0,
+        HighCurrent,
+        HighTemperature,
         Low,
-        Critical
+        Critical,
     };
 
     // Battery monitor driver types
@@ -101,6 +107,7 @@ public:
         INA2XX                     = 21,
         LTC2946                    = 22,
         Torqeedo                   = 23,
+        UAVCAN_FlyhawkSmartBattery = 24
     };
 
     FUNCTOR_TYPEDEF(battery_failsafe_handler_fn_t, void, const char *, const int8_t);
@@ -120,27 +127,63 @@ public:
         uint16_t cells[AP_BATT_MONITOR_CELLS_MAX];
     };
 
+    // Battery info and (yet) unknown fields
+    struct BattMonitor_Info {
+        uint16_t    capacity_initial_mah;      // Capacity when full according to manufacturer
+        uint16_t    capacity_current_mah;      // Capacity when full (accounting for battery degradation)
+        uint16_t    cycles;                    // Charge/discharge cycle count
+        char        serial_num[AP_BATT_MONITOR_SERIAL_LEN];
+        char        model_name[AP_BATT_MONITOR_MODEL_NAME_LEN];
+        char        firmware_id[AP_BATT_MONITOR_FIRMWARE_ID_LEN];
+        uint8_t     lifetime_pct;
+        uint16_t    made_year;
+        uint8_t     unk1;
+        uint8_t     unk2;
+        uint16_t    unk3;
+        uint8_t     unk4;
+        uint8_t     unk5;
+        uint8_t     info_unk1;
+        uint16_t    info_unk2;
+        uint16_t    info_unk3;
+        uint32_t    info_serial;
+        uint8_t     info_unk4[8];
+        uint8_t     info_unk5[5];
+        uint16_t    version_unk1;
+        uint8_t     version_unk2[6];
+    };
+
     // The BattMonitor_State structure is filled in by the backend driver
     struct BattMonitor_State {
-        cells       cell_voltages;             // battery cell voltages in millivolts, 10 cells matches the MAVLink spec
-        float       voltage;                   // voltage in volts
-        float       current_amps;              // current in amperes
-        float       consumed_mah;              // total current draw in milliamp hours since start-up
-        float       consumed_wh;               // total energy consumed in Wh since start-up
-        uint32_t    last_time_micros;          // time when voltage and current was last read in microseconds
-        uint32_t    low_voltage_start_ms;      // time when voltage dropped below the minimum in milliseconds
-        uint32_t    critical_voltage_start_ms; // critical voltage failsafe start timer in milliseconds
-        float       temperature;               // battery temperature in degrees Celsius
-        uint32_t    temperature_time;          // timestamp of the last received temperature message
-        float       voltage_resting_estimate;  // voltage with sag removed based on current and resistance estimate in Volt
-        float       resistance;                // resistance, in Ohms, calculated by comparing resting voltage vs in flight voltage
-        Failsafe failsafe;                     // stage failsafe the battery is in
-        bool        healthy;                   // battery monitor is communicating correctly
-        bool        is_powering_off;           // true when power button commands power off
-        bool        powerOffNotified;          // only send powering off notification once
-        uint32_t    time_remaining;            // remaining battery time
-        bool        has_time_remaining;        // time_remaining is only valid if this is true
+        uint8_t                     battery_id;                // identifies the battery within this vehicle
+        cells                       cell_voltages;             // battery cell voltages in millivolts, 10 cells matches the MAVLink spec
+        float                       voltage;                   // voltage in volts
+        float                       current_amps;              // current in amperes
+        uint8_t                     capacity_pct;              // capacity % direct from battery (0% to 100%)
+        float                       consumed_mah;              // total current draw in milliamp hours since start-up
+        float                       consumed_wh;               // total energy consumed in Wh since start-up
+        float                       remaining_capacity_wh;     // capacity in watt hours direct from battery
+        uint32_t                    last_time_micros;          // time when voltage and current was last read in microseconds
+        uint32_t                    low_voltage_start_ms;      // time when voltage dropped below the minimum in milliseconds
+        uint32_t                    critical_voltage_start_ms; // critical voltage failsafe start timer in milliseconds
+        uint32_t                    high_temperature_start_ms; // high temperature failsafe start time in milliseconds
+        uint32_t                    high_current_start_ms;     // high current failsafe start time in milliseconds
+        float                       temperature;               // battery temperature in degrees Celsius
+        uint32_t                    temperature_time;          // timestamp of the last received temperature message
+        float                       voltage_resting_estimate;  // voltage with sag removed based on current and resistance estimate in Volt
+        float                       resistance;                // resistance, in Ohms, calculated by comparing resting voltage vs in flight voltage
+        Failsafe                    failsafe;                  // stage failsafe the battery is in
+        bool                        healthy;                   // battery monitor is communicating correctly
+        bool                        is_powering_off;           // true when power button commands power off
+        bool                        powerOffNotified;          // only send powering off notification once
+        uint32_t                    time_remaining;            // remaining battery time
+        bool                        has_time_remaining;        // time_remaining is only valid if this is true
         const struct AP_Param::GroupInfo *var_info;
+        float                       current2_amps;             // current2 in amperes
+        bool                        is_on;                     // true when the battery is powered on
+        MAV_BATTERY_CHARGE_STATE    charge_state;              // charge state of the battery
+        float                       average_power_10sec;       // average power consumption over the last 10 seconds in watt
+
+        struct BattMonitor_Info info;    
     };
 
     static const struct AP_Param::GroupInfo *backend_var_info[AP_BATT_MONITOR_MAX_INSTANCES];
@@ -176,6 +219,9 @@ public:
     /// current_amps - returns the instantaneous current draw in amperes
     bool current_amps(float &current, const uint8_t instance = AP_BATT_PRIMARY_INSTANCE) const WARN_IF_UNUSED;
 
+    /// current2_amps - returns the instantaneous current draw for the extra current battery report, in amperes
+    bool current2_amps(float &current2, const uint8_t instance = AP_BATT_PRIMARY_INSTANCE) const WARN_IF_UNUSED;
+
     /// consumed_mah - returns total current drawn since start-up in milliampere.hours
     bool consumed_mah(float &mah, const uint8_t instance = AP_BATT_PRIMARY_INSTANCE) const WARN_IF_UNUSED;
 
@@ -184,7 +230,7 @@ public:
 
     /// capacity_remaining_pct - returns true if the percentage is valid and writes to percentage argument
     virtual bool capacity_remaining_pct(uint8_t &percentage, uint8_t instance) const WARN_IF_UNUSED;
-    bool capacity_remaining_pct(uint8_t &percentage) const WARN_IF_UNUSED { return capacity_remaining_pct(percentage, AP_BATT_PRIMARY_INSTANCE); }
+    bool capacity_remaining_pct(uint8_t &percentage) const WARN_IF_UNUSED;
 
     /// time_remaining - returns remaining battery time
     bool time_remaining(uint32_t &seconds, const uint8_t instance = AP_BATT_PRIMARY_INSTANCE) const WARN_IF_UNUSED;
@@ -221,6 +267,8 @@ public:
     const cells &get_cell_voltages() const { return get_cell_voltages(AP_BATT_PRIMARY_INSTANCE); }
     const cells &get_cell_voltages(const uint8_t instance) const;
 
+    bool get_battery_info(BattMonitor_Info &info, const uint8_t instance) const;
+
     // temperature
     bool get_temperature(float &temperature) const { return get_temperature(temperature, AP_BATT_PRIMARY_INSTANCE); }
     bool get_temperature(float &temperature, const uint8_t instance) const;
@@ -231,6 +279,12 @@ public:
     // get battery resistance estimate in ohms
     float get_resistance() const { return get_resistance(AP_BATT_PRIMARY_INSTANCE); }
     float get_resistance(uint8_t instance) const { return state[instance].resistance; }
+
+    // set is_powering_off to true when the battery instance is powring off, false otherwise. return false if out of range.
+    bool is_powering_off(bool &is_powering_off, uint8_t instance) const;
+
+    // set is_battery_on to true when the battery instance is currently on, false otherwise. return false if out of range.
+    bool is_battery_on(bool &is_battery_on, uint8_t instance) const;
 
     // returns false if we fail arming checks, in which case the buffer will be populated with a failure message
     bool arming_checks(size_t buflen, char *buffer) const;
@@ -249,6 +303,7 @@ public:
     uint32_t get_mavlink_fault_bitmask(const uint8_t instance) const;
 
     static const struct AP_Param::GroupInfo var_info[];
+    static const struct AP_Param::GroupInfo var_info_global[];  // for parameters that not belong to a specific battery monitor instance
 
 protected:
 
@@ -274,6 +329,14 @@ private:
 
     int8_t      _highest_failsafe_priority; // highest selected failsafe action level (used to restrict what actions we move into)
     bool        _has_triggered_failsafe;  // true after a battery failsafe has been triggered for the first time
+
+    uint32_t    _battery_power_diff_started_ms; // battery power diff start time in milliseconds
+
+    AP_Int16 _power_diff_min_pwr;       /// minimal power (in Watt) of any of the batts to check for battery power diff
+    AP_Int8  _power_diff_timeout;       /// timeout (in seconds) before we report battery power diff
+    AP_Int8  _power_diff_percent;       /// the maximum power diff between batteries allowed
+    
+    uint32_t    _last_log_write_us[AP_BATT_MONITOR_MAX_INSTANCES];  // last time battery messages were written to the log
 
 };
 

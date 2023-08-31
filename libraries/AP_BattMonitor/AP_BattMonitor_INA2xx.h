@@ -18,7 +18,8 @@ public:
     /// Constructor
     AP_BattMonitor_INA2XX(AP_BattMonitor &mon,
                           AP_BattMonitor::BattMonitor_State &mon_state,
-                          AP_BattMonitor_Params &params);
+                          AP_BattMonitor_Params &params,
+                          uint8_t instance_number);
 
     bool has_cell_voltages() const override { return false; }
     bool has_temperature() const override { return false; }

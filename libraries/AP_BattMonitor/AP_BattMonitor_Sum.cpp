@@ -33,7 +33,7 @@ AP_BattMonitor_Sum::AP_BattMonitor_Sum(AP_BattMonitor &mon,
                                        AP_BattMonitor::BattMonitor_State &mon_state,
                                        AP_BattMonitor_Params &params,
                                        uint8_t instance) :
-    AP_BattMonitor_Backend(mon, mon_state, params),
+    AP_BattMonitor_Backend(mon, mon_state, params, instance),
     _instance(instance)
 {
     AP_Param::setup_object_defaults(this, var_info);

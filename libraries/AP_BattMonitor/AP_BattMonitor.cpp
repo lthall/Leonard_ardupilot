@@ -23,6 +23,7 @@
 #include "AP_BattMonitor_UAVCAN.h"
 #endif
 
+#include <AP_Vehicle/AP_Vehicle.h>
 #include <AP_Vehicle/AP_Vehicle_Type.h>
 #include <AP_Logger/AP_Logger.h>
 #include <GCS_MAVLink/GCS.h>
@@ -179,6 +180,38 @@ const AP_Param::GroupInfo AP_BattMonitor::var_info[] = {
     AP_SUBGROUPVARPTR(drivers[8], "9_", 49, AP_BattMonitor, backend_var_info[8]),
 #endif
 
+    AP_SUBGROUPEXTENSION("", 50, AP_BattMonitor, var_info_global),
+
+    AP_GROUPEND
+};
+
+const AP_Param::GroupInfo AP_BattMonitor::var_info_global[] = {
+    // @Param: POW_DFF_MIN
+    // @DisplayName: minimal power (in Watt) of any of the batts to check for battery power diff
+    // @Description: minimal power (in Watt) of any of the batts to check for battery power diff
+    // @Units: Watt
+    // @Increment: 1
+    // @User: Advanced
+    AP_GROUPINFO("_POW_DFF_MIN", 0, AP_BattMonitor, _power_diff_min_pwr, 150),
+
+    // @Param: POW_DFF_TIM
+    // @DisplayName: timeout (in seconds) before we report battery power diff
+    // @Description: timeout (in seconds) before we report battery power diff
+    // @Units: s
+    // @Increment: 1
+    // @Range: 0 120
+    // @User: Advanced
+    AP_GROUPINFO("_POW_DFF_TIM", 1, AP_BattMonitor, _power_diff_timeout, 10),
+
+    // @Param: POW_DFF_PCT
+    // @DisplayName: the maximum power diff between batteries allowed
+    // @Description: the maximum power diff between batteries allowed
+    // @Units: %
+    // @Increment: 1
+    // @Range: 0 100
+    // @User: Advanced
+    AP_GROUPINFO("_POW_DFF_PCT", 2, AP_BattMonitor, _power_diff_percent, 25),
+
     AP_GROUPEND
 };
 
@@ -194,6 +227,7 @@ AP_BattMonitor::AP_BattMonitor(uint32_t log_battery_bit, battery_failsafe_handle
     _failsafe_priorities(failsafe_priorities)
 {
     AP_Param::setup_object_defaults(this, var_info);
+    AP_Param::setup_object_defaults(this, var_info_global);
 
     if (_singleton != nullptr) {
         AP_HAL::panic("AP_BattMonitor must be singleton");
@@ -224,29 +258,29 @@ AP_BattMonitor::init()
         switch (get_type(instance)) {
             case Type::ANALOG_VOLTAGE_ONLY:
             case Type::ANALOG_VOLTAGE_AND_CURRENT:
-                drivers[instance] = new AP_BattMonitor_Analog(*this, state[instance], _params[instance]);
+                drivers[instance] = new AP_BattMonitor_Analog(*this, state[instance], _params[instance], instance);
                 break;
 #if AP_BATTMON_SMBUS_ENABLE
             case Type::SOLO:
-                drivers[instance] = new AP_BattMonitor_SMBus_Solo(*this, state[instance], _params[instance]);
+                drivers[instance] = new AP_BattMonitor_SMBus_Solo(*this, state[instance], _params[instance], instance);
                 break;
             case Type::SMBus_Generic:
-                drivers[instance] = new AP_BattMonitor_SMBus_Generic(*this, state[instance], _params[instance]);
+                drivers[instance] = new AP_BattMonitor_SMBus_Generic(*this, state[instance], _params[instance], instance);
                 break;
             case Type::SUI3:
-                drivers[instance] = new AP_BattMonitor_SMBus_SUI(*this, state[instance], _params[instance], 3);
+                drivers[instance] = new AP_BattMonitor_SMBus_SUI(*this, state[instance], _params[instance], 3, instance);
                 break;
             case Type::SUI6:
-                drivers[instance] = new AP_BattMonitor_SMBus_SUI(*this, state[instance], _params[instance], 6);
+                drivers[instance] = new AP_BattMonitor_SMBus_SUI(*this, state[instance], _params[instance], 6, instance);
                 break;
             case Type::MAXELL:
-                drivers[instance] = new AP_BattMonitor_SMBus_Maxell(*this, state[instance], _params[instance]);
+                drivers[instance] = new AP_BattMonitor_SMBus_Maxell(*this, state[instance], _params[instance], instance);
                 break;
             case Type::Rotoye:
-                drivers[instance] = new AP_BattMonitor_SMBus_Rotoye(*this, state[instance], _params[instance]);
+                drivers[instance] = new AP_BattMonitor_SMBus_Rotoye(*this, state[instance], _params[instance], instance);
                 break;
             case Type::NeoDesign:
-                drivers[instance] = new AP_BattMonitor_SMBus_NeoDesign(*this, state[instance], _params[instance]);
+                drivers[instance] = new AP_BattMonitor_SMBus_NeoDesign(*this, state[instance], _params[instance], instance);
                 break;
 #endif // AP_BATTMON_SMBUS_ENABLE
             case Type::BEBOP:
@@ -255,13 +289,15 @@ AP_BattMonitor::init()
 #endif
                 break;
             case Type::UAVCAN_BatteryInfo:
+                FALLTHROUGH;
+            case Type::UAVCAN_FlyhawkSmartBattery:
 #if HAL_ENABLE_LIBUAVCAN_DRIVERS
-                drivers[instance] = new AP_BattMonitor_UAVCAN(*this, state[instance], AP_BattMonitor_UAVCAN::UAVCAN_BATTERY_INFO, _params[instance]);
+                drivers[instance] = new AP_BattMonitor_UAVCAN(*this, state[instance], AP_BattMonitor_UAVCAN::UAVCAN_BATTERY_INFO, _params[instance], instance);
 #endif
                 break;
             case Type::BLHeliESC:
 #if HAL_WITH_ESC_TELEM && !defined(HAL_BUILD_AP_PERIPH)
-                drivers[instance] = new AP_BattMonitor_ESC(*this, state[instance], _params[instance]);
+                drivers[instance] = new AP_BattMonitor_ESC(*this, state[instance], _params[instance], instance);
 #endif
                 break;
             case Type::Sum:
@@ -269,23 +305,23 @@ AP_BattMonitor::init()
                 break;
 #if AP_BATTMON_FUEL_ENABLE
             case Type::FuelFlow:
-                drivers[instance] = new AP_BattMonitor_FuelFlow(*this, state[instance], _params[instance]);
+                drivers[instance] = new AP_BattMonitor_FuelFlow(*this, state[instance], _params[instance], instance);
                 break;
             case Type::FuelLevel_PWM:
-                drivers[instance] = new AP_BattMonitor_FuelLevel_PWM(*this, state[instance], _params[instance]);
+                drivers[instance] = new AP_BattMonitor_FuelLevel_PWM(*this, state[instance], _params[instance], instance);
                 break;
 #endif // AP_BATTMON_FUEL_ENABLE
 #if HAL_GENERATOR_ENABLED
             case Type::GENERATOR_ELEC:
-                drivers[instance] = new AP_BattMonitor_Generator_Elec(*this, state[instance], _params[instance]);
+                drivers[instance] = new AP_BattMonitor_Generator_Elec(*this, state[instance], _params[instance], instance);
                 break;
             case Type::GENERATOR_FUEL:
-                drivers[instance] = new AP_BattMonitor_Generator_FuelLevel(*this, state[instance], _params[instance]);
+                drivers[instance] = new AP_BattMonitor_Generator_FuelLevel(*this, state[instance], _params[instance], instance);
                 break;
 #endif // HAL_GENERATOR_ENABLED
 #if HAL_BATTMON_INA2XX_ENABLED
             case Type::INA2XX:
-                drivers[instance] = new AP_BattMonitor_INA2XX(*this, state[instance], _params[instance]);
+                drivers[instance] = new AP_BattMonitor_INA2XX(*this, state[instance], _params[instance], instance);
                 break;
 #endif
 #if HAL_BATTMON_LTC2946_ENABLED
@@ -295,7 +331,7 @@ AP_BattMonitor::init()
 #endif
 #if HAL_TORQEEDO_ENABLED
             case Type::Torqeedo:
-                drivers[instance] = new AP_BattMonitor_Torqeedo(*this, state[instance], _params[instance]);
+                drivers[instance] = new AP_BattMonitor_Torqeedo(*this, state[instance], _params[instance], instance);
                 break;
 #endif
             case Type::NONE:
@@ -394,14 +430,25 @@ void AP_BattMonitor::read()
 
     for (uint8_t i=0; i<_num_instances; i++) {
         if (drivers[i] != nullptr && get_type(i) != Type::NONE) {
+            if (_params[i]._simulated_charge_state == 0) {
+                state[i].charge_state = MAV_BATTERY_CHARGE_STATE_UNDEFINED;  // initialize and let read() to set it, if it needs
+            }
+
             drivers[i]->read();
             drivers[i]->update_resistance_estimate();
 
+            if (_params[i]._simulated_charge_state == 1) {
+                state[i].charge_state = MAV_BATTERY_CHARGE_STATE_CHARGING;  // override real value for testing purposes
+            } else if (_params[i]._simulated_charge_state == 2) {
+                state[i].charge_state = MAV_BATTERY_CHARGE_STATE_UNHEALTHY;
+            }
+            
 #if HAL_LOGGING_ENABLED
-            if (logger != nullptr && logger->should_log(_log_battery_bit)) {
+            if (logger != nullptr && logger->should_log(_log_battery_bit) && (state[i].last_time_micros != _last_log_write_us[i])) {
                 const uint64_t time_us = AP_HAL::micros64();
                 drivers[i]->Log_Write_BAT(i, time_us);
                 drivers[i]->Log_Write_BCL(i, time_us);
+                _last_log_write_us[i] = state[i].last_time_micros;
             }
 #endif
         }
@@ -461,6 +508,15 @@ bool AP_BattMonitor::current_amps(float &current, uint8_t instance) const {
     }
 }
 
+/// current2_amps - returns the instantaneous current draw for the extra current battery report, in amperes
+bool AP_BattMonitor::current2_amps(float &current2, uint8_t instance) const {
+    if ((instance < _num_instances) && (drivers[instance] != nullptr) && (get_type(instance) == Type::UAVCAN_FlyhawkSmartBattery)) {
+        current2 = state[instance].current2_amps;
+        return true;
+    }
+    return false;
+}
+
 /// consumed_mah - returns total current drawn since start-up in milliampere.hours
 bool AP_BattMonitor::consumed_mah(float &mah, const uint8_t instance) const {
     if ((instance < _num_instances) && (drivers[instance] != nullptr) && drivers[instance]->has_current()) {
@@ -490,6 +546,27 @@ bool AP_BattMonitor::capacity_remaining_pct(uint8_t &percentage, uint8_t instanc
     return false;
 }
 
+/// capacity_remaining_pct - returns true if the percentage is valid and writes to percentage argument, the minimal battery capacity remaining out of all drivers
+bool AP_BattMonitor::capacity_remaining_pct(uint8_t &percentage) const
+{
+    uint8_t minimal_capacity_remaining = UINT8_MAX;
+    for (uint8_t instance = 0; instance < _num_instances; ++instance) {
+        if (drivers[instance] == nullptr) {
+            continue;
+        }
+        
+        uint8_t capacity_remaining;
+        if ((drivers[instance]->capacity_remaining_pct(capacity_remaining)) && (capacity_remaining < minimal_capacity_remaining)) {
+            minimal_capacity_remaining = capacity_remaining;
+        }
+    }
+    if (minimal_capacity_remaining == UINT8_MAX) {
+        return false;
+    }
+    percentage = minimal_capacity_remaining;
+    return true;
+}
+
 /// time_remaining - returns remaining battery time
 bool AP_BattMonitor::time_remaining(uint32_t &seconds, uint8_t instance) const
 {
@@ -512,22 +589,41 @@ int32_t AP_BattMonitor::pack_capacity_mah(uint8_t instance) const
 
 void AP_BattMonitor::check_failsafes(void)
 {
+    float max_power_average = FLT_MIN;
+    float instances_power_average[_num_instances] {};
+    uint8_t active_instances = 0;
+
     if (hal.util->get_soft_armed()) {
         for (uint8_t i = 0; i < _num_instances; i++) {
             if (drivers[i] == nullptr) {
                 continue;
             }
+            ++active_instances;
+
+            if (fabs(state[i].average_power_10sec) > max_power_average) {
+                max_power_average = fabs(state[i].average_power_10sec);
+            }
+            instances_power_average[active_instances - 1] = state[i].average_power_10sec;
 
             const Failsafe type = drivers[i]->update_failsafes();
             if (type <= state[i].failsafe) {
                 continue;
             }
+            state[i].failsafe = type;
 
             int8_t action = 0;
             const char *type_str = nullptr;
             switch (type) {
                 case Failsafe::None:
                     continue; // should not have been called in this case
+                case Failsafe::HighCurrent:
+                    GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Battery %d reached current of %.1f A", i, state[i].current_amps);
+                    continue;  // just a warning. not a real failsafe (yet).
+                    break;
+                case Failsafe::HighTemperature:
+                    GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Battery %d reached temperature of %.1f degC", i, state[i].temperature);
+                    continue;  // just a warning. not a real failsafe (yet).
+                    break;
                 case Failsafe::Low:
                     action = _params[i]._failsafe_low_action;
                     type_str = "low";
@@ -538,13 +634,12 @@ void AP_BattMonitor::check_failsafes(void)
                     break;
             }
 
-            GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Battery %d is %s %.2fV used %.0f mAh", i + 1, type_str,
-                            (double)voltage(i), (double)state[i].consumed_mah);
+            GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Battery %d is %s %u%% %.2fV used %.0f mAh", i + 1, type_str,
+                            (unsigned int)state[i].capacity_pct, (double)voltage(i), (double)state[i].consumed_mah);
             _has_triggered_failsafe = true;
 #ifndef HAL_BUILD_AP_PERIPH
             AP_Notify::flags.failsafe_battery = true;
 #endif
-            state[i].failsafe = type;
 
             // map the desired failsafe action to a prioritiy level
             int8_t priority = 0;
@@ -565,6 +660,20 @@ void AP_BattMonitor::check_failsafes(void)
                 _highest_failsafe_priority = priority;
             }
         }
+    }
+
+    uint32_t now_ms = AP_HAL::millis();
+    if ((max_power_average > _power_diff_min_pwr) && 
+        (!is_zero(fabs(instances_power_average[0] + instances_power_average[1]))) &&
+        (((fabs(instances_power_average[0] - instances_power_average[1]) / (fabs(instances_power_average[0] + instances_power_average[1]))) * 100) > _power_diff_percent)) {
+            if (_battery_power_diff_started_ms == 0) {
+                _battery_power_diff_started_ms = now_ms;
+            }
+            if ((now_ms - _battery_power_diff_started_ms) > ((uint32_t)_power_diff_timeout * 1000)) {
+                AP::vehicle()->set_battery_failure();
+            }
+    } else {
+        _battery_power_diff_started_ms = 0;
     }
 }
 
@@ -610,6 +719,15 @@ const AP_BattMonitor::cells & AP_BattMonitor::get_cell_voltages(const uint8_t in
     }
 }
 
+bool AP_BattMonitor::get_battery_info(BattMonitor_Info &info, const uint8_t instance) const
+{
+    if (instance >= AP_BATT_MONITOR_MAX_INSTANCES) {
+        return false;
+    }
+    memcpy(&info, &(state[instance].info), sizeof(info));
+    return true;
+}
+
 // returns true if there is a temperature reading
 bool AP_BattMonitor::get_temperature(float &temperature, const uint8_t instance) const
 {
@@ -620,6 +738,26 @@ bool AP_BattMonitor::get_temperature(float &temperature, const uint8_t instance)
     temperature = state[instance].temperature;
 
     return drivers[instance]->has_temperature();
+}
+
+// set is_powering_off to true when the battery instance is powring off, false otherwise. return false if out of range.
+bool AP_BattMonitor::is_powering_off(bool &is_powering_off, uint8_t instance) const
+{
+    if (instance >= AP_BATT_MONITOR_MAX_INSTANCES || drivers[instance] == nullptr) {
+        return false;
+    } 
+    
+    return state[instance].is_powering_off;
+}
+
+// set is_battery_on to true when the battery instance is currently on, false otherwise. return false if out of range.
+bool AP_BattMonitor::is_battery_on(bool &is_battery_on, uint8_t instance) const
+{
+    if (instance >= AP_BATT_MONITOR_MAX_INSTANCES || drivers[instance] == nullptr) {
+        return false;
+    } 
+    
+    return state[instance].is_on;
 }
 
 // return true if cycle count can be provided and fills in cycles argument
@@ -638,6 +776,10 @@ bool AP_BattMonitor::arming_checks(size_t buflen, char *buffer) const
     for (uint8_t i = 0; i < AP_BATT_MONITOR_MAX_INSTANCES; i++) {
         if (drivers[i] != nullptr && !(drivers[i]->arming_checks(temp_buffer, sizeof(temp_buffer)))) {
             hal.util->snprintf(buffer, buflen, "Battery %d %s", i + 1, temp_buffer);
+            return false;
+        }
+        if (_params[i]._fail_arm_checks_on_charging && get_mavlink_charge_state(i) == MAV_BATTERY_CHARGE_STATE_CHARGING) {
+            hal.util->snprintf(buffer, buflen, "Battery %d is charging", i + 1);
             return false;
         }
     }
@@ -704,11 +846,14 @@ bool AP_BattMonitor::reset_remaining_mask(uint16_t battery_mask, float percentag
 
 // Returns the mavlink charge state. The following mavlink charge states are not used
 // MAV_BATTERY_CHARGE_STATE_EMERGENCY , MAV_BATTERY_CHARGE_STATE_FAILED
-// MAV_BATTERY_CHARGE_STATE_UNHEALTHY, MAV_BATTERY_CHARGE_STATE_CHARGING
 MAV_BATTERY_CHARGE_STATE AP_BattMonitor::get_mavlink_charge_state(const uint8_t instance) const 
 {
     if (instance >= _num_instances) {
         return MAV_BATTERY_CHARGE_STATE_UNDEFINED;
+    }
+
+    if (state[instance].charge_state != MAV_BATTERY_CHARGE_STATE_OK) {
+        return state[instance].charge_state;
     }
 
     switch (state[instance].failsafe) {
@@ -717,6 +862,10 @@ MAV_BATTERY_CHARGE_STATE AP_BattMonitor::get_mavlink_charge_state(const uint8_t 
         if (get_mavlink_fault_bitmask(instance) != 0 || !healthy()) {
             return MAV_BATTERY_CHARGE_STATE_UNHEALTHY;
         }
+        FALLTHROUGH;
+    case Failsafe::HighCurrent:
+        FALLTHROUGH;
+    case Failsafe::HighTemperature:
         return MAV_BATTERY_CHARGE_STATE_OK;
 
     case Failsafe::Low:
@@ -744,6 +893,9 @@ uint32_t AP_BattMonitor::get_mavlink_fault_bitmask(const uint8_t instance) const
  */
 bool AP_BattMonitor::healthy() const
 {
+    if (AP::vehicle()->get_battery_failure()) {
+        return false;
+    }
     for (uint8_t i=0; i< _num_instances; i++) {
         if (get_type(i) != Type::NONE && !healthy(i)) {
             return false;

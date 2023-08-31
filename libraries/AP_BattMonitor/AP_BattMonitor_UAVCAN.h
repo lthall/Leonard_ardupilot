@@ -6,11 +6,12 @@
 #include <AP_UAVCAN/AP_UAVCAN.h>
 #include <mppt/OutputEnable.hpp>
 
-#define AP_BATTMONITOR_UAVCAN_TIMEOUT_MICROS         5000000 // sensor becomes unhealthy if no successful readings for 5 seconds
-
 class BattInfoCb;
+class BattInfoExCb;
 class BattInfoAuxCb;
 class MpptStreamCb;
+class SmartBattInfoCb;
+class SmartBattStatusCb;
 
 class AP_BattMonitor_UAVCAN : public AP_BattMonitor_Backend
 {
@@ -20,11 +21,15 @@ public:
     };
 
     /// Constructor
-    AP_BattMonitor_UAVCAN(AP_BattMonitor &mon, AP_BattMonitor::BattMonitor_State &mon_state, BattMonitor_UAVCAN_Type type, AP_BattMonitor_Params &params);
+    AP_BattMonitor_UAVCAN(AP_BattMonitor &mon, AP_BattMonitor::BattMonitor_State &mon_state, BattMonitor_UAVCAN_Type type, AP_BattMonitor_Params &params, uint8_t instance_number);
 
     static const struct AP_Param::GroupInfo var_info[];
 
-    void init() override {}
+    void init() override {
+        for (size_t cell = 0; cell < ARRAY_SIZE(_interim_state.cell_voltages.cells); ++cell) {
+            _interim_state.cell_voltages.cells[cell] = UINT16_MAX;
+        }
+    }
 
     /// Read the battery voltage and current.  Should be called at 10hz
     void read() override;
@@ -49,14 +54,28 @@ public:
 
     static void subscribe_msgs(AP_UAVCAN* ap_uavcan);
     static AP_BattMonitor_UAVCAN* get_uavcan_backend(AP_UAVCAN* ap_uavcan, uint8_t node_id, uint8_t battery_id);
+    static bool is_type_uavcan(uint8_t i);
     static void handle_battery_info_trampoline(AP_UAVCAN* ap_uavcan, uint8_t node_id, const BattInfoCb &cb);
+    static void handle_battery_info_extended_trampoline(AP_UAVCAN* ap_uavcan, uint8_t node_id, const BattInfoExCb &cb);
     static void handle_battery_info_aux_trampoline(AP_UAVCAN* ap_uavcan, uint8_t node_id, const BattInfoAuxCb &cb);
     static void handle_mppt_stream_trampoline(AP_UAVCAN* ap_uavcan, uint8_t node_id, const MpptStreamCb &cb);
+    static void handle_smart_battery_info_trampoline(AP_UAVCAN* ap_uavcan, uint8_t node_id, const SmartBattInfoCb &cb);
+    static void handle_smart_battery_status_trampoline(AP_UAVCAN* ap_uavcan, uint8_t node_id, const SmartBattStatusCb &cb);
+
+    uint8_t get_batt_log_id() const override {
+        return (AP::battery().get_type(_instance_number) == AP_BattMonitor::Type::UAVCAN_FlyhawkSmartBattery) ? _instance_number : _node_id;
+    }
 
 private:
     void handle_battery_info(const BattInfoCb &cb);
+    void handle_battery_info_extended(const BattInfoExCb &cb);
+    void handle_smart_battery_info(const SmartBattInfoCb &cb);
+    void handle_smart_battery_status(const SmartBattStatusCb &cb);
     void handle_battery_info_aux(const BattInfoAuxCb &cb);
     void update_interim_state(const float voltage, const float current, const float temperature_K, const uint8_t soc);
+    void update_interim_state(const float voltage, const float current, const float temperature_K, const uint8_t soc, const float remaining_capacity_wh, const float average_power_10sec);
+
+    void report_charging_status(const BattInfoCb &cb);
 
     static bool match_battery_id(uint8_t instance, uint8_t battery_id) {
         // when serial number is negative, all batteries are accepted. Else, it must match

@@ -14,8 +14,8 @@
 extern const AP_HAL::HAL& hal;
 
 /// Constructor
-AP_BattMonitor_FuelLevel_PWM::AP_BattMonitor_FuelLevel_PWM(AP_BattMonitor &mon, AP_BattMonitor::BattMonitor_State &mon_state, AP_BattMonitor_Params &params) :
-    AP_BattMonitor_Analog(mon, mon_state, params)
+AP_BattMonitor_FuelLevel_PWM::AP_BattMonitor_FuelLevel_PWM(AP_BattMonitor &mon, AP_BattMonitor::BattMonitor_State &mon_state, AP_BattMonitor_Params &params, uint8_t instance_number) :
+    AP_BattMonitor_Analog(mon, mon_state, params, instance_number)
 {
     _state.voltage = 1.0; // show a fixed voltage of 1v
 

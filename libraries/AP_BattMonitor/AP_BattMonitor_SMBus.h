@@ -34,7 +34,8 @@ public:
     AP_BattMonitor_SMBus(AP_BattMonitor &mon,
                     AP_BattMonitor::BattMonitor_State &mon_state,
                     AP_BattMonitor_Params &params,
-                    uint8_t i2c_bus);
+                    uint8_t i2c_bus,
+                    uint8_t instance_number);
 
     // virtual destructor to reduce compiler warnings
     virtual ~AP_BattMonitor_SMBus() {}
