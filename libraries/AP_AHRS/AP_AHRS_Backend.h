@@ -182,7 +182,7 @@ public:
     // return a ground velocity in meters/second, North/East/Down
     // order. This will only be accurate if have_inertial_nav() is
     // true
-    virtual bool get_velocity_NED(Vector3f &vec) const WARN_IF_UNUSED {
+    virtual bool get_velocity_NED(Vector3f &vec, int8_t core = -1) const WARN_IF_UNUSED {
         return false;
     }
 

@@ -114,6 +114,9 @@ public:
     // get latest altitude estimate above ground level in meters and validity flag
     bool get_hagl(float &hagl) const WARN_IF_UNUSED;
 
+    // return the Euler roll, pitch and yaw angle in radians for the specified instance
+    bool get_euler_angles(int8_t instance, Vector3f &eulers) const;
+
     // status reporting of estimated error
     float           get_error_rp() const;
     float           get_error_yaw() const;
@@ -217,7 +220,7 @@ public:
 
     bool have_inertial_nav() const;
 
-    bool get_velocity_NED(Vector3f &vec) const WARN_IF_UNUSED;
+    bool get_velocity_NED(Vector3f &vec, int8_t core = -1) const WARN_IF_UNUSED;
 
     // return the relative position NED to either home or origin
     // return true if the estimate is valid
@@ -618,6 +621,8 @@ public:
 
     // get access to an EKFGSF_yaw estimator
     const EKFGSF_yaw *get_yaw_estimator(void) const;
+
+    uint8_t get_active_core_count(void) const;
 
 private:
 

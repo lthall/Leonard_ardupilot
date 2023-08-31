@@ -1194,7 +1194,7 @@ bool AP_AHRS_DCM::healthy(void) const
 /*
   return NED velocity if we have GPS lock
  */
-bool AP_AHRS_DCM::get_velocity_NED(Vector3f &vec) const
+bool AP_AHRS_DCM::get_velocity_NED(Vector3f &vec, int8_t core) const
 {
     const AP_GPS &_gps = AP::gps();
     if (_gps.status() < AP_GPS::GPS_OK_FIX_3D) {

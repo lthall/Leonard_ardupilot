@@ -31,6 +31,7 @@
 #include <AP_Vehicle/AP_Vehicle_Type.h>
 #include <GCS_MAVLink/GCS.h>
 #include <AP_InertialSensor/AP_InertialSensor.h>
+#include <AP_Arming/AP_Arming.h>
 
 #define ATTITUDE_CHECK_THRESH_ROLL_PITCH_RAD radians(10)
 #define ATTITUDE_CHECK_THRESH_YAW_RAD radians(20)
@@ -584,7 +585,7 @@ void AP_AHRS::update_EKF3(void)
                     accel -= abias;
                 }
                 if (_ins.get_accel_health(i)) {
-                    _accel_ef_ekf[i] = _dcm_matrix * accel;
+                    _accel_ef_ekf[i] = _dcm_matrix * get_rotation_autopilot_body_to_vehicle_body() * accel;
                 }
             }
             _accel_ef_ekf_blended = _accel_ef_ekf[primary_imu>=0?primary_imu:_ins.get_primary_accel()];
@@ -1345,7 +1346,7 @@ bool AP_AHRS::have_inertial_nav(void) const
 
 // return a ground velocity in meters/second, North/East/Down
 // order. Must only be called if have_inertial_nav() is true
-bool AP_AHRS::get_velocity_NED(Vector3f &vec) const
+bool AP_AHRS::get_velocity_NED(Vector3f &vec, int8_t core) const
 {
     switch (active_EKF_type()) {
     case EKFType::NONE:
@@ -1353,13 +1354,13 @@ bool AP_AHRS::get_velocity_NED(Vector3f &vec) const
 
 #if HAL_NAVEKF2_AVAILABLE
     case EKFType::TWO:
-        EKF2.getVelNED(-1,vec);
+        EKF2.getVelNED(core,vec);
         return true;
 #endif
 
 #if HAL_NAVEKF3_AVAILABLE
     case EKFType::THREE:
-        EKF3.getVelNED(-1,vec);
+        EKF3.getVelNED(core,vec);
         return true;
 #endif
 
@@ -1510,6 +1511,41 @@ bool AP_AHRS::get_hagl(float &height) const
         return true;
     }
 #endif
+#if HAL_EXTERNAL_AHRS_ENABLED
+    case EKFType::EXTERNAL: {
+        return false;
+    }
+#endif
+    }
+    // since there is no default case above, this is unreachable
+    return false;
+}
+
+// return the Euler roll, pitch and yaw angle in radians for the specified instance
+bool AP_AHRS::get_euler_angles(int8_t instance, Vector3f &eulers) const
+{
+    switch (active_EKF_type()) {
+    case EKFType::NONE:
+        return false;
+
+#if HAL_NAVEKF2_AVAILABLE
+    case EKFType::TWO:
+        EKF2.getEulerAngles(instance, eulers);
+        return true;
+#endif
+
+#if HAL_NAVEKF3_AVAILABLE
+    case EKFType::THREE:
+        EKF3.getEulerAngles(instance, eulers);
+        return true;
+#endif
+
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+    case EKFType::SIM: {
+        return false;
+    }
+#endif
+
 #if HAL_EXTERNAL_AHRS_ENABLED
     case EKFType::EXTERNAL: {
         return false;
@@ -1739,6 +1775,12 @@ bool AP_AHRS::get_relative_position_D_origin(float &posD) const
 // will use the barometer if the EKF isn't available
 void AP_AHRS::get_relative_position_D_home(float &posD) const
 {
+    // Home-relative altitude when not armed and home is not explicitly set is 0.
+    if (!home_is_locked() && !AP::arming().is_armed()) {
+        posD = 0;
+        return;
+    }
+
     Location originLLH;
     float originD;
     if (!get_relative_position_D_origin(originD) ||
@@ -1800,6 +1842,27 @@ AP_AHRS::EKFType AP_AHRS::ekf_type(void) const
 #else
     return EKFType::NONE;
 #endif
+}
+
+uint8_t AP_AHRS::get_active_core_count(void) const {
+    uint8_t active_ekf_cores = 0;
+    switch (active_EKF_type()) {
+#if HAL_NAVEKF3_AVAILABLE
+        case EKFType::THREE:
+            active_ekf_cores = EKF3.activeCores();
+            break;
+#endif
+#if HAL_NAVEKF2_AVAILABLE
+        case EKFType::TWO:
+            active_ekf_cores = EKF2.activeCores();
+            break;
+#endif
+        default:
+            active_ekf_cores = 0;
+            break;
+    }
+
+    return active_ekf_cores;
 }
 
 AP_AHRS::EKFType AP_AHRS::active_EKF_type(void) const
