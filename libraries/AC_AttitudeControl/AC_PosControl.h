@@ -45,7 +45,7 @@ public:
                   const AP_Motors& motors, AC_AttitudeControl& attitude_control, float dt);
 
     /// get_dt - gets time delta in seconds for all position controllers
-    float get_dt() const { return _dt; }
+    float get_dt() const { return AP::scheduler().get_filtered_loop_time(); }
 
     /// get_shaping_jerk_xy_cmsss - gets the jerk limit of the xy kinematic path generation in cm/s/s/s
     float get_shaping_jerk_xy_cmsss() const { return _shaping_jerk_xy*100.0; }
