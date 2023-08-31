@@ -227,7 +227,7 @@ void LoggerMessageWriter_WriteSysInfo::process() {
         FALLTHROUGH;
 
     case Stage::GIT_VERSIONS:
-        if (fwver.middleware_name && fwver.os_name) {
+        if (fwver.middleware_name && fwver.middleware_hash_str && fwver.os_name && fwver.os_hash_str) {
             if (! _logger_backend->Write_MessageF("%s: %s %s: %s",
                                                         fwver.middleware_name,
                                                         fwver.middleware_hash_str,
@@ -235,7 +235,7 @@ void LoggerMessageWriter_WriteSysInfo::process() {
                                                         fwver.os_hash_str)) {
                 return; // call me again
             }
-        } else if (fwver.os_name) {
+        } else if (fwver.os_name && fwver.os_hash_str) {
             if (! _logger_backend->Write_MessageF("%s: %s",
                                                         fwver.os_name,
                                                         fwver.os_hash_str)) {
@@ -253,10 +253,17 @@ void LoggerMessageWriter_WriteSysInfo::process() {
         FALLTHROUGH;
     }
     case Stage::SYSTEM_ID:
-        char sysid[40];
-        if (hal.util->get_system_id(sysid)) {
-            if (! _logger_backend->Write_Message(sysid)) {
-                return; // call me again
+        {
+            char sysid[40];
+            uint8_t sysid_len = sizeof(sysid) / 2 - 1;  // each byte is two chars, minus 1 char for '\0'
+            uint8_t raw_sysid[sysid_len] = {};
+            if (hal.util->get_system_id_unformatted(raw_sysid, sysid_len)) {
+                for (uint8_t i = 0; i < sysid_len; ++i) {
+                    hal.util->snprintf(sysid + (i * 2), 3, "%02x", raw_sysid[i]);
+                }
+                if (! _logger_backend->Write_Message((const char *)sysid)) {
+                    return; // call me again
+                }
             }
         }
         stage = Stage::PARAM_SPACE_USED;

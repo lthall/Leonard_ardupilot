@@ -1,10 +1,11 @@
 #pragma once
 
 #include "AP_Logger.h"
+#include <GCS_MAVLink/GCS.h>
 
 class LoggerMessageWriter_DFLogStart;
 
-#define MAX_LOG_FILES 500
+#define MAX_LOG_FILES 100
 
 // class to handle rate limiting of log messages
 class AP_Logger_RateLimiter
@@ -67,9 +68,30 @@ public:
     virtual uint16_t find_last_log() = 0;
     virtual void get_log_boundaries(uint16_t list_entry, uint32_t & start_page, uint32_t & end_page) = 0;
     virtual void get_log_info(uint16_t list_entry, uint32_t &size, uint32_t &time_utc) = 0;
+    virtual bool get_log_info(const char log_label[], uint32_t &size, uint32_t &time_utc) {
+        GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "get_log_info by label not implemented");
+        return true;
+    }
     virtual int16_t get_log_data(uint16_t list_entry, uint16_t page, uint32_t offset, uint16_t len, uint8_t *data) = 0;
+    virtual int16_t get_log_data(const char log_label[], uint16_t page, uint32_t offset, uint16_t len, uint8_t *data) {
+        GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "get_log_data by label not implemented");
+        return -1;
+    }
     virtual uint16_t get_num_logs() = 0;
     virtual uint16_t find_oldest_log();
+    virtual void set_label(const char label[], size_t label_size) {
+        GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "set_label not implemented");
+    }
+
+    virtual void list_labels(GCS_MAVLINK* log_sending_link) {
+        GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "list_labels not implemented");
+    }
+
+    // convert between log numbering in storage and label. 0 means not ready yet, -1 means not found.
+    virtual int16_t log_num_from_label(const char log_label[]) {
+        GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "log_num_from_label by label not implemented");
+        return 0;
+    }
 
     virtual bool logging_started(void) const = 0;
 
@@ -121,7 +143,7 @@ public:
                           const RallyLocation &rally_point);
     bool Write_Rally();
     bool Write_Format(const struct LogStructure *structure);
-    bool Write_Message(const char *message);
+    bool Write_Message(const char *message, bool is_debug=false);
     bool Write_MessageF(const char *fmt, ...);
     bool Write_Mission_Cmd(const AP_Mission &mission,
                                const AP_Mission::Mission_Command &cmd);
@@ -232,6 +254,7 @@ protected:
     void df_stats_clear();
 
     AP_Logger_RateLimiter *rate_limiter;
+    virtual bool log_exists(const uint16_t lognum) { return false; }
 
 private:
     // statistics support

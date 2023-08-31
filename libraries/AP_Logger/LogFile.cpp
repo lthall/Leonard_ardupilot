@@ -199,6 +199,18 @@ void AP_Logger::Write_RCOUT(void)
     WriteBlock(&pkt, sizeof(pkt));
 }
 
+// Write thrust boost data
+void AP_Logger::Write_TB(void)
+{
+    const struct log_TB pkt{
+        LOG_PACKET_HEADER_INIT(LOG_TB_MSG),
+        time_us       : AP_HAL::micros64(),
+        lost_motor    : AP::motors()->get_lost_motor(),
+        thrust_boost  : AP::motors()->get_thrust_boost()
+    };
+    WriteBlock(&pkt, sizeof(pkt));
+}
+
 // Write an RSSI packet
 void AP_Logger::Write_RSSI()
 {
@@ -226,7 +238,6 @@ void AP_Logger::Write_Command(const mavlink_command_int_t &packet,
         LOG_PACKET_HEADER_INIT(LOG_MAVLINK_COMMAND_MSG),
         time_us         : AP_HAL::micros64(),
         target_system   : packet.target_system,
-        target_component: packet.target_component,
         source_system   : source_system,
         source_component: source_component,
         frame           : packet.frame,
@@ -239,7 +250,41 @@ void AP_Logger::Write_Command(const mavlink_command_int_t &packet,
         y               : packet.y,
         z               : packet.z,
         result          : (uint8_t)result,
-        was_command_long:was_command_long,
+        was_command_long: was_command_long,
+        tid             : packet.tid,
+    };
+    return WriteBlock(&pkt, sizeof(pkt));
+}
+
+void AP_Logger::Write_Mission_Item(const mavlink_mission_item_int_t &packet)
+{
+    const struct log_MAVLink_Mission_Item pkt{
+        LOG_PACKET_HEADER_INIT(LOG_MAVLINK_MISSION_ITEM_MSG),
+        time_us         : AP_HAL::micros64(),
+        sequence        : packet.seq,
+        frame           : packet.frame,
+        command         : packet.command,
+        current         : packet.current,
+        autocontinue    : packet.autocontinue,
+        param1          : packet.param1,
+        param2          : packet.param2,
+        param3          : packet.param3,
+        param4          : packet.param4,
+        x               : packet.x,
+        y               : packet.y,
+        z               : packet.z,
+        mission_type    : packet.mission_type,
+        tid             : packet.tid,
+    };
+    return WriteBlock(&pkt, sizeof(pkt));
+}
+
+void AP_Logger::Write_Mavlink_Message_Received(const mavlink_message_t &msg)
+{
+    const struct log_MAVLink_Message_Received pkt{
+        LOG_PACKET_HEADER_INIT(LOG_MAVLINK_MSG),
+        time_us         : AP_HAL::micros64(),
+        msg_id          : msg.msgid,
     };
     return WriteBlock(&pkt, sizeof(pkt));
 }
@@ -276,10 +321,11 @@ bool AP_Logger_Backend::Write_EntireMission()
 #endif
 
 // Write a text message to the log
-bool AP_Logger_Backend::Write_Message(const char *message)
+bool AP_Logger_Backend::Write_Message(const char *message, bool is_debug/*=false*/)
 {
+    enum LogMessages pkt_header = is_debug ? LOG_MESSAGE_MSGD : LOG_MESSAGE_MSG;
     struct log_Message pkt{
-        LOG_PACKET_HEADER_INIT(LOG_MESSAGE_MSG),
+        LOG_PACKET_HEADER_INIT(pkt_header),
         time_us : AP_HAL::micros64(),
         msg  : {}
     };
@@ -345,6 +391,7 @@ void AP_Logger::Write_Compass_instance(const uint64_t time_us, const uint8_t mag
     const Vector3f &mag_field = compass.get_field(mag_instance);
     const Vector3f &mag_offsets = compass.get_offsets(mag_instance);
     const Vector3f &mag_motor_offsets = compass.get_motor_offsets(mag_instance);
+
     const struct log_MAG pkt{
         LOG_PACKET_HEADER_INIT(LOG_MAG_MSG),
         time_us         : time_us,
@@ -362,6 +409,37 @@ void AP_Logger::Write_Compass_instance(const uint64_t time_us, const uint8_t mag
         SUS             : compass.last_update_usec(mag_instance)
     };
     WriteBlock(&pkt, sizeof(pkt));
+
+    if (mag_instance != compass.get_first_usable()) {
+        const Vector3f &primary_mag_field = compass.get_field();
+        const Vector2f primary_mag_field_xy = Vector2f(primary_mag_field.x,primary_mag_field.y);
+        const Vector3f primary_mag_field_norm = primary_mag_field.normalized();
+        const Vector2f primary_mag_field_xy_norm = primary_mag_field_xy.normalized();
+        Vector2f mag_field_xy = Vector2f(mag_field.x,mag_field.y);
+        const float xy_len_diff  = (primary_mag_field_xy-mag_field_xy).length();
+        Vector3f mag_field_clone = mag_field;
+        mag_field_clone.normalize();
+        mag_field_xy.normalize();
+
+        if ( mag_field_clone.is_nan() ||
+            primary_mag_field_norm.is_nan() ||
+            mag_field_xy.is_nan() ||
+            primary_mag_field_xy_norm.is_nan()) {
+            return;
+        }
+
+        const float xyz_ang_diff = acosf(constrain_float(mag_field_clone*primary_mag_field_norm,-1.0f,1.0f));
+        const float xy_ang_diff  = acosf(constrain_float(mag_field_xy*primary_mag_field_xy_norm,-1.0f,1.0f));
+
+        const struct log_Consistency c_pkt{
+            LOG_PACKET_HEADER_INIT(LOG_CONSISTENCY_MSG),
+            time_us         : time_us,
+            xyz             : degrees(xyz_ang_diff),
+            xy              : degrees(xy_ang_diff),
+            len             : xy_len_diff
+        };
+        WriteBlock(&c_pkt, sizeof(c_pkt));
+    }
 }
 
 // Write a Compass packet

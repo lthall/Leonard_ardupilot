@@ -272,6 +272,13 @@ struct PACKED log_RCOUT {
     uint16_t chan14;
 };
 
+struct PACKED log_TB {
+    LOG_PACKET_HEADER;
+    uint64_t time_us;
+    uint8_t lost_motor;
+    bool thrust_boost;
+};
+
 struct PACKED log_MAV {
     LOG_PACKET_HEADER;
     uint64_t time_us;
@@ -335,7 +342,6 @@ struct PACKED log_MAVLink_Command {
     LOG_PACKET_HEADER;
     uint64_t time_us;
     uint8_t target_system;
-    uint8_t target_component;
     uint8_t source_system;
     uint8_t source_component;
     uint8_t frame;
@@ -349,6 +355,32 @@ struct PACKED log_MAVLink_Command {
     float z;
     uint8_t result;
     bool was_command_long;
+    uint8_t tid;
+};
+
+struct PACKED log_MAVLink_Mission_Item {
+    LOG_PACKET_HEADER;
+    uint64_t time_us;
+    uint16_t sequence;
+    uint8_t frame;
+    uint16_t command;
+    uint8_t current;
+    uint8_t autocontinue;
+    float param1;
+    float param2;
+    float param3;
+    float param4;
+    int32_t x;
+    int32_t y;
+    float z;
+    uint8_t mission_type;
+    uint8_t tid;
+};
+
+struct PACKED log_MAVLink_Message_Received {
+    LOG_PACKET_HEADER;
+    uint64_t time_us;
+    uint32_t msg_id;
 };
 
 struct PACKED log_Radio {
@@ -400,6 +432,31 @@ struct PACKED log_ADSB {
     uint16_t squawk;
 };
 
+struct PACKED log_FTS {
+    LOG_PACKET_HEADER;
+    uint64_t time_us;
+    float vcap1;
+    float vcap2;
+    float vcap3;
+    float vcap4;
+    float gpi;
+    float vin;
+    float vcap;
+    float vout;
+    float iin;
+    float ichg;
+    float dtemp;
+};
+
+struct PACKED log_FTS2 {
+    LOG_PACKET_HEADER;
+    uint64_t time_us;
+    float pyc;
+    float pysc;
+    float busv;
+    float vcc;
+};
+
 struct PACKED log_MAG {
     LOG_PACKET_HEADER;
     uint64_t time_us;
@@ -415,6 +472,14 @@ struct PACKED log_MAG {
     int16_t  motor_offset_z;
     uint8_t  health;
     uint32_t SUS;
+};
+
+struct PACKED log_Consistency {
+    LOG_PACKET_HEADER;
+    uint64_t time_us;
+    float    xyz;
+    float    xy;
+    float    len;
 };
 
 struct PACKED log_Mode {
@@ -729,6 +794,18 @@ struct PACKED log_VER {
     uint16_t _APJ_BOARD_ID;
 };
 
+
+// position controller Down axis logging
+struct PACKED log_RTCM {
+    LOG_PACKET_HEADER;
+    uint64_t time_us;
+    uint8_t len;
+    int16_t id;
+    uint8_t flags;
+    uint8_t sequence;
+    uint8_t is_fragment;
+    uint8_t fragment;
+};
 
 // FMT messages define all message formats other than FMT
 // UNIT messages define units which can be referenced by FMTU messages
@@ -1286,12 +1363,16 @@ struct PACKED log_VER {
 LOG_STRUCTURE_FROM_GPS \
     { LOG_MESSAGE_MSG, sizeof(log_Message), \
       "MSG",  "QZ",     "TimeUS,Message", "s-", "F-"}, \
+    { LOG_MESSAGE_MSGD, sizeof(log_Message), \
+      "MSGD",  "QZ",     "TimeUS,Message", "s-", "F-"}, \
     { LOG_RCIN_MSG, sizeof(log_RCIN), \
       "RCIN",  "QHHHHHHHHHHHHHH",     "TimeUS,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11,C12,C13,C14", "sYYYYYYYYYYYYYY", "F--------------", true }, \
     { LOG_RCIN2_MSG, sizeof(log_RCIN2), \
       "RCI2",  "QHHH",     "TimeUS,C15,C16,OMask", "sYY-", "F---", true }, \
     { LOG_RCOUT_MSG, sizeof(log_RCOUT), \
       "RCOU",  "QHHHHHHHHHHHHHH",     "TimeUS,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11,C12,C13,C14", "sYYYYYYYYYYYYYY", "F--------------", true  }, \
+    { LOG_TB_MSG, sizeof(log_TB), \
+      "TB",    "QBB",     "TimeUS,Motor,Boost", "s--", "F--"  }, \
     { LOG_RSSI_MSG, sizeof(log_RSSI), \
       "RSSI",  "Qff",     "TimeUS,RXRSSI,RXLQ", "s--", "F--", true  }, \
 LOG_STRUCTURE_FROM_BARO \
@@ -1301,7 +1382,11 @@ LOG_STRUCTURE_FROM_PRECLAND \
     { LOG_CMD_MSG, sizeof(log_Cmd), \
       "CMD", "QHHHffffLLfB","TimeUS,CTot,CNum,CId,Prm1,Prm2,Prm3,Prm4,Lat,Lng,Alt,Frame", "s-------DUm-", "F-------GG0-" }, \
     { LOG_MAVLINK_COMMAND_MSG, sizeof(log_MAVLink_Command), \
-      "MAVC", "QBBBBBHffffiifBB","TimeUS,TS,TC,SS,SC,Fr,Cmd,P1,P2,P3,P4,X,Y,Z,Res,WL", "s---------------", "F---------------" }, \
+      "MAVC", "QBBBBHffffiifBBB","TimeUS,TS,SS,SC,Fr,Cmd,P1,P2,P3,P4,X,Y,Z,Res,WL,Tid", "s---------------", "F---------------" }, \
+    { LOG_MAVLINK_MISSION_ITEM_MSG, sizeof(log_MAVLink_Mission_Item), \
+      "MAVI", "QHBHBBffffiifBB","TimeUS,Seq,Fr,Cmd,Cur,AC,P1,P2,P3,P4,X,Y,Z,MT,Tid", "s--------------", "F--------------" }, \
+    { LOG_MAVLINK_MSG, sizeof(log_MAVLink_Message_Received), \
+      "MAVM", "QI","TimeUS,Id", "s-", "F-" }, \
     { LOG_RADIO_MSG, sizeof(log_Radio), \
       "RAD", "QBBBBBHH", "TimeUS,RSSI,RemRSSI,TxBuf,Noise,RemNoise,RxErrors,Fixed", "s-------", "F-------", true }, \
 LOG_STRUCTURE_FROM_CAMERA \
@@ -1309,6 +1394,8 @@ LOG_STRUCTURE_FROM_CAMERA \
     LOG_STRUCTURE_FROM_BATTMONITOR \
     { LOG_MAG_MSG, sizeof(log_MAG), \
       "MAG", "QBhhhhhhhhhBI",    "TimeUS,I,MagX,MagY,MagZ,OfsX,OfsY,OfsZ,MOX,MOY,MOZ,Health,S", "s#GGGGGGGGG-s", "F-CCCCCCCCC-F", true }, \
+    { LOG_CONSISTENCY_MSG, sizeof(log_Consistency), \
+      "CONS", "Qfff",    "TimeUS,xyz,xy,len", "s---", "F---" }, \
     { LOG_MODE_MSG, sizeof(log_Mode), \
       "MODE", "QMBB",         "TimeUS,Mode,ModeNum,Rsn", "s---", "F---" }, \
     { LOG_RFND_MSG, sizeof(log_RFND), \
@@ -1370,6 +1457,10 @@ LOG_STRUCTURE_FROM_VISUALODOM \
       "WENC",  "Qfbfb", "TimeUS,Dist0,Qual0,Dist1,Qual1", "sm-m-", "F0-0-" , true }, \
     { LOG_ADSB_MSG, sizeof(log_ADSB), \
       "ADSB",  "QIiiiHHhH", "TimeUS,ICAO_address,Lat,Lng,Alt,Heading,Hor_vel,Ver_vel,Squark", "s-DUmhnn-", "F-GGCBCC-" }, \
+    { LOG_FTS_MSG, sizeof(log_FTS), \
+      "FTS",   "Qfffffffffff", "TimeUS,vcap1,vcap2,vcap3,vcap4,gpi,vin,vcap,vout,iin,ichg,dtemp", "svvvvvvvvAAO", "FCCCCCCCCCC-" }, \
+    { LOG_FTS2_MSG, sizeof(log_FTS2), \
+      "FTS2",   "Qffff", "TimeUS,pyc,pysc,busv,vcc", "svvvv", "F0000" }, \
     { LOG_EVENT_MSG, sizeof(log_Event), \
       "EV",   "QB",           "TimeUS,Id", "s-", "F-" }, \
     { LOG_ARM_DISARM_MSG, sizeof(log_Arm_Disarm), \
@@ -1394,7 +1485,9 @@ LOG_STRUCTURE_FROM_AIS, \
     { LOG_VER_MSG, sizeof(log_VER), \
       "VER",   "QBHBBBBIZH", "TimeUS,BT,BST,Maj,Min,Pat,FWT,GH,FWS,APJ", "s---------", "F---------", false }, \
     { LOG_MOTBATT_MSG, sizeof(log_MotBatt), \
-      "MOTB", "QffffB",  "TimeUS,LiftMax,BatVolt,ThLimit,ThrAvMx,FailFlags", "s-----", "F-----" , true }
+      "MOTB", "QffffB",  "TimeUS,LiftMax,BatVolt,ThLimit,ThrAvMx,FailFlags", "s-----", "F-----" , true }, \
+    { LOG_RTCM_MSG, sizeof(log_RTCM), \
+        "RTCM", "QBhBBBB", "TimeUS,Len,ID,Flags,Sequence,IsFragment,Fragment", "s------", "F000000" }
 
 // message types 0 to 63 reserved for vehicle specific use
 
@@ -1404,9 +1497,11 @@ enum LogMessages : uint8_t {
     LOG_IDS_FROM_NAVEKF2,
     LOG_IDS_FROM_NAVEKF3,
     LOG_MESSAGE_MSG,
+    LOG_MESSAGE_MSGD,
     LOG_RCIN_MSG,
     LOG_RCIN2_MSG,
     LOG_RCOUT_MSG,
+    LOG_TB_MSG,
     LOG_RSSI_MSG,
     LOG_IDS_FROM_BARO,
     LOG_POWR_MSG,
@@ -1477,6 +1572,13 @@ enum LogMessages : uint8_t {
     LOG_VIDEO_STABILISATION_MSG,
     LOG_MOTBATT_MSG,
     LOG_VER_MSG,
+
+    LOG_MAVLINK_MISSION_ITEM_MSG,
+    LOG_MAVLINK_MSG,
+    LOG_CONSISTENCY_MSG,
+    LOG_FTS_MSG,
+    LOG_FTS2_MSG,
+    LOG_RTCM_MSG,
 
     _LOG_LAST_MSG_
 };

@@ -560,8 +560,8 @@ uint16_t AP_Logger_Backend::log_num_from_list_entry(const uint16_t list_entry)
     }
 
     uint32_t log_num = oldest_log + list_entry - 1;
-    if (log_num > MAX_LOG_FILES) {
-        log_num -= MAX_LOG_FILES;
+    if (log_num > (uint32_t)_front._params.max_log_files) {
+        log_num -= _front._params.max_log_files;
     }
     return (uint16_t)log_num;
 }
@@ -579,8 +579,23 @@ uint16_t AP_Logger_Backend::find_oldest_log()
         return 0;
     }
 
-    _cached_oldest_log = last_log_num - get_num_logs() + 1;
+    // if there is only one log then it is the oldest
+    if (get_num_logs() == 1) {
+        _cached_oldest_log = last_log_num;
+        return _cached_oldest_log;
+    }
 
+    // if there are more than one log then the first existing log after the last log is the oldest
+    for (uint16_t oldest_log_num = (last_log_num % _front._params.max_log_files) + 1;
+                  oldest_log_num != last_log_num;
+                  oldest_log_num = (oldest_log_num % _front._params.max_log_files) + 1) {
+        if (log_exists(oldest_log_num)) {
+            _cached_oldest_log = oldest_log_num;
+            return _cached_oldest_log;
+        }
+    }
+
+    _cached_oldest_log = 0;  // no log found
     return _cached_oldest_log;
 }
 

@@ -286,11 +286,12 @@ public:
                      LogErrorCode error_code);
     void Write_RCIN(void);
     void Write_RCOUT(void);
+    void Write_TB(void);
     void Write_RSSI();
     void Write_Rally();
     void Write_Power(void);
     void Write_Radio(const mavlink_radio_t &packet);
-    void Write_Message(const char *message);
+    void Write_Message(const char *message, bool is_debug=false);
     void Write_MessageF(const char *fmt, ...);
     void Write_ServoStatus(uint64_t time_us, uint8_t id, float position, float force, float speed, uint8_t power_pct);
     void Write_Compass();
@@ -302,6 +303,8 @@ public:
                        uint8_t source_component,
                        MAV_RESULT result,
                        bool was_command_long=false);
+    void Write_Mission_Item(const mavlink_mission_item_int_t &packet);
+    void Write_Mavlink_Message_Received(const mavlink_message_t &msg);
     void Write_Mission_Cmd(const AP_Mission &mission,
                                const AP_Mission::Mission_Command &cmd);
     void Write_RPM(const AP_RPM &rpm_sensor);
@@ -385,6 +388,7 @@ public:
         AP_Float file_ratemax;
         AP_Float mav_ratemax;
         AP_Float blk_ratemax;
+        AP_Int16 max_log_files;
     } _params;
 
     const struct LogStructure *structure(uint16_t num) const;
@@ -478,6 +482,7 @@ private:
         FILESYSTEM = (1<<0),
         MAVLINK    = (1<<1),
         BLOCK      = (1<<2),
+        COMPRESSED = (1<<3),
     };
 
     /*
@@ -592,6 +597,12 @@ private:
     // log number for data send
     uint16_t _log_num_data;
 
+    // will send LOG_DATA_EXTENDED messages if true, otherwise will send LOG_DATA messages
+    bool _log_data_extended;
+
+    // log label for data send
+    char _log_label_data[MAVLINK_MSG_SET_LOG_LABEL_FIELD_LABEL_LEN];
+
     // offset in log
     uint32_t _log_data_offset;
 
@@ -600,6 +611,8 @@ private:
 
     // number of bytes left to send
     uint32_t _log_data_remaining;
+
+    bool _log_data_remaining_initialized;
 
     // start page of log data
     uint32_t _log_data_page;
@@ -620,13 +633,20 @@ private:
     void handle_log_request_data(class GCS_MAVLINK &, const mavlink_message_t &msg);
     void handle_log_request_erase(class GCS_MAVLINK &, const mavlink_message_t &msg);
     void handle_log_request_end(class GCS_MAVLINK &, const mavlink_message_t &msg);
+    void handle_log_request_last(class GCS_MAVLINK &, const mavlink_message_t &msg);
     void handle_log_send_listing(); // handle LISTING state
     void handle_log_sending(); // handle SENDING state
     bool handle_log_send_data(); // send data chunk to client
+    void handle_log_set_label(GCS_MAVLINK &link, const mavlink_message_t &msg);
+    void handle_log_request_data_by_label(GCS_MAVLINK &link, const mavlink_message_t &msg);
+    void handle_log_request_label_list(GCS_MAVLINK &link, const mavlink_message_t &msg);
 
     void get_log_info(uint16_t log_num, uint32_t &size, uint32_t &time_utc);
+    bool get_log_info(char log_label[], uint32_t &size, uint32_t &time_utc);
 
     int16_t get_log_data(uint16_t log_num, uint16_t page, uint32_t offset, uint16_t len, uint8_t *data);
+    int16_t get_log_data(char log_label[], uint16_t page, uint32_t offset, uint16_t len, uint8_t *data);
+    int16_t get_log_num_from_label(char log_label[]);
 
     /* end support for retrieving logs via mavlink: */
 

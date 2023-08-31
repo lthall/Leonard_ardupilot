@@ -5,12 +5,14 @@
 #include "AP_Logger_Backend.h"
 
 #include "AP_Logger_File.h"
+#include "AP_Logger_Compressed.h"
 #include "AP_Logger_DataFlash.h"
 #include "AP_Logger_W25N01GV.h"
 #include "AP_Logger_MAVLink.h"
 
 #include <AP_InternalError/AP_InternalError.h>
 #include <GCS_MAVLink/GCS.h>
+#include <AP_Common/AP_FWVersion.h>
 #include <AP_BoardConfig/AP_BoardConfig.h>
 
 AP_Logger *AP_Logger::_singleton;
@@ -52,11 +54,11 @@ extern const AP_HAL::HAL& hal;
 
 #ifndef HAL_LOGGING_BACKENDS_DEFAULT
 # if HAL_LOGGING_FILESYSTEM_ENABLED && (CONFIG_HAL_BOARD == HAL_BOARD_SITL)
-#  define HAL_LOGGING_BACKENDS_DEFAULT Backend_Type::FILESYSTEM
+#  define HAL_LOGGING_BACKENDS_DEFAULT Backend_Type::COMPRESSED
 # elif HAL_LOGGING_DATAFLASH_ENABLED
 #  define HAL_LOGGING_BACKENDS_DEFAULT Backend_Type::BLOCK
 # elif HAL_LOGGING_FILESYSTEM_ENABLED
-#  define HAL_LOGGING_BACKENDS_DEFAULT Backend_Type::FILESYSTEM
+#  define HAL_LOGGING_BACKENDS_DEFAULT Backend_Type::COMPRESSED
 # elif HAL_LOGGING_MAVLINK_ENABLED
 #  define HAL_LOGGING_BACKENDS_DEFAULT Backend_Type::MAVLINK
 # else
@@ -68,7 +70,7 @@ const AP_Param::GroupInfo AP_Logger::var_info[] = {
     // @Param: _BACKEND_TYPE
     // @DisplayName: AP_Logger Backend Storage type
     // @Description: Bitmap of what Logger backend types to enable. Block-based logging is available on SITL and boards with dataflash chips. Multiple backends can be selected.
-    // @Bitmask: 0:File,1:MAVLink,2:Block
+    // @Bitmask: 0:File,1:MAVLink,2:Block,3:Compressed
     // @User: Standard
     AP_GROUPINFO("_BACKEND_TYPE",  0, AP_Logger, _params.backend_types,       uint8_t(HAL_LOGGING_BACKENDS_DEFAULT)),
 
@@ -151,6 +153,12 @@ const AP_Param::GroupInfo AP_Logger::var_info[] = {
     AP_GROUPINFO("_BLK_RATEMAX", 10, AP_Logger, _params.blk_ratemax, 0),
 #endif
     
+    // @Param: _MAX_FILES
+    // @DisplayName: Maximum log files to keep
+    // @Description: The maximum number of log files to keep.  Older files will be deleted first. All logs must be cleared if changed.
+    // @User: Standard
+    AP_GROUPINFO("_MAX_FILES",  11, AP_Logger, _params.max_log_files,       MAX_LOG_FILES),
+
     AP_GROUPEND
 };
 
@@ -190,6 +198,7 @@ void AP_Logger::Init(const struct LogStructure *structures, uint8_t num_types)
         AP_Logger_Backend* (*probe_fn)(AP_Logger&, LoggerMessageWriter_DFLogStart*);
     } backend_configs[] {
 #if HAL_LOGGING_FILESYSTEM_ENABLED
+        { Backend_Type::COMPRESSED, AP_Logger_Compressed::probe },
         { Backend_Type::FILESYSTEM, AP_Logger_File::probe },
 #endif
 #if HAL_LOGGING_DATAFLASH_ENABLED
@@ -783,11 +792,30 @@ void AP_Logger::get_log_info(uint16_t log_num, uint32_t &size, uint32_t &time_ut
     }
     backends[0]->get_log_info(log_num, size, time_utc);
 }
+bool AP_Logger::get_log_info(char log_label[], uint32_t &size, uint32_t &time_utc) {
+    if (_next_backend == 0) {
+        return true;
+    }
+    return backends[0]->get_log_info(log_label, size, time_utc);
+}
 int16_t AP_Logger::get_log_data(uint16_t log_num, uint16_t page, uint32_t offset, uint16_t len, uint8_t *data) {
     if (_next_backend == 0) {
         return 0;
     }
     return backends[0]->get_log_data(log_num, page, offset, len, data);
+}
+int16_t AP_Logger::get_log_data(char log_label[], uint16_t page, uint32_t offset, uint16_t len, uint8_t *data) {
+    if (_next_backend == 0) {
+        return 0;
+    }
+    return backends[0]->get_log_data(log_label, page, offset, len, data);
+}
+int16_t AP_Logger::get_log_num_from_label(char log_label[]) {
+    if (_next_backend == 0) {
+        return -1;
+    }
+
+    return backends[0]->log_num_from_label(log_label);
 }
 uint16_t AP_Logger::get_num_logs(void) {
     if (_next_backend == 0) {
@@ -816,9 +844,15 @@ void AP_Logger::handle_mavlink_msg(GCS_MAVLINK &link, const mavlink_message_t &m
         FALLTHROUGH;
     case MAVLINK_MSG_ID_LOG_REQUEST_DATA:
         FALLTHROUGH;
+    case MAVLINK_MSG_ID_LOG_REQUEST_DATA_BY_LABEL:
+        FALLTHROUGH;
     case MAVLINK_MSG_ID_LOG_ERASE:
         FALLTHROUGH;
     case MAVLINK_MSG_ID_LOG_REQUEST_END:
+        FALLTHROUGH;
+    case MAVLINK_MSG_ID_SET_LOG_LABEL:
+        FALLTHROUGH;
+    case MAVLINK_MSG_ID_LOG_REQUEST_LABEL_LIST:
         handle_log_message(link, msg);
         break;
     }
@@ -844,9 +878,9 @@ void AP_Logger::Write_EntireMission()
     FOR_EACH_BACKEND(Write_EntireMission());
 }
 
-void AP_Logger::Write_Message(const char *message)
+void AP_Logger::Write_Message(const char *message, bool is_debug/*=false*/)
 {
-    FOR_EACH_BACKEND(Write_Message(message));
+    FOR_EACH_BACKEND(Write_Message(message, is_debug));
 }
 
 void AP_Logger::Write_Mode(uint8_t mode, const ModeReason reason)
