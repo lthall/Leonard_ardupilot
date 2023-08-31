@@ -19,6 +19,13 @@
 #include <SITL/SIM_JSBSim.h>
 #include <AP_HAL/utility/Socket.h>
 
+#include <AP_Vehicle/AP_Vehicle.h>
+
+#include <GCS_MAVLink/GCS.h>
+
+#define MAX_MOTOR_POWER_DIFF_MS         600
+#define MOTOR_POWER_DIFF_ALLOWED        40
+
 extern const AP_HAL::HAL& hal;
 
 using namespace HALSITL;
@@ -89,6 +96,10 @@ void SITL_State::_sitl_setup()
 
         if (_use_fg_view) {
             fg_socket.connect(_fg_address, _fg_view_port);
+        }
+
+        if (_send_state_to_passenger) {
+            passenger_socket.connect("127.0.0.1", PASSENGER_PORT);
         }
 
         fprintf(stdout, "Using Irlock at port : %d\n", _irlock_port);
@@ -504,6 +515,15 @@ void SITL_State::_output_to_flightgear(void)
 }
 
 /*
+  output current state to passenger
+ */
+void SITL_State::_output_to_passenger(void)
+{
+    const SITL::sitl_fdm &sitl_fdm = _sitl->state;
+    passenger_socket.send(&sitl_fdm, sizeof(sitl_fdm));
+}
+
+/*
   get FDM input from a local model
  */
 void SITL_State::_fdm_input_local(void)
@@ -664,6 +684,10 @@ void SITL_State::_fdm_input_local(void)
         _output_to_flightgear();
     }
 
+    if (_sitl && _send_state_to_passenger) {
+        _output_to_passenger();
+    }
+
     // update simulation time
     if (_sitl) {
         hal.scheduler->stop_clock(_sitl->state.timestamp_us);
@@ -771,6 +795,8 @@ void SITL_State::_simulator_servos(struct sitl_input &input)
 
     float engine_mul = _sitl?_sitl->engine_mul.get():1;
     uint8_t engine_fail = _sitl?_sitl->engine_fail.get():0;
+    uint8_t motor_stop = _sitl?_sitl->motor_stop.get():0;
+    uint8_t motor_failure_activate = _sitl?_sitl->motor_failure_activate.get():0;
     float throttle = 0.0f;
     
     if (engine_fail >= ARRAY_SIZE(input.servos)) {
@@ -781,6 +807,16 @@ void SITL_State::_simulator_servos(struct sitl_input &input)
         input.servos[engine_fail] = ((input.servos[engine_fail]-1000) * engine_mul) + 1000;
     } else {
         input.servos[engine_fail] = static_cast<uint16_t>(((input.servos[engine_fail] - 1500) * engine_mul) + 1500);
+    }
+
+    if (motor_stop) {
+        for (uint8_t i = 0; i < ARRAY_SIZE(input.servos); ++i) {
+            input.servos[i] = 1000;
+        }
+    }
+
+    if (motor_failure_activate) {
+        AP::vehicle()->set_motor_failure();
     }
 
     if (_vehicle == ArduPlane) {
@@ -865,6 +901,47 @@ void SITL_State::_simulator_servos(struct sitl_input &input)
     // fake battery2 as just a 25% gain on the first one
     voltage2_pin_value = ((voltage * 0.25f / 10.1f) / 5.0f) * 1024;
     current2_pin_value = ((_current * 0.25f / 17.0f) / 5.0f) * 1024;
+
+    _check_motor_failure(input);
+}
+
+void SITL_State::_check_motor_failure(const struct sitl_input &input)
+{
+    AP_Motors *motors = AP_Motors::get_singleton();
+    if (!motors) {
+        return;
+    }
+
+    uint32_t now_ms = AP_HAL::millis();
+    if ((!motors->armed()) || is_zero(motors->get_throttle())) {
+        _last_motor_idle_ms = now_ms;
+        return;
+    }
+
+    // Altough we're getting the current motor setup from a mask, all the multicopter motor setup are sequential.
+    // So we're actully using the get_motors_mask() just for counting how many motors are we using in the current setup.
+    for (uint8_t i = 0; i < __builtin_popcount(motors->get_motor_mask()); ++i) {
+        float power_rating_pct;
+        if (_vehicle == Rover) {
+            power_rating_pct = !is_zero(_sitl->throttle) ? (input.servos[i] - 1500) / 500.0f : 0;
+        } else {
+            power_rating_pct = !is_zero(_sitl->throttle) ? (input.servos[i] - 1000) / 1000.0f : 0;
+        }
+        float desired_power = motors->get_motor_output_value(i);
+        float motor_power_diff = fabs(desired_power - power_rating_pct);
+        if (motor_power_diff < (MOTOR_POWER_DIFF_ALLOWED / 100.0f)) {
+            _last_matching_motor_power_ms[i] = now_ms;
+        } else {
+            motors->set_lost_motor(i);
+        }
+        if (motors->armed() && (!AP_Notify::flags.in_arming_delay) && (!AP::vehicle()->get_motor_failure())) {
+            uint32_t time_from_last_healthy = now_ms - _last_matching_motor_power_ms[i];
+            if (time_from_last_healthy >= MAX_MOTOR_POWER_DIFF_MS) {
+                gcs().send_text(MAV_SEVERITY_ERROR, "High motor power diff for %u", i);
+                AP::vehicle()->set_motor_failure();
+            }
+        }
+    }
 }
 
 void SITL_State::init(int argc, char * const argv[])

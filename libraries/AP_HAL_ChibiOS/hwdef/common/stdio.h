@@ -40,6 +40,8 @@ int vasprintf(char **strp, const char *fmt, va_list ap);
 int asprintf(char **strp, const char *fmt, ...);
 int vprintf(const char *fmt, va_list arg);
 int printf(const char *fmt, ...);
+int sscanf (const char *buf, const char *fmt, ...); //undefined, only used as a placeholder, its replaced by wrap method at link time
+int vsscanf (const char *buf, const char *s, va_list ap);
 
 void *malloc(size_t size);
 void *calloc(size_t nmemb, size_t size);

@@ -22,6 +22,7 @@
 #include <SITL/SIM_CRRCSim.h>
 #include <SITL/SIM_Gazebo.h>
 #include <SITL/SIM_last_letter.h>
+#include <SITL/SIM_AP.h>
 #include <SITL/SIM_JSBSim.h>
 #include <SITL/SIM_Tracker.h>
 #include <SITL/SIM_Balloon.h>
@@ -83,6 +84,7 @@ void SITL_State::_usage(void)
            "\t--config string          set additional simulation config string\n"
            "\t--fg|-F ADDRESS          set Flight Gear view address, defaults to 127.0.0.1\n"
            "\t--disable-fgview         disable Flight Gear view\n"
+           "\t--enable-passenger       enable sending sitl state to passenger\n"
            "\t--gimbal                 enable simulated MAVLink gimbal\n"
            "\t--autotest-dir DIR       set directory for additional files\n"
            "\t--defaults path          set path to defaults file\n"
@@ -172,6 +174,7 @@ static const struct {
     { "airsim",             AirSim::create},
     { "scrimmage",          Scrimmage::create },
     { "webots",             Webots::create },
+    { "passenger",          AP_Vehicle::create },
     { "JSON",               JSON::create },
     { "blimp",              Blimp::create },
 };
@@ -205,6 +208,7 @@ void SITL_State::_parse_command_line(int argc, char * const argv[])
     const char *home_str = nullptr;
     const char *model_str = nullptr;
     _use_fg_view = true;
+    _send_state_to_passenger = false;
     char *autotest_dir = nullptr;
     _fg_address = "127.0.0.1";
     const char* config = "";
@@ -264,6 +268,7 @@ void SITL_State::_parse_command_line(int argc, char * const argv[])
         CMDLINE_SIM_PORT_IN,
         CMDLINE_SIM_PORT_OUT,
         CMDLINE_IRLOCK_PORT,
+        CMD_PASSENGER,
         CMDLINE_START_TIME,
         CMDLINE_SYSID,
         CMDLINE_SLAVE,
@@ -279,53 +284,54 @@ void SITL_State::_parse_command_line(int argc, char * const argv[])
     };
 
     const struct GetOptLong::option options[] = {
-        {"help",            false,  0, 'h'},
-        {"wipe",            false,  0, 'w'},
-        {"unhide-groups",   false,  0, 'u'},
-        {"speedup",         true,   0, 's'},
-        {"rate",            true,   0, 'r'},
-        {"console",         false,  0, 'C'},
-        {"instance",        true,   0, 'I'},
-        {"param",           true,   0, 'P'},
-        {"synthetic-clock", false,  0, 'S'},
-        {"home",            true,   0, 'O'},
-        {"model",           true,   0, 'M'},
-        {"config",          true,   0, 'c'},
-        {"fg",              true,   0, 'F'},
-        {"gimbal",          false,  0, CMDLINE_GIMBAL},
-        {"disable-fgview",  false,  0, CMDLINE_FGVIEW},
-        {"autotest-dir",    true,   0, CMDLINE_AUTOTESTDIR},
-        {"defaults",        true,   0, CMDLINE_DEFAULTS},
-        {"uartA",           true,   0, CMDLINE_UARTA},
-        {"uartB",           true,   0, CMDLINE_UARTB},
-        {"uartC",           true,   0, CMDLINE_UARTC},
-        {"uartD",           true,   0, CMDLINE_UARTD},
-        {"uartE",           true,   0, CMDLINE_UARTE},
-        {"uartF",           true,   0, CMDLINE_UARTF},
-        {"uartG",           true,   0, CMDLINE_UARTG},
-        {"uartH",           true,   0, CMDLINE_UARTH},
-        {"uartI",           true,   0, CMDLINE_UARTI},
-        {"uartJ",           true,   0, CMDLINE_UARTJ},
-        {"serial0",         true,   0, CMDLINE_SERIAL0},
-        {"serial1",         true,   0, CMDLINE_SERIAL1},
-        {"serial2",         true,   0, CMDLINE_SERIAL2},
-        {"serial3",         true,   0, CMDLINE_SERIAL3},
-        {"serial4",         true,   0, CMDLINE_SERIAL4},
-        {"serial5",         true,   0, CMDLINE_SERIAL5},
-        {"serial6",         true,   0, CMDLINE_SERIAL6},
-        {"serial7",         true,   0, CMDLINE_SERIAL7},
-        {"serial8",         true,   0, CMDLINE_SERIAL8},
-        {"serial9",         true,   0, CMDLINE_SERIAL9},
-        {"rtscts",          false,  0, CMDLINE_RTSCTS},
-        {"base-port",       true,   0, CMDLINE_BASE_PORT},
-        {"rc-in-port",      true,   0, CMDLINE_RCIN_PORT},
-        {"sim-address",     true,   0, CMDLINE_SIM_ADDRESS},
-        {"sim-port-in",     true,   0, CMDLINE_SIM_PORT_IN},
-        {"sim-port-out",    true,   0, CMDLINE_SIM_PORT_OUT},
-        {"irlock-port",     true,   0, CMDLINE_IRLOCK_PORT},
-        {"start-time",      true,   0, CMDLINE_START_TIME},
-        {"sysid",           true,   0, CMDLINE_SYSID},
-        {"slave",           true,   0, CMDLINE_SLAVE},
+        {"help",                false,  0, 'h'},
+        {"wipe",                false,  0, 'w'},
+        {"unhide-groups",       false,  0, 'u'},
+        {"speedup",             true,   0, 's'},
+        {"rate",                true,   0, 'r'},
+        {"console",             false,  0, 'C'},
+        {"instance",            true,   0, 'I'},
+        {"param",               true,   0, 'P'},
+        {"synthetic-clock",     false,  0, 'S'},
+        {"home",                true,   0, 'O'},
+        {"model",               true,   0, 'M'},
+        {"config",              true,   0, 'c'},
+        {"fg",                  true,   0, 'F'},
+        {"gimbal",              false,  0, CMDLINE_GIMBAL},
+        {"disable-fgview",      false,  0, CMDLINE_FGVIEW},
+        {"autotest-dir",        true,   0, CMDLINE_AUTOTESTDIR},
+        {"defaults",            true,   0, CMDLINE_DEFAULTS},
+        {"uartA",               true,   0, CMDLINE_UARTA},
+        {"uartB",               true,   0, CMDLINE_UARTB},
+        {"uartC",               true,   0, CMDLINE_UARTC},
+        {"uartD",               true,   0, CMDLINE_UARTD},
+        {"uartE",               true,   0, CMDLINE_UARTE},
+        {"uartF",               true,   0, CMDLINE_UARTF},
+        {"uartG",               true,   0, CMDLINE_UARTG},
+        {"uartH",               true,   0, CMDLINE_UARTH},
+        {"uartI",               true,   0, CMDLINE_UARTI},
+        {"uartJ",               true,   0, CMDLINE_UARTJ},
+        {"serial0",             true,   0, CMDLINE_SERIAL0},
+        {"serial1",             true,   0, CMDLINE_SERIAL1},
+        {"serial2",             true,   0, CMDLINE_SERIAL2},
+        {"serial3",             true,   0, CMDLINE_SERIAL3},
+        {"serial4",             true,   0, CMDLINE_SERIAL4},
+        {"serial5",             true,   0, CMDLINE_SERIAL5},
+        {"serial6",             true,   0, CMDLINE_SERIAL6},
+        {"serial7",             true,   0, CMDLINE_SERIAL7},
+        {"serial8",             true,   0, CMDLINE_SERIAL8},
+        {"serial9",             true,   0, CMDLINE_SERIAL9},
+        {"rtscts",              false,  0, CMDLINE_RTSCTS},
+        {"base-port",           true,   0, CMDLINE_BASE_PORT},
+        {"rc-in-port",          true,   0, CMDLINE_RCIN_PORT},
+        {"sim-address",         true,   0, CMDLINE_SIM_ADDRESS},
+        {"sim-port-in",         true,   0, CMDLINE_SIM_PORT_IN},
+        {"sim-port-out",        true,   0, CMDLINE_SIM_PORT_OUT},
+        {"irlock-port",         true,   0, CMDLINE_IRLOCK_PORT},
+        {"enable-passenger",    false,  0, CMD_PASSENGER},
+        {"start-time",          true,   0, CMDLINE_START_TIME},
+        {"sysid",               true,   0, CMDLINE_SYSID},
+        {"slave",               true,   0, CMDLINE_SLAVE},
 #if STORAGE_USE_FLASH
         {"set-storage-flash-enabled", true,   0, CMDLINE_SET_STORAGE_FLASH_ENABLED},
 #endif
@@ -423,6 +429,9 @@ void SITL_State::_parse_command_line(int argc, char * const argv[])
             break;
         case CMDLINE_FGVIEW:
             _use_fg_view = false;
+            break;
+        case CMD_PASSENGER:
+            _send_state_to_passenger = true;
             break;
         case CMDLINE_AUTOTESTDIR:
             autotest_dir = strdup(gopt.optarg);

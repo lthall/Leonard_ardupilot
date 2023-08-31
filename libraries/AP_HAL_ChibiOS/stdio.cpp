@@ -148,6 +148,21 @@ int __wrap_scanf(const char *fmt, ...)
     return 0;
 }
 
+/*
+ *  sscanf(buf,fmt,va_alist)
+ */
+int 
+__wrap_sscanf(const char *buf, const char *fmt, ...)
+{
+    int             count;
+    va_list ap;
+
+    va_start (ap, fmt);
+    count = vsscanf(buf, fmt, ap);
+    va_end (ap);
+    return (count);
+}
+
 extern "C" {
     // empty function fiprintf(), saves flash space for unused code path
     int __wrap_fiprintf(const char *fmt, ...);

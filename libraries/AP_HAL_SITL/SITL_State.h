@@ -59,6 +59,7 @@
 #include <SITL/SIM_RichenPower.h>
 #include <SITL/SIM_FETtecOneWireESC.h>
 #include <AP_HAL/utility/Socket.h>
+#include <AP_Motors/AP_Motors.h>
 
 class HAL_SITL;
 
@@ -147,7 +148,9 @@ private:
     bool _read_rc_sitl_input();
     void _fdm_input_local(void);
     void _output_to_flightgear(void);
+    void _output_to_passenger(void);
     void _simulator_servos(struct sitl_input &input);
+    void _check_motor_failure(const struct sitl_input &input);
     void _fdm_input_step(void);
 
     void wait_clock(uint64_t wait_time_usec);
@@ -159,6 +162,11 @@ private:
     pid_t _parent_pid;
     uint32_t _update_count;
 
+    uint32_t _last_matching_motor_power_ms[AP_MOTORS_MAX_NUM_MOTORS];
+    uint32_t _last_motor_idle_ms;
+
+    AP_Baro *_barometer;
+    AP_InertialSensor *_ins;
     Scheduler *_scheduler;
 
     SocketAPM _sitl_rc_in{true};
@@ -172,6 +180,7 @@ private:
 
     bool _use_rtscts;
     bool _use_fg_view;
+    bool _send_state_to_passenger;
     
     const char *_fg_address;
 
@@ -288,6 +297,9 @@ private:
 
     // output socket for flightgear viewing
     SocketAPM fg_socket{true};
+
+    // output socket for AP passenger
+    SocketAPM passenger_socket{true};
     
     const char *defaults_path = HAL_PARAM_DEFAULTS_PATH;
 
