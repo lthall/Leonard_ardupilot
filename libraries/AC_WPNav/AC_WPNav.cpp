@@ -12,6 +12,12 @@ extern const AP_HAL::HAL& hal;
 #define WPNAV_WP_SPEED_UP               250.0f      // default maximum climb velocity
 #define WPNAV_WP_SPEED_DOWN             150.0f      // default maximum descent velocity
 #define WPNAV_WP_ACCEL_Z_DEFAULT        100.0f      // default vertical acceleration between waypoints in cm/s/s
+#define WPNAV_WP_SPEED_MF               200.0f      // default horizontal speed between waypoints in cm/s, during motor failure
+#define WPNAV_WP_SPEED_UP_MF            100.0f      // default maximum climb velocity in cm/s, during motor failure
+#define WPNAV_WP_SPEED_DOWN_MF          100.0f      // default maximum descent velocity in cm/s, during motor failure
+#define WPNAV_WP_SPEED_BF               750.0f      // default horizontal speed between waypoints in cm/s, during battery failure
+#define WPNAV_WP_SPEED_UP_BF            100.0f      // default maximum climb velocity in cm/s, during battery failure
+#define WPNAV_WP_SPEED_DOWN_BF          100.0f      // default maximum descent velocity in cm/s, during battery failure
 
 const AP_Param::GroupInfo AC_WPNav::var_info[] = {
     // index 0 was used for the old orientation matrix
@@ -93,6 +99,60 @@ const AP_Param::GroupInfo AC_WPNav::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("TER_MARGIN",  12, AC_WPNav, _terrain_margin, 10.0),
 
+    // @Param: SPD_MF
+    // @DisplayName: Waypoint Horizontal Speed Target, during motor failure
+    // @Description: Defines the speed in cm/s which the aircraft will attempt to maintain horizontally during a WP mission, during motor failure
+    // @Units: cm/s
+    // @Range: 20 2000
+    // @Increment: 50
+    // @User: Standard
+    AP_GROUPINFO("SPD_MF",      13, AC_WPNav, _wp_speed_mf_cms, WPNAV_WP_SPEED_MF),
+
+    // @Param: SPD_UP_MF
+    // @DisplayName: Waypoint Climb Speed Target, during motor failure
+    // @Description: Defines the speed in cm/s which the aircraft will attempt to maintain while climbing during a WP mission, during motor failure
+    // @Units: cm/s
+    // @Range: 10 1000
+    // @Increment: 50
+    // @User: Standard
+    AP_GROUPINFO("SPD_UP_MF",   14, AC_WPNav, _wp_speed_up_mf_cms, WPNAV_WP_SPEED_UP_MF),
+
+    // @Param: SPD_DN_MF
+    // @DisplayName: Waypoint Descent Speed Target, during motor failure
+    // @Description: Defines the speed in cm/s which the aircraft will attempt to maintain while descending during a WP mission, during motor failure
+    // @Units: cm/s
+    // @Range: 10 500
+    // @Increment: 10
+    // @User: Standard
+    AP_GROUPINFO("SPD_DN_MF",   15, AC_WPNav, _wp_speed_down_mf_cms, WPNAV_WP_SPEED_DOWN_MF),
+
+    // @Param: SPD_BF
+    // @DisplayName: Waypoint Horizontal Speed Target, during battery failure
+    // @Description: Defines the speed in cm/s which the aircraft will attempt to maintain horizontally during a WP mission, during battery failure
+    // @Units: cm/s
+    // @Range: 20 2000
+    // @Increment: 50
+    // @User: Standard
+    AP_GROUPINFO("SPD_BF",      16, AC_WPNav, _wp_speed_bf_cms, WPNAV_WP_SPEED_BF),
+
+    // @Param: SPD_UP_BF
+    // @DisplayName: Waypoint Climb Speed Target, during battery failure
+    // @Description: Defines the speed in cm/s which the aircraft will attempt to maintain while climbing during a WP mission, during battery failure
+    // @Units: cm/s
+    // @Range: 10 1000
+    // @Increment: 50
+    // @User: Standard
+    AP_GROUPINFO("SPD_UP_BF",   17, AC_WPNav, _wp_speed_up_bf_cms, WPNAV_WP_SPEED_UP_BF),
+
+    // @Param: SPD_DN_MF
+    // @DisplayName: Waypoint Descent Speed Target, during battery failure
+    // @Description: Defines the speed in cm/s which the aircraft will attempt to maintain while descending during a WP mission, during battery failure
+    // @Units: cm/s
+    // @Range: 10 500
+    // @Increment: 10
+    // @User: Standard
+    AP_GROUPINFO("SPD_DN_BF",   18, AC_WPNav, _wp_speed_down_bf_cms, WPNAV_WP_SPEED_DOWN_BF),
+
     AP_GROUPEND
 };
 
@@ -158,7 +218,7 @@ void AC_WPNav::wp_and_spline_init(float speed_cms, Vector3f stopping_point)
     _wp_radius_cm.set_and_save_ifchanged(MAX(_wp_radius_cm, WPNAV_WP_RADIUS_MIN));
 
     // check _wp_speed
-    _wp_speed_cms.set_and_save_ifchanged(MAX(_wp_speed_cms, WPNAV_WP_SPEED_MIN));
+    _wp_speed_cms.set_and_save_ifchanged(MAX(get_default_speed_xy_cms(), WPNAV_WP_SPEED_MIN));
 
     // initialise position controller
     _pos_control.init_z_controller_stopping_point();
@@ -171,8 +231,8 @@ void AC_WPNav::wp_and_spline_init(float speed_cms, Vector3f stopping_point)
     // initialise position controller speed and acceleration
     _pos_control.set_max_speed_accel_xy(_wp_desired_speed_xy_cms, _wp_accel_cmss);
     _pos_control.set_correction_speed_accel_xy(_wp_desired_speed_xy_cms, _wp_accel_cmss);
-    _pos_control.set_max_speed_accel_z(-get_default_speed_down(), _wp_speed_up_cms, _wp_accel_z_cmss);
-    _pos_control.set_correction_speed_accel_z(-get_default_speed_down(), _wp_speed_up_cms, _wp_accel_z_cmss);
+    _pos_control.set_max_speed_accel_z(-get_default_speed_down(), get_default_speed_up(), _wp_accel_z_cmss);
+    _pos_control.set_correction_speed_accel_z(-get_default_speed_down(), get_default_speed_up(), _wp_accel_z_cmss);
 
     // calculate scurve jerk and jerk time
     if (!is_positive(_wp_jerk)) {
@@ -203,6 +263,12 @@ void AC_WPNav::wp_and_spline_init(float speed_cms, Vector3f stopping_point)
 
     // mark as active
     _wp_last_update = AP_HAL::millis();
+}
+
+/// set current target horizontal speed during wp navigation
+float AC_WPNav::get_min_speed_xy() const
+{
+    return WPNAV_WP_SPEED_MIN;
 }
 
 /// set_speed_xy - allows main code to pass target horizontal velocity for wp navigation
@@ -237,6 +303,45 @@ void AC_WPNav::set_speed_down(float speed_down_cms)
 {
     _pos_control.set_max_speed_accel_z(speed_down_cms, _pos_control.get_max_speed_up_cms(), _pos_control.get_max_accel_z_cmss());
     update_track_with_speed_accel_limits();
+}
+
+/// get default target horizontal velocity during wp navigation
+float AC_WPNav::get_default_speed_xy_cms() const
+{
+    float speed_xy_cms = _wp_speed_cms;
+    if (AP::vehicle()->get_motor_failure()) {
+        speed_xy_cms = _wp_speed_mf_cms;
+    }
+    if (AP::vehicle()->get_battery_failure()) {
+        speed_xy_cms = _wp_speed_bf_cms;
+    }
+    return speed_xy_cms;
+}
+
+/// get default target climb speed in cm/s during missions
+float AC_WPNav::get_default_speed_up() const
+{
+    float speed_up_cms = _wp_speed_up_cms;
+    if (AP::vehicle()->get_motor_failure()) {
+        speed_up_cms = _wp_speed_up_mf_cms;
+    }
+    if (AP::vehicle()->get_battery_failure()) {
+        speed_up_cms = _wp_speed_up_bf_cms;
+    }
+    return speed_up_cms;
+}
+
+/// get default target descent rate in cm/s during missions.  Note: always positive
+float AC_WPNav::get_default_speed_down() const
+{
+    float speed_down_cms = _wp_speed_down_cms;
+    if (AP::vehicle()->get_motor_failure()) {
+        speed_down_cms = _wp_speed_down_mf_cms;
+    }
+    if (AP::vehicle()->get_battery_failure()) {
+        speed_down_cms = _wp_speed_down_bf_cms;
+    }
+    return speed_down_cms;
 }
 
 /// set_wp_destination waypoint using location class
@@ -587,9 +692,9 @@ bool AC_WPNav::update_wpnav()
 {
     bool ret = true;
 
-    if (!is_equal(_wp_speed_cms.get(), _last_wp_speed_cms)) {
-        set_speed_xy(_wp_speed_cms);
-        _last_wp_speed_cms = _wp_speed_cms;
+    float default_speed_xy = get_default_speed_xy_cms();
+    if (_wp_desired_speed_xy_cms > default_speed_xy) {
+        set_speed_xy(default_speed_xy);
     }
     if (!is_equal(_wp_speed_up_cms.get(), _last_wp_speed_up_cms)) {
         set_speed_up(_wp_speed_up_cms);

@@ -54,6 +54,9 @@ public:
     ///     should be called once before the waypoint controller is used but does not need to be called before subsequent updates to destination
     void wp_and_spline_init(float speed_cms = 0.0f, Vector3f stopping_point = Vector3f{});
 
+    // minimum horizontal speed between waypoints in cm/s
+    float get_min_speed_xy() const;
+
     /// set current target horizontal speed during wp navigation
     void set_speed_xy(float speed_cms);
 
@@ -64,18 +67,21 @@ public:
     /// get paused status
     bool paused() { return _paused; }
 
+    // get_pause_success returns true when paused and waypoint maximum speed drops to less than 5% of _wp_desired_speed_xy_cms
+    bool get_pause_success() { return (_paused == true && _offset_vel < 0.05 * _wp_desired_speed_xy_cms); }
+
     /// set current target climb or descent rate during wp navigation
     void set_speed_up(float speed_up_cms);
     void set_speed_down(float speed_down_cms);
 
     /// get default target horizontal velocity during wp navigation
-    float get_default_speed_xy() const { return _wp_speed_cms; }
+    float get_default_speed_xy_cms() const;
 
     /// get default target climb speed in cm/s during missions
-    float get_default_speed_up() const { return _wp_speed_up_cms; }
+    float get_default_speed_up() const;
 
     /// get default target descent rate in cm/s during missions.  Note: always positive
-    float get_default_speed_down() const { return fabsf(_wp_speed_down_cms); }
+    float get_default_speed_down() const;
 
     /// get_speed_z - returns target descent speed in cm/s during missions.  Note: always positive
     float get_accel_z() const { return _wp_accel_z_cmss; }
@@ -156,6 +162,9 @@ public:
     // returns true if update_wpnav has been run very recently
     bool is_active() const;
 
+    /// using_next_waypoint - true when in a turn using S-Curves
+    virtual bool using_next_waypoint() const { return _scurve_next_leg.started(); }
+
     ///
     /// spline methods
     ///
@@ -233,6 +242,12 @@ protected:
     AP_Float    _wp_speed_cms;          // default maximum horizontal speed in cm/s during missions
     AP_Float    _wp_speed_up_cms;       // default maximum climb rate in cm/s
     AP_Float    _wp_speed_down_cms;     // default maximum descent rate in cm/s
+    AP_Float    _wp_speed_mf_cms;       // default maximum horizontal speed in cm/s during missions, during motor failure
+    AP_Float    _wp_speed_up_mf_cms;    // default maximum climb rate in cm/s, during motor failure
+    AP_Float    _wp_speed_down_mf_cms;  // default maximum descent rate in cm/s, during motor failure
+    AP_Float    _wp_speed_bf_cms;       // default maximum horizontal speed in cm/s during missions, during battery failure
+    AP_Float    _wp_speed_up_bf_cms;    // default maximum climb rate in cm/s, during battery failure
+    AP_Float    _wp_speed_down_bf_cms;  // default maximum descent rate in cm/s, during battery failure
     AP_Float    _wp_radius_cm;          // distance from a waypoint in cm that, when crossed, indicates the wp has been reached
     AP_Float    _wp_accel_cmss;         // horizontal acceleration in cm/s/s during missions
     AP_Float    _wp_accel_z_cmss;       // vertical acceleration in cm/s/s during missions
