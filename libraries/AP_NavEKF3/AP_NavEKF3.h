@@ -438,6 +438,9 @@ private:
     AP_Float _ognmTestScaleFactor;  // Scale factor applied to the thresholds used by the on ground not moving test
     AP_Float _baroGndEffectDeadZone;// Dead zone applied to positive baro height innovations when in ground effect (m)
     AP_Int8 _primary_core;          // initial core number
+    AP_Int16 _magFailTimeLimit_ms;  // number of msec before a magnetometer failing innovation consistency checks is declared failed (msec)
+    AP_Int8 _core_try_compass_change;  // core index that should be forced to try changing compass
+    AP_Float _gpsVAccThreshold;     // vertical accuracy threshold to use GPS as an altitude source
 
 // Possible values for _flowUse
 #define FLOW_USE_NONE    0
@@ -457,7 +460,6 @@ private:
     const uint16_t hgtRetryTimeMode0_ms = 10000;   // Height retry time with vertical velocity measurement (msec)
     const uint16_t hgtRetryTimeMode12_ms = 5000;   // Height retry time without vertical velocity measurement (msec)
     const uint16_t tasRetryTime_ms = 5000;         // True airspeed timeout and retry interval (msec)
-    const uint32_t magFailTimeLimit_ms = 10000;    // number of msec before a magnetometer failing innovation consistency checks is declared failed (msec)
     const float magVarRateScale = 0.005f;          // scale factor applied to magnetometer variance due to angular rate
     const float gyroBiasNoiseScaler = 2.0f;        // scale factor applied to gyro bias state process noise when on ground
     const uint16_t hgtAvg_ms = 100;                // average number of msec between height measurements
@@ -517,6 +519,8 @@ private:
     float coreRelativeErrors[MAX_EKF_CORES];        // relative errors of cores with respect to primary
     float coreErrorScores[MAX_EKF_CORES];           // the instance error values used to update relative core error
     uint64_t coreLastTimePrimary_us[MAX_EKF_CORES]; // last time we were using this core as primary
+
+    AP_NavEKF_Source::SourceZ last_active_height_source[MAX_EKF_CORES];
 
     // origin set by one of the cores
     struct Location common_EKF_origin;

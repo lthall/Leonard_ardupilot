@@ -91,7 +91,7 @@ void NavEKF3_core::controlMagYawReset()
             finalResetRequest; // the final reset when we have achieved enough height to be in stable magnetic field environment
 
     // Perform a reset of magnetic field states and reset yaw to corrected magnetic heading
-    if (magYawResetRequest && use_compass()) {
+    if (magYawResetRequest && use_compass(dal.compass().get_first_usable())) {
         // send initial alignment status to console
         if (!yawAlignComplete) {
             GCS_SEND_TEXT(MAV_SEVERITY_INFO, "EKF3 IMU%u MAG%u initial yaw alignment complete",(unsigned)imu_index, (unsigned)magSelectIndex);
@@ -222,7 +222,7 @@ void NavEKF3_core::SelectMagFusion()
     // Handle case where we are not using a yaw sensor of any type and attempt to reset the yaw in
     // flight using the output from the GSF yaw estimator.
     if ((yaw_source == AP_NavEKF_Source::SourceYaw::GSF) ||
-        (!use_compass() &&
+        (!use_compass(dal.compass().get_first_usable()) &&
          yaw_source != AP_NavEKF_Source::SourceYaw::GPS &&
          yaw_source != AP_NavEKF_Source::SourceYaw::GPS_COMPASS_FALLBACK &&
          yaw_source != AP_NavEKF_Source::SourceYaw::EXTNAV)) {
@@ -299,7 +299,7 @@ void NavEKF3_core::SelectMagFusion()
             // no fallback
             return;
         }
-
+        
         // get new mag data into delay buffer
         readMagData();
 
@@ -369,7 +369,7 @@ void NavEKF3_core::SelectMagFusion()
     if (magHealth) {
         magTimeout = false;
         lastHealthyMagTime_ms = imuSampleTime_ms;
-    } else if ((imuSampleTime_ms - lastHealthyMagTime_ms) > frontend->magFailTimeLimit_ms && use_compass()) {
+    } else if ((imuSampleTime_ms - lastHealthyMagTime_ms) > (uint32_t)frontend->_magFailTimeLimit_ms && use_compass()) {
         magTimeout = true;
     }
 

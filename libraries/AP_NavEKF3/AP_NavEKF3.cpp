@@ -719,7 +719,31 @@ const AP_Param::GroupInfo NavEKF3::var_info2[] = {
     // @Increment: 1
     // @User: Advanced
     AP_GROUPINFO("PRIMARY", 8, NavEKF3, _primary_core, EK3_PRIMARY_DEFAULT),
-    
+
+    // @Param: GPS_VACC_MAX
+    // @DisplayName: GPS vertical accuracy threshold
+    // @Description: Vertical accuracy threshold for GPS as the altitude source. The GPS will not be used as an altitude source if the reported vertical accuracy of the GPS is larger than this threshold, falling back to baro instead. Set to zero to deactivate the threshold check.
+    // @Range: 0.0 10.0
+    // @Increment: 0.1
+    // @User: Advanced
+    // @Units: m
+    AP_GROUPINFO("GPS_VACC_MAX", 9, NavEKF3, _gpsVAccThreshold, 0.0f),
+
+    // @Param: MAG_FAIL_MS
+    // @DisplayName: magnetometer faiure timeout
+    // @Description: Number of msec before a magnetometer failing innovation consistency checks is declared failed (msec).
+    // @Range: 0 30000
+    // @Units: ms
+    AP_GROUPINFO("MAG_FAIL_MS", 10, NavEKF3, _magFailTimeLimit_ms, 2500),
+
+    // @Param: CORE_MAG_CNG
+    // @DisplayName: force EKF3 core to change magnetometer
+    // @Description: Core number to force change of magnetometer. A value of 0 corresponds to the first IMU in EK3_IMU_MASK. A value of -1 disables this feature.
+    // @Range: -1 2
+    // @Increment: 1
+    // @User: Advanced
+    AP_GROUPINFO("CORE_MAG_CNG", 11, NavEKF3, _core_try_compass_change, -1),
+
     AP_GROUPEND
 };
 
@@ -918,12 +942,15 @@ void NavEKF3::UpdateFilter(void)
 
     // core selection is only available after the vehicle is armed, else forced to lane 0 if its healthy
     if (runCoreSelection && armed) {
+        const auto& ins = AP::ins();
         // update this instance's error scores for all active cores and get the primary core's error score
         float primaryErrorScore = updateCoreErrorScores();
 
         // update the accumulated relative error scores for all active cores
         updateCoreRelativeErrors();
 
+        bool primaryHighVibes = ins.is_high_vibrations(core[primary].getIMUIndex());
+        bool altHighVibes = false;
         bool betterCore = false;
         bool altCoreAvailable = false;
         uint8_t newPrimaryIndex = primary;
@@ -940,6 +967,11 @@ void NavEKF3::UpdateFilter(void)
                 altCoreAvailable = coreBetterScore(coreIndex, newPrimaryIndex) &&
                     imuSampleTime_us - coreLastTimePrimary_us[coreIndex] > 1E7;
 
+                altHighVibes = ins.is_high_vibrations(core[coreIndex].getIMUIndex());
+                if (primaryHighVibes && !altHighVibes) {
+                    altCoreAvailable = true;
+                }
+
                 if (altCoreAvailable) {
                     // if this core has a significantly lower relative error to the active primary, we consider it as a 
                     // better core and would like to switch to it even if the current primary is healthy
@@ -954,13 +986,16 @@ void NavEKF3::UpdateFilter(void)
             }
         }
         altCoreAvailable = newPrimaryIndex != primary;
+        altHighVibes = ins.is_high_vibrations(core[newPrimaryIndex].getIMUIndex());
 
         // Switch cores if another core is available and the active primary core meets one of the following conditions - 
         // 1. has a bad error score
         // 2. is unhealthy
         // 3. is healthy, but a better core is available
+        // 4. has high vibrations and and the better core doesn't
         // also update the yaw and position reset data to capture changes due to the lane switch
-        if (altCoreAvailable && (primaryErrorScore > 1.0f || !core[primary].healthy() || betterCore)) {
+        if (altCoreAvailable && (primaryErrorScore > 1.0f || !core[primary].healthy() || betterCore || 
+                (primaryHighVibes && !altHighVibes))) {
             updateLaneSwitchYawResetData(newPrimaryIndex, primary);
             updateLaneSwitchPosResetData(newPrimaryIndex, primary);
             updateLaneSwitchPosDownResetData(newPrimaryIndex, primary);

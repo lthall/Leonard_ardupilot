@@ -357,6 +357,11 @@ void NavEKF3::Log_Write()
 
     for (uint8_t i=0; i<activeCores(); i++) {
         core[i].Log_Write(time_us);
+        const AP_NavEKF_Source::SourceZ active_height_source = core[i].get_active_height_source();
+        if (last_active_height_source[i] != active_height_source) {
+            GCS_SEND_TEXT(MAV_SEVERITY_INFO, "core %u active height source is %u", i, (uint8_t)active_height_source);
+            last_active_height_source[i] = active_height_source;
+        }
     }
 
     AP::dal().start_frame(AP_DAL::FrameType::LogWriteEKF3);

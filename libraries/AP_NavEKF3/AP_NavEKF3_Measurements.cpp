@@ -236,11 +236,13 @@ void NavEKF3_core::writeOptFlowMeas(const uint8_t rawFlowQuality, const Vector2f
 *                      MAGNETOMETER                     *
 ********************************************************/
 
-// try changing compass, return true if a new compass is found
+// try changing to another compass
 void NavEKF3_core::tryChangeCompass(void)
 {
     const auto &compass = dal.compass();
     const uint8_t maxCount = compass.get_count();
+
+    AP::compass().set_permanently_unhealthy(magSelectIndex, core_index); // set the mag to be permanently unhelthy so we won't use it anymore in this flight
 
     // search through the list of magnetometers
     for (uint8_t i=1; i<maxCount; i++) {
@@ -252,7 +254,7 @@ void NavEKF3_core::tryChangeCompass(void)
         // if the magnetometer is allowed to be used for yaw and has a different index, we start using it
         if (compass.healthy(tempIndex) && compass.use_for_yaw(tempIndex) && tempIndex != magSelectIndex) {
             magSelectIndex = tempIndex;
-            GCS_SEND_TEXT(MAV_SEVERITY_INFO, "EKF3 IMU%u switching to compass %u",(unsigned)imu_index,magSelectIndex);
+            GCS_SEND_TEXT(MAV_SEVERITY_INFO, "EKF3 IMU%u switching to compass %u",(unsigned)imu_index, magSelectIndex);
             // reset the timeout flag and timer
             magTimeout = false;
             lastHealthyMagTime_ms = imuSampleTime_ms;
@@ -309,9 +311,13 @@ void NavEKF3_core::readMagData()
     // if the timeout is due to a sensor failure, then declare a timeout regardless of onground status
     if (maxCount > 1) {
         bool fusionTimeout = magTimeout && !onGround && imuSampleTime_ms - ekfStartTime_ms > 30000 && !(frontend->_affinity & EKF_AFFINITY_MAG);
-        bool sensorTimeout = !compass.healthy(magSelectIndex) && imuSampleTime_ms - lastMagRead_ms > frontend->magFailTimeLimit_ms;
+        bool sensorTimeout = (!compass.healthy(magSelectIndex) || !compass.use_for_yaw(magSelectIndex)) && imuSampleTime_ms - lastMagRead_ms > (uint32_t)frontend->_magFailTimeLimit_ms;
         if (fusionTimeout || sensorTimeout) {
             tryChangeCompass();
+        }
+        if (frontend->_core_try_compass_change == core_index) {
+            tryChangeCompass();
+            frontend->_core_try_compass_change.set_and_save(-1);
         }
     }
 

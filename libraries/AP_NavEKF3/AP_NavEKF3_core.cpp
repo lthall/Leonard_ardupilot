@@ -293,9 +293,12 @@ void NavEKF3_core::InitialiseVariables()
     sAccFilterState1 = 0.0f;
     sAccFilterState2 = 0.0f;
     lastGpsCheckTime_ms = 0;
-    lastInnovPassTime_ms = 0;
-    lastInnovFailTime_ms = 0;
+    lastGpsInnovPassTime_ms = 0;
+    lastGpsInnovFailTime_ms = 0;
+    lastGpsVertAccPassTime_ms = 0;
+    lastGpsVertAccFailTime_ms = 0;
     gpsAccuracyGood = false;
+    gpsAccuracyGoodForAltitude = false;
     gpsloc_prev = {};
     gpsDriftNE = 0.0f;
     gpsVertVelFilt = 0.0f;
@@ -2027,7 +2030,7 @@ void NavEKF3_core::calcEarthRateNED(Vector3F &omega, int32_t latitude) const
 // set yaw from a single magnetometer sample
 void NavEKF3_core::setYawFromMag()
 {
-    if (!use_compass()) {
+    if (!use_compass(dal.compass().get_first_usable())) {
         return;
     }
 
