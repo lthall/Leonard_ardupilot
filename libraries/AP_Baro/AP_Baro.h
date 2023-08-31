@@ -115,6 +115,9 @@ public:
     // pressure in Pascal
     float get_altitude_difference(float base_pressure, float pressure) const;
 
+    // returns true if the current altitude is too far from 0 to takeoff
+    bool is_far_from_takeoff_alt(uint8_t instance) const;
+
     // get scale factor required to convert equivalent to true airspeed
     float get_EAS2TAS(void);
 
@@ -289,6 +292,7 @@ private:
     void _probe_i2c_barometers(void);
     AP_Int8                            _filter_range;  // valid value range from mean value
     AP_Int32                           _baro_probe_ext;
+    AP_Float                           _max_takeoff_altitude_m;
 
     // semaphore for API access from threads
     HAL_Semaphore                      _rsem;

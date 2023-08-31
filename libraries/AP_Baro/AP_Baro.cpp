@@ -223,6 +223,14 @@ const AP_Param::GroupInfo AP_Baro::var_info[] = {
 #endif
 #endif
 
+    // @Param: MAX_ALT_TH
+    // @DisplayName: Takeoff altitude threshold.
+    // @Description: If the altitude difference is above this threshold arming should fail.
+    // @Units: m
+    // @Range: 0 100
+    // @Increment: 0.01
+    AP_GROUPINFO("_MAX_ALT_TH", 21, AP_Baro, _max_takeoff_altitude_m, 2),
+
     AP_GROUPEND
 };
 
@@ -494,6 +502,11 @@ float AP_Baro::get_external_temperature(const uint8_t instance) const
     return MIN(get_temperature(instance), INTERNAL_TEMPERATURE_CLAMP);
 }
 
+
+bool AP_Baro::is_far_from_takeoff_alt(uint8_t instance) const
+{
+    return fabsf(sensors[instance].altitude) > _max_takeoff_altitude_m;
+}
 
 bool AP_Baro::_add_backend(AP_Baro_Backend *backend)
 {
