@@ -149,6 +149,11 @@ void AP_Compass_SITL::_timer()
             // frozen compass
             accumulate_sample(_last_data[i], _compass_instance[i], 10);
             break;
+        case 3:
+            // scale by some large number for getting higher values than expected (or reasonable) mag field values
+            Vector3f scaled_mag_data = f * 40;
+            accumulate_sample(scaled_mag_data, _compass_instance[i], 10);
+            break;
         }
     }
 }

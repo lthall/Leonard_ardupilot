@@ -59,6 +59,11 @@ extern const AP_HAL::HAL& hal;
 #define HAL_COMPASS_AUTO_ROT_DEFAULT 2
 #endif
 
+#define AP_COMPASS_MAGFIELD_MIN  185     // 0.35 * 530 milligauss
+#define AP_COMPASS_MAGFIELD_MAX  875     // 1.65 * 530 milligauss
+
+#define AP_COMPASS_DEBUG_MESSAGE_RATE_MS 5000
+
 const AP_Param::GroupInfo Compass::var_info[] = {
     // index 0 was used for the old orientation matrix
 
@@ -662,6 +667,25 @@ const AP_Param::GroupInfo Compass::var_info[] = {
     // @RebootRequired: True
     // @User: Advanced
     AP_GROUPINFO("CUS_YAW", 51, Compass, _custom_yaw, 0),
+
+    // @Param: MAX_XYZ
+    // @DisplayName: Compass maximum xyz angle diff
+    // @Description: Compass maximum xyz angle diff for compass calibration fitness and consistency checks. zero for disabling the check.
+    // @User: Advanced
+    AP_GROUPINFO("MAX_XYZ", 52, Compass, _max_xyz_ang_diff, 0.0f),
+
+    // @Param: MAX_XY_A
+    // @DisplayName: Compass maximum xy angle diff
+    // @Description: Compass maximum xy angle diff for compass calibration fitness and consistency checks. zero for disabling the check.
+    // @User: Advanced
+    AP_GROUPINFO("MAX_XY_A", 53, Compass, _max_xy_ang_diff, 0.0f),
+
+    // @Param: MAX_XY_L
+    // @DisplayName: Compass maximum xy length diff
+    // @Description: Compass maximum xy length diff for compass calibration fitness and consistency checks. zero for disabling the check.
+    // @User: Advanced
+    AP_GROUPINFO("MAX_XY_L", 54, Compass, _max_xy_len_diff, 0.0f),
+    
 #endif
     AP_GROUPEND
 };
@@ -1831,15 +1855,18 @@ bool Compass::configured(uint8_t i)
         return false;
     }
 
+    StateIndex id = _get_state_id(Priority(i));
+
     // exit immediately if all offsets are zero
     if (is_zero(get_offsets(i).length())) {
+        _state[id].configured = false;
         return false;
     }
 
-    StateIndex id = _get_state_id(Priority(i));
     // exit immediately if dev_id hasn't been detected
     if (_state[id].detected_dev_id == 0 || 
         id == COMPASS_MAX_INSTANCES) {
+        _state[id].configured = false;
         return false;
     }
 
@@ -1862,10 +1889,12 @@ bool Compass::configured(uint8_t i)
         // restore cached value
         _state[id].dev_id = dev_id_cache_value;
         // return failure
+        _state[id].configured = false;
         return false;
     }
 
     // if we got here then it must be configured
+    _state[id].configured = true;
     return true;
 }
 
@@ -1920,8 +1949,11 @@ void Compass::motor_compensation_type(const uint8_t comp_type)
     }
 }
 
-bool Compass::consistent() const
+bool Compass::consistent(bool use_const_thresholds) const
 {
+    static uint32_t last_debug_message_ms = 0;
+    const uint32_t now = AP_HAL::millis();
+
     const Vector3f &primary_mag_field = get_field();
     const Vector2f primary_mag_field_xy = Vector2f(primary_mag_field.x,primary_mag_field.y);
 
@@ -1955,16 +1987,43 @@ bool Compass::consistent() const
 
         // check for gross misalignment on all axes
         if (xyz_ang_diff > AP_COMPASS_MAX_XYZ_ANG_DIFF) {
+            if ((now - last_debug_message_ms) > AP_COMPASS_DEBUG_MESSAGE_RATE_MS) {
+                GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "xyz_ang_diff = %f", degrees(xyz_ang_diff));
+                last_debug_message_ms = now;
+            }
+            if (use_const_thresholds) {
+                return false;
+            }
+        }
+        if ((!is_zero(_max_xyz_ang_diff)) && (xyz_ang_diff > radians(_max_xyz_ang_diff))) {
             return false;
         }
 
         // check for an unacceptable angle difference on the xy plane
         if (xy_ang_diff > AP_COMPASS_MAX_XY_ANG_DIFF) {
+            if (((now - last_debug_message_ms) > AP_COMPASS_DEBUG_MESSAGE_RATE_MS)) {
+                GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "xy_ang_diff = %f", degrees(xy_ang_diff));
+                last_debug_message_ms = now;
+            }
+            if (use_const_thresholds) {
+                return false;
+            }
+        }
+        if ((!is_zero(_max_xy_ang_diff)) && (xy_ang_diff > radians(_max_xy_ang_diff))) {
             return false;
         }
 
         // check for an unacceptable length difference on the xy plane
         if (xy_len_diff > AP_COMPASS_MAX_XY_LENGTH_DIFF) {
+            if (((now - last_debug_message_ms) > AP_COMPASS_DEBUG_MESSAGE_RATE_MS)) {
+                GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "xy_len_diff = %f", xy_len_diff);
+                last_debug_message_ms = now;
+            }
+            if (use_const_thresholds) {
+                return false;
+            }
+        }
+        if ((!is_zero(_max_xy_len_diff)) && (xy_len_diff > _max_xy_len_diff)) {
             return false;
         }
     }
@@ -2028,6 +2087,84 @@ void Compass::force_save_calibration(void)
     }
 }
 
+bool Compass::compass_checks(uint8_t i) const
+{
+    static bool last_result = true;
+
+    // check if compass is calibrating
+    if (is_calibrating()) {
+        if (last_result) {
+            GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Compass calibration running");
+        }
+        last_result = false;
+        return false;
+    }
+
+    // check if compass has calibrated and requires reboot
+    if (compass_cal_requires_reboot()) {
+        if (last_result) {
+            GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Compass calibrated requires reboot");
+        }
+        last_result = false;
+        return false;
+    }
+
+    if (!use_for_yaw(i)) {
+        if (last_result) {
+            GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Compass %u use is disabled", i);
+        }
+        last_result = false;
+        return true;
+    }
+
+    if (!healthy(i)) {
+        if (last_result) {
+            GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Compass %u not healthy", i);
+        }
+        last_result = false;
+        return false;
+    }
+    // check compass learning is on or offsets have been set
+    if ((!learn_offsets_enabled()) && !is_configured(i)) {
+        if (last_result) {
+            GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Compass %u not calibrated", i);
+        }
+        last_result = false;
+        return false;
+    }
+
+    // check for unreasonable compass offsets
+    const Vector3f offsets = get_offsets(i);
+    if (offsets.length() > get_offsets_max()) {
+        if (last_result) {
+            GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Compass %u offsets too high", i);
+        }
+        last_result = false;
+        return false;
+    }
+
+    // check for unreasonable mag field length
+    const float mag_field = get_field(i).length();
+    if (mag_field > AP_COMPASS_MAGFIELD_MAX || mag_field < AP_COMPASS_MAGFIELD_MIN) {
+        if (last_result) {
+            GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Check mag %u field", i);
+        }
+        last_result = false;
+        return false;
+    }
+
+    // check all compasses point in roughly same direction
+    if ((get_first_usable() != i) && (!consistent(false))) {
+        if (last_result) {
+            GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Compasses inconsistent");
+        }
+        last_result = false;
+        return false;
+    }
+
+    last_result = true;
+    return true;
+}
 
 // singleton instance
 Compass *Compass::_singleton;

@@ -3,6 +3,7 @@
 #include <inttypes.h>
 
 #include <AP_Common/AP_Common.h>
+#include <AP_Common/Bitmask.h>
 #include <AP_Declination/AP_Declination.h>
 #include <AP_HAL/AP_HAL.h>
 #include <AP_Math/AP_Math.h>
@@ -52,18 +53,18 @@
 #ifndef HAL_BUILD_AP_PERIPH
 #ifndef HAL_COMPASS_MAX_SENSORS
 #define HAL_COMPASS_MAX_SENSORS 3
-#endif
+#endif  /* HAL_COMPASS_MAX_SENSORS */
 #if HAL_COMPASS_MAX_SENSORS > 1
 #define COMPASS_MAX_UNREG_DEV 5
-#else
+#else   /* HAL_COMPASS_MAX_SENSORS > 1 */
 #define COMPASS_MAX_UNREG_DEV 0
-#endif
-#else
+#endif  /* HAL_COMPASS_MAX_SENSORS > 1 */
+#else   /* HAL_BUILD_AP_PERIPH */
 #ifndef HAL_COMPASS_MAX_SENSORS
 #define HAL_COMPASS_MAX_SENSORS 1
-#endif
+#endif  /* HAL_COMPASS_MAX_SENSORS */
 #define COMPASS_MAX_UNREG_DEV 0
-#endif
+#endif  /* HAL_BUILD_AP_PERIPH */
 
 #define COMPASS_MAX_INSTANCES HAL_COMPASS_MAX_SENSORS
 #define COMPASS_MAX_BACKEND   HAL_COMPASS_MAX_SENSORS
@@ -73,6 +74,8 @@
 #ifndef AP_SIM_COMPASS_ENABLED
 #define AP_SIM_COMPASS_ENABLED (CONFIG_HAL_BOARD == HAL_BOARD_SITL)
 #endif
+#define MAX_CORES_FOR_PERMANENTLY_UNHEALTHY_COMPASS 8
+#define MIN_CORES_FOR_PERMANENTLY_UNHEALTHY_COMPASS 2
 
 #include "CompassCalibrator.h"
 
@@ -199,12 +202,14 @@ public:
     bool send_mag_cal_report(const class GCS_MAVLINK& link);
 
     // check if the compasses are pointing in the same direction
-    bool consistent() const;
+    bool consistent(bool use_const_thresholds) const;
 
     /// Return the health of a compass
-    bool healthy(uint8_t i) const { return _get_state(Priority(i)).healthy; }
+    bool healthy(uint8_t i) const { return _get_state(Priority(i)).permanently_unhealthy_by_core.count() >= MIN_CORES_FOR_PERMANENTLY_UNHEALTHY_COMPASS ? false : _get_state(Priority(i)).healthy; }
     bool healthy(void) const { return healthy(_first_usable); }
     uint8_t get_healthy_mask() const;
+
+    void set_permanently_unhealthy(uint8_t mag_index, uint8_t core_index) { _state[_get_state_id(Priority(mag_index))].permanently_unhealthy_by_core.set(core_index); }
 
     /// Returns the current offset values
     ///
@@ -298,6 +303,8 @@ public:
     ///
     bool configured(uint8_t i);
     bool configured(char *failure_msg, uint8_t failure_msg_len);
+    bool is_configured(uint8_t i) const { return _get_state(Priority(i)).configured; }  // just return if it's configured or not without changing anything
+
 
     // return last update time in microseconds
     uint32_t last_update_usec(void) const { return last_update_usec(_first_usable); }
@@ -335,6 +342,8 @@ public:
     }
 
     uint8_t get_filter_range() const { return uint8_t(_filter_range.get()); }
+
+    bool compass_checks(uint8_t i) const;
 
     /*
       fast compass calibration given vehicle position and yaw
@@ -489,6 +498,7 @@ private:
     struct mag_state {
         AP_Int8     external;
         bool        healthy;
+        bool        configured;     // True if the compasses have been configured (i.e. offsets saved)
         bool        registered;
         Compass::Priority priority;
         AP_Int8     orientation;
@@ -496,6 +506,9 @@ private:
         AP_Vector3f diagonals;
         AP_Vector3f offdiagonals;
         AP_Float    scale_factor;
+
+        // when true, the compass is set to be permanently unhealthy and will not change until reboot
+        Bitmask<MAX_CORES_FOR_PERMANENTLY_UNHEALTHY_COMPASS> permanently_unhealthy_by_core;
 
         // device id detected at init.
         // saved to eeprom when offsets are saved allowing ram &
@@ -571,6 +584,10 @@ private:
         CAL_REQUIRE_GPS = (1U<<0),
     };
     AP_Int16 _options;
+
+    AP_Float _max_xyz_ang_diff;
+    AP_Float _max_xy_ang_diff;
+    AP_Float _max_xy_len_diff;
 
 #if COMPASS_CAL_ENABLED
     RestrictIDTypeArray<CompassCalibrator*, COMPASS_MAX_INSTANCES, Priority> _calibrator;
