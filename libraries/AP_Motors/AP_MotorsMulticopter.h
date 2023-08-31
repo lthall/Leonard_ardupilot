@@ -24,6 +24,8 @@
 #define AP_MOTORS_BATT_VOLT_FILT_HZ     0.5f    // battery voltage filtered at 0.5hz
 #define AP_MOTORS_SLEW_TIME_DEFAULT     0.0f    // slew rate limit for thrust output
 #define AP_MOTORS_SAFE_TIME_DEFAULT     1.0f    // Time for the esc when transitioning between zero pwm to minimum
+#define AP_MOTORS_MAX_POWER_DIFF_PCT    15.0f   // Maximum power difference allowed between motors
+#define AP_MOTORS_MAX_POWER_DIFF_MS     250     // Time (in ms) before power diff warning
 
 // spool definition
 #define AP_MOTORS_SPOOL_UP_TIME_DEFAULT 0.5f    // time (in seconds) for throttle to increase from zero to min throttle, and min throttle to full throttle.
@@ -50,6 +52,11 @@ public:
     // update estimated throttle required to hover
     void                update_throttle_hover(float dt);
     virtual float       get_throttle_hover() const override { return constrain_float(_throttle_hover, AP_MOTORS_THST_HOVER_MIN, AP_MOTORS_THST_HOVER_MAX); }
+
+    virtual float       get_power_diff() const override;
+
+    // get_motor_output_value - get power (in percent) per motor - for logging purposes only
+    virtual float get_motor_output_value(uint8_t motor_num) const override { return ((motor_num < AP_MOTORS_MAX_NUM_MOTORS) ? _actuator[motor_num] : -1.0); };
 
     // passes throttle directly to all motors for ESC calibration.
     //   throttle_input is in the range of 0 ~ 1 where 0 will send get_pwm_output_min() and 1 will send get_pwm_output_max()
@@ -113,6 +120,9 @@ protected:
     // output_to_motors - sends commands to the motors
     virtual void        output_to_motors() = 0;
 
+    // check_motors_span - check for a large power diff between motors and warn if needed
+    void                check_motors_span();
+
     // update the throttle input filter
     virtual void        update_throttle_filter() override;
 
@@ -164,6 +174,10 @@ protected:
     AP_Float            _slew_up_time;          // throttle increase slew limitting
     AP_Float            _slew_dn_time;          // throttle decrease slew limitting
     AP_Float            _safe_time;             // Time for the esc when transitioning between zero pwm to minimum
+    AP_Float            _max_power_diff_pct;    // Maximum allowed power difference between motors
+    AP_Int16            _max_power_diff_ms;     // Time (in ms) before power diff warning
+    AP_Int16            _power_diff_max_roll_pitch; // Maximum roll/pitch (in degrees) for checking power diff. beyond that value we ignore large power diffs.
+    AP_Int16            _power_diff_max_yaw_rate;   // Maximum yaw rate (in degrees/second) for checking power diff. beyond that value we ignore large power diffs.
     AP_Float            _spin_min;              // throttle out ratio which produces the minimum thrust.  (i.e. 0 ~ 1 ) of the full throttle range
     AP_Float            _spin_max;              // throttle out ratio which produces the maximum thrust.  (i.e. 0 ~ 1 ) of the full throttle range
     AP_Float            _spin_arm;              // throttle out ratio which produces the armed spin rate.  (i.e. 0 ~ 1 ) of the full throttle range
@@ -177,6 +191,8 @@ protected:
     AP_Float            _throttle_hover;        // estimated throttle required to hover throttle in the range 0 ~ 1
     AP_Int8             _throttle_hover_learn;  // enable/disabled hover thrust learning
     AP_Int8             _disarm_disable_pwm;    // disable PWM output while disarmed
+    AP_Int8             _scaled_motor_power_index;  // scaling motor power index
+    AP_Float            _scaled_motor_power_factor; // scaling factor for the motor power, by it's index
 
     // Maximum lean angle of yaw servo in degrees. This is specific to tricopter
     AP_Float            _yaw_servo_angle_max_deg;

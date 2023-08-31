@@ -140,6 +140,21 @@ void AP_MotorsMatrix::set_frame_class_and_type(motor_frame_class frame_class, mo
 
 }
 
+void AP_MotorsMatrix::set_lost_motor(uint8_t motor_lost_index)
+{ 
+    AP_Motors *motors = AP_Motors::get_singleton();
+    if (!motors) {
+        return;
+    }
+    if ((!motors->armed()) || (AP_Notify::flags.in_arming_delay)) {
+        return;
+    }
+    if (!AP::vehicle()->get_motor_failure()) {
+        _motor_lost_index = motor_lost_index;
+    }
+    AP::motors()->set_thrust_boost(true);
+}
+
 void AP_MotorsMatrix::output_to_motors()
 {
     int8_t i;
@@ -177,6 +192,10 @@ void AP_MotorsMatrix::output_to_motors()
     // convert output to PWM and send to each motor
     for (i = 0; i < AP_MOTORS_MAX_NUM_MOTORS; i++) {
         if (motor_enabled[i]) {
+            if ((_scaled_motor_power_index >= 0) && (i == _scaled_motor_power_index)) { // scale one motor power by factor
+                rc_write(i, output_to_pwm(_actuator[i] * _scaled_motor_power_factor));
+                continue;
+            }
             rc_write(i, output_to_pwm(_actuator[i]));
         }
     }
@@ -453,7 +472,7 @@ void AP_MotorsMatrix::check_for_failed_motor(float throttle_thrust_best_plus_adj
 
     // check to see if thrust boost is using more throttle than _throttle_thrust_max
     if ((_throttle_thrust_max * get_compensation_gain() > throttle_thrust_best_plus_adj) && (rpyt_high < 0.9f) && _thrust_balanced) {
-        _thrust_boost = false;
+        set_thrust_boost(false);
     }
 }
 
@@ -580,6 +599,14 @@ void AP_MotorsMatrix::setup_motors(motor_frame_class frame_class, motor_frame_ty
     bool success = true;
 
     switch (frame_class) {
+#ifdef FTS
+        case MOTOR_FRAME_FTS:
+            success = true;
+            _mav_type = MAV_TYPE_FTS;
+            _frame_type_string = "FTS";
+            break;
+#endif      
+
 #if AP_MOTORS_FRAME_QUAD_ENABLED
         case MOTOR_FRAME_QUAD:
             _frame_class_string = "QUAD";
@@ -1212,6 +1239,7 @@ void AP_MotorsMatrix::setup_motors(motor_frame_class frame_class, motor_frame_ty
             }
             break;
 #endif //AP_MOTORS_FRAME_DECA_ENABLED
+        
         default:
             // matrix doesn't support the configured class
             _frame_class_string = "UNSUPPORTED";

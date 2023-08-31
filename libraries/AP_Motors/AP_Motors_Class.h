@@ -74,6 +74,7 @@ public:
         MOTOR_FRAME_SCRIPTING_MATRIX = 15,
         MOTOR_FRAME_6DOF_SCRIPTING = 16,
         MOTOR_FRAME_DYNAMIC_SCRIPTING_MATRIX = 17,
+        MOTOR_FRAME_FTS = 18,
     };
 
     // return string corresponding to frame_class
@@ -148,15 +149,18 @@ public:
     float               get_yaw_ff() const { return _yaw_in_ff; }
     float               get_throttle_out() const { return _throttle_out; }
     float               get_throttle() const { return constrain_float(_throttle_filter.get(), 0.0f, 1.0f); }
+    virtual float       get_power_diff() const = 0;
     float               get_throttle_bidirectional() const { return constrain_float(2 * (_throttle_filter.get() - 0.5f), -1.0f, 1.0f); }
     float               get_forward() const { return _forward_in; }
     float               get_lateral() const { return _lateral_in; }
     virtual float       get_throttle_hover() const = 0;
+    virtual float       get_motor_output_value(uint8_t motor_num) const = 0;
 
     // motor failure handling
-    void                set_thrust_boost(bool enable) { _thrust_boost = enable; }
+    void                set_thrust_boost(bool enable);
     bool                get_thrust_boost() const { return _thrust_boost; }
     virtual uint8_t     get_lost_motor() const { return 0; }
+    virtual void        set_lost_motor(uint8_t motor_lost_index) { return; }
 
     // desired spool states
     enum class DesiredSpoolState : uint8_t {

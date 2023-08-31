@@ -17,6 +17,8 @@
 #include <AP_HAL/AP_HAL.h>
 #include <AP_BattMonitor/AP_BattMonitor.h>
 #include <AP_Logger/AP_Logger.h>
+#include <AP_AHRS/AP_AHRS.h>
+#include <GCS_MAVLink/GCS.h>
 
 extern const AP_HAL::HAL& hal;
 
@@ -207,8 +209,51 @@ const AP_Param::GroupInfo AP_MotorsMulticopter::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("SAFE_TIME", 42, AP_MotorsMulticopter, _safe_time, AP_MOTORS_SAFE_TIME_DEFAULT),
 
+    // @Param: PWR_DFF_PCT
+    // @DisplayName: Maximum allowed power difference between motors.
+    // @Description: Maximum allowed power difference between motors.
+    // @Range: 0 100
+    // @Units: %
+    // @User: Advanced
+    AP_GROUPINFO("PWR_DFF_PCT", 43, AP_MotorsMulticopter, _max_power_diff_pct, AP_MOTORS_MAX_POWER_DIFF_PCT),
+
+    // @Param: PWR_DFF_MS
+    // @DisplayName: Time (in ms) before power diff warning.
+    // @Description: Time (in ms) before power diff warning.
+    // @Range: 50 5000
+    // @Units: ms
+    // @User: Advanced
+    AP_GROUPINFO("PWR_DFF_MS", 44, AP_MotorsMulticopter, _max_power_diff_ms, AP_MOTORS_MAX_POWER_DIFF_MS),
+
+    // @Param: SCLPOW_IDX
+    // @DisplayName: Scaled motor power index (-1 for Disabling).
+    // @Description: Scaled motor power index (-1 for Disabling).
+    // @Range: -1 11
+    // @User: Advanced
+    AP_GROUPINFO("SCLPOW_IDX", 45, AP_MotorsMulticopter, _scaled_motor_power_index, -1),
+
+    // @Param: SCLPOW_FAC
+    // @DisplayName: Scaled motor power factor.
+    // @Description: Scaled motor power factor.
+    // @User: Advanced
+    AP_GROUPINFO("SCLPOW_FAC", 46, AP_MotorsMulticopter, _scaled_motor_power_factor, 1.0),
+
+    // @Param: PWR_DFF_RP
+    // @DisplayName: Maximum roll/pitch (in degrees) for checking power diff. beyond that value we ignore large power diffs.
+    // @Description: Maximum roll/pitch (in degrees) for checking power diff. beyond that value we ignore large power diffs.
+    // @User: Advanced
+    AP_GROUPINFO("PWR_DFF_RP", 47, AP_MotorsMulticopter, _power_diff_max_roll_pitch, 10),
+
+    // @Param: PWR_DFF_Y
+    // @DisplayName: Maximum yaw rate (in degrees/second) for checking power diff. beyond that value we ignore large power diffs.
+    // @Description: Maximum yaw rate (in degrees/second) for checking power diff. beyond that value we ignore large power diffs.
+    // @User: Advanced
+    AP_GROUPINFO("PWR_DFF_Y", 48, AP_MotorsMulticopter, _power_diff_max_yaw_rate, 35),
+
     AP_GROUPEND
 };
+
+#define MIN_TIME_BETWEEN_POWER_DIFF_WARNINGS 5000
 
 // Constructor
 AP_MotorsMulticopter::AP_MotorsMulticopter(uint16_t loop_rate, uint16_t speed_hz) :
@@ -245,12 +290,46 @@ void AP_MotorsMulticopter::output()
     // convert rpy_thrust values to pwm
     output_to_motors();
 
+    check_motors_span();
+
     // output any booster throttle
     output_boost_throttle();
 
     // output raw roll/pitch/yaw/thrust
     output_rpyt();
 };
+
+void AP_MotorsMulticopter::check_motors_span()
+{
+    static uint32_t power_diff_time = 0;
+    static uint32_t last_warning = 0;
+
+    uint32_t time = AP_HAL::millis();
+
+    const AP_AHRS &ahrs = AP::ahrs();
+    const int32_t yaw_rate = labs(roundf(ToDeg(ahrs.get_yaw_rate_earth())));
+    const int32_t pitch = labs(roundf(ahrs.pitch_sensor / 100.0)); // attitude pitch in degrees
+    const int32_t roll = labs(roundf(ahrs.roll_sensor / 100.0));   // attitude roll in degrees
+
+    if ((roll >= _power_diff_max_roll_pitch) || (pitch >= _power_diff_max_roll_pitch) || (yaw_rate >= _power_diff_max_yaw_rate)) {
+        // We skip this test if our angle in one of the axes is higher than 10deg
+        power_diff_time = 0;
+        return;
+    }
+
+    float power_diff = get_power_diff() * 100;
+    if (power_diff > _max_power_diff_pct) {
+        if (power_diff_time == 0) {
+            power_diff_time = time;
+        }
+        if (((time - power_diff_time) >= (uint32_t)_max_power_diff_ms) && (time - last_warning > MIN_TIME_BETWEEN_POWER_DIFF_WARNINGS)) {
+            last_warning = time;
+            GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "High power diff between motors (%u%% %lums)", (uint16_t)power_diff, (unsigned long)(time - power_diff_time));
+        }
+    } else {
+        power_diff_time = 0;
+    }
+}
 
 // output booster throttle, if any
 void AP_MotorsMulticopter::output_boost_throttle(void)
@@ -579,7 +658,7 @@ void AP_MotorsMulticopter::output_logic()
         _throttle_thrust_max = 0.0f;
 
         // initialise motor failure variables
-        _thrust_boost = false;
+        set_thrust_boost(false);
         _thrust_boost_ratio = 0.0f;
         break;
 
@@ -660,7 +739,7 @@ void AP_MotorsMulticopter::output_logic()
         }
 
         // initialise motor failure variables
-        _thrust_boost = false;
+        set_thrust_boost(false);
         _thrust_boost_ratio = MAX(0.0, _thrust_boost_ratio - 1.0 / (_spool_up_time * _loop_rate));
         break;
 
@@ -771,6 +850,28 @@ void AP_MotorsMulticopter::output_motor_mask(float thrust, uint8_t mask, float r
             }
         }
     }
+}
+
+float AP_MotorsMulticopter::get_power_diff() const
+{
+    float min_power = FLT_MAX;
+    bool min_set = false;
+    float max_power = FLT_MIN;
+    bool max_set = false;
+    for (uint8_t i = 1; i < AP_MOTORS_MAX_NUM_MOTORS; i++) {
+        if (motor_enabled[i]) {
+            float power = _actuator[i];
+            if (power < min_power) {
+                min_power = power;
+                min_set = true;
+            }
+            if (power > max_power) {
+                max_power = power;
+                max_set = true;
+            }
+        }
+    }    
+    return (min_set && max_set) ? max_power - min_power : 0;
 }
 
 // get_motor_mask - returns a bitmask of which outputs are being used for motors (1 means being used)

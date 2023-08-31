@@ -17,6 +17,7 @@
 #include <AP_HAL/AP_HAL.h>
 #include <SRV_Channel/SRV_Channel.h>
 #include <GCS_MAVLink/GCS.h>
+#include <AP_Vehicle/AP_Vehicle.h>
 
 extern const AP_HAL::HAL& hal;
 
@@ -44,7 +45,7 @@ AP_Motors::AP_Motors(uint16_t loop_rate, uint16_t speed_hz) :
     limit.yaw = true;
     limit.throttle_lower = true;
     limit.throttle_upper = true;
-    _thrust_boost = false;
+    set_thrust_boost(false);
     _thrust_balanced = true;
 };
 
@@ -265,6 +266,14 @@ void AP_Motors::output_test_seq(uint8_t motor_seq, int16_t pwm)
     if (armed() && _interlock) {
         _output_test_seq(motor_seq, pwm);
     }
+}
+
+void AP_Motors::set_thrust_boost(bool enable)
+{
+    if (AP::vehicle()->get_motor_failure() && !enable) {
+        return;  // disabling thrust boost is forbidden while we have a motor failure
+    }
+    _thrust_boost = enable;
 }
 
 namespace AP {
