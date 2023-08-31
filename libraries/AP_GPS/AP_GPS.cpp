@@ -53,6 +53,10 @@
 #define GPS_BAUD_TIME_MS 1200
 #define GPS_TIMEOUT_MS 4000u
 
+#define MAX_ALLOWED_RTK_RETRIES 3
+#define RTK_ACK_TIMEOUT_MS 200
+#define RTK_BUFFER_QUEUE_MAX_MESSAGES 10
+
 // defines used to specify the mask position for use of different accuracy metrics in the blending algorithm
 #define BLEND_MASK_USE_HPOS_ACC     1
 #define BLEND_MASK_USE_VPOS_ACC     2
@@ -62,6 +66,8 @@
 #ifndef HAL_GPS_COM_PORT_DEFAULT
 #define HAL_GPS_COM_PORT_DEFAULT 1
 #endif
+
+#define RTK_FRAGMENT_SIZE 240
 
 extern const AP_HAL::HAL &hal;
 
@@ -387,6 +393,53 @@ const AP_Param::GroupInfo AP_GPS::var_info[] = {
 #endif // GPS_MAX_RECEIVERS > 1
 #endif // HAL_ENABLE_LIBUAVCAN_DRIVERS
 
+#if GPS_MAX_RECEIVERS > 1
+    // @Param: _MAX_DIFF_XY
+    // @DisplayName: Maximum allowed horizontal location distance (in meters) between two GPS devices, during arming checks
+    // @Description: Maximum allowed horizontal location distance (in meters) between two GPS devices, during arming checks.
+    // @Increment: 0.1
+    // @User: Advanced
+    AP_GROUPINFO("_MAX_DIFF_XY", 32, AP_GPS, _max_allowed_diff_xy, 4),
+
+    // @Param: _MAX_DIFF_Z
+    // @DisplayName: Maximum allowed vertical location distance (in meters) between two GPS devices, during arming checks
+    // @Description: Maximum allowed vertical location distance (in meters) between two GPS devices, during arming checks.
+    // @Increment: 0.1
+    // @User: Advanced
+    AP_GROUPINFO("_MAX_DIFF_Z", 33, AP_GPS, _max_allowed_diff_z, 10),
+#endif
+
+    // @Param: _FORCE_CHECK
+    // @DisplayName: Force perform all GPS arming checks even if not in not in mode that requires GPS.
+    // @Description: Force perform all GPS arming checks even if not in not in mode that requires GPS. 1 for forcing checks, 0 for performing checks only in mode that requires GPS.
+    // @Values: 0:NotForced, 1:Forced
+    // @User: Advanced
+    AP_GROUPINFO("_FORCE_CHECK", 34, AP_GPS, _force_checks, 1),
+
+    // @Param: _ACC_TIM
+    // @DisplayName: Accuracy level timeout.
+    // @Description: The grace time period before declaring an accuracy level of a GPS device.
+    // @User: Advanced
+    AP_GROUPINFO("_ACC_TIM", 35, AP_GPS, _accuracy_level_timeout_ms, 2000),
+
+    // @Param: _ACC_RED
+    // @DisplayName: Reduced accuracy level threshold.
+    // @Description: The horizontal accuracy threshold, above it the accuracy level declared as reduced accuracy.
+    // @User: Advanced
+    AP_GROUPINFO("_ACC_RED", 36, AP_GPS, _accuracy_level_reduced_threshold, 0.1),
+
+    // @Param: _ACC_BAD
+    // @DisplayName: Bad accuracy level threshold.
+    // @Description: The horizontal accuracy threshold, above it the accuracy level declared as bad accuracy.
+    // @User: Advanced
+    AP_GROUPINFO("_ACC_BAD", 37, AP_GPS, _accuracy_level_bad_threshold, 3.0),
+
+    // @Param: _ACC_UNR
+    // @DisplayName: Unreliable accuracy level threshold.
+    // @Description: The horizontal accuracy threshold, above it the accuracy level declared as unreliable accuracy.
+    // @User: Advanced
+    AP_GROUPINFO("_ACC_UNR", 38, AP_GPS, _accuracy_level_unreliable_threshold, 10.0),
+
     AP_GROUPEND
 };
 
@@ -402,6 +455,8 @@ AP_GPS::AP_GPS()
         AP_HAL::panic("AP_GPS must be singleton");
     }
     _singleton = this;
+
+    rtk_tx_reset_state();
 }
 
 // return true if a specific type of GPS uses a UART
@@ -448,6 +503,8 @@ void AP_GPS::init(const AP_SerialManager& serial_manager)
     // prep the state instance fields
     for (uint8_t i = 0; i < GPS_MAX_INSTANCES; i++) {
         state[i].instance = i;
+        accuracy_level_state[i].start_ms[GPS_ACCURACY_LEVEL_UNRELIABLE] = 1;
+        accuracy_level_state[i].level = GPS_ACCURACY_LEVEL_UNRELIABLE;
     }
 
     // sanity check update rate
@@ -809,6 +866,56 @@ bool AP_GPS::should_log() const
 #endif
 }
 
+void AP_GPS::calculate_accuracy_level(uint8_t instance)
+{
+    uint32_t now = AP_HAL::millis();
+    if ((!state[instance].have_horizontal_accuracy) ||
+        is_zero(state[instance].horizontal_accuracy) ||
+        (state[instance].horizontal_accuracy >= _accuracy_level_unreliable_threshold)) {
+        if (accuracy_level_state[instance].start_ms[GPS_ACCURACY_LEVEL_UNRELIABLE] == 0) {
+            accuracy_level_state[instance].start_ms[GPS_ACCURACY_LEVEL_UNRELIABLE] = now;
+        }
+    } else {
+        accuracy_level_state[instance].start_ms[GPS_ACCURACY_LEVEL_UNRELIABLE] = 0;
+    }
+    if (state[instance].have_horizontal_accuracy &&
+        (!is_zero(state[instance].horizontal_accuracy)) &&
+        (state[instance].horizontal_accuracy <= _accuracy_level_reduced_threshold)) {
+        if (accuracy_level_state[instance].start_ms[GPS_ACCURACY_LEVEL_GOOD] == 0) {
+            accuracy_level_state[instance].start_ms[GPS_ACCURACY_LEVEL_GOOD] = now;
+        }
+    } else {
+        accuracy_level_state[instance].start_ms[GPS_ACCURACY_LEVEL_GOOD] = 0;
+    }
+    if (state[instance].have_horizontal_accuracy &&
+        (!is_zero(state[instance].horizontal_accuracy)) &&
+        (state[instance].horizontal_accuracy >= _accuracy_level_reduced_threshold)) {
+        if (accuracy_level_state[instance].start_ms[GPS_ACCURACY_LEVEL_REDUCED] == 0) {
+            accuracy_level_state[instance].start_ms[GPS_ACCURACY_LEVEL_REDUCED] = now;
+        }
+    } else {
+        accuracy_level_state[instance].start_ms[GPS_ACCURACY_LEVEL_REDUCED] = 0;
+    }
+    if (state[instance].have_horizontal_accuracy &&
+        (!is_zero(state[instance].horizontal_accuracy)) &&
+        (state[instance].horizontal_accuracy >= _accuracy_level_bad_threshold)) {
+        if (accuracy_level_state[instance].start_ms[GPS_ACCURACY_LEVEL_BAD] == 0) {
+            accuracy_level_state[instance].start_ms[GPS_ACCURACY_LEVEL_BAD] = now;
+        }
+    } else {
+        accuracy_level_state[instance].start_ms[GPS_ACCURACY_LEVEL_BAD] = 0;
+    }
+
+    for (GPS_ACCURACY_LEVEL accuracy_level = GPS_ACCURACY_LEVEL_UNRELIABLE; accuracy_level < GPS_ACCURACY_LEVEL_ENUM_END; accuracy_level = GPS_ACCURACY_LEVEL(accuracy_level - 1)) {
+        if (accuracy_level_state[instance].start_ms[accuracy_level] == 0) {
+            continue;
+        }
+        if ((now - accuracy_level_state[instance].start_ms[accuracy_level]) >= (uint32_t)_accuracy_level_timeout_ms) {
+            accuracy_level_state[instance].level = accuracy_level;
+            break;
+        }
+    }
+}
 
 /*
   update one GPS instance. This should be called at 10Hz or greater
@@ -844,6 +951,7 @@ void AP_GPS::update_instance(uint8_t instance)
 
     // we have an active driver for this instance
     bool result = drivers[instance]->read();
+    calculate_accuracy_level(instance);
     uint32_t tnow = AP_HAL::millis();
 
     // if we did not get a message, and the idle timer of 2 seconds
@@ -856,6 +964,8 @@ void AP_GPS::update_instance(uint8_t instance)
             state[instance].instance = instance;
             state[instance].hdop = GPS_UNKNOWN_DOP;
             state[instance].vdop = GPS_UNKNOWN_DOP;
+            accuracy_level_state[instance].start_ms[GPS_ACCURACY_LEVEL_UNRELIABLE] = 1;
+            accuracy_level_state[instance].level = GPS_ACCURACY_LEVEL_UNRELIABLE;
             timing[instance].last_message_time_ms = tnow;
             timing[instance].delta_time_ms = GPS_TIMEOUT_MS;
             // do not try to detect again if type is MAV or UAVCAN
@@ -999,6 +1109,23 @@ void AP_GPS::inject_MBL_data(uint8_t* data, uint16_t length)
 }
 #endif //#if GPS_MOVING_BASELINE
 
+GPS_ACCURACY_LEVEL AP_GPS::get_accuracy_level(void) const
+{
+    if ((accuracy_level_state[0].level == GPS_ACCURACY_LEVEL_GOOD) && (accuracy_level_state[1].level == GPS_ACCURACY_LEVEL_GOOD)) {
+        return GPS_ACCURACY_LEVEL_GOOD;
+    }
+    if ((accuracy_level_state[0].level <= GPS_ACCURACY_LEVEL_REDUCED) && (accuracy_level_state[1].level <= GPS_ACCURACY_LEVEL_REDUCED)) {
+        return GPS_ACCURACY_LEVEL_REDUCED;
+    }
+    if ((accuracy_level_state[0].level <= GPS_ACCURACY_LEVEL_REDUCED) || (accuracy_level_state[1].level <= GPS_ACCURACY_LEVEL_REDUCED)) {
+        return GPS_ACCURACY_LEVEL_PARTIAL;
+    }
+    if ((accuracy_level_state[0].level == GPS_ACCURACY_LEVEL_BAD) || (accuracy_level_state[1].level == GPS_ACCURACY_LEVEL_BAD)) {
+        return GPS_ACCURACY_LEVEL_BAD;
+    }
+    return GPS_ACCURACY_LEVEL_UNRELIABLE;
+}
+
 /*
   update all GPS instances
  */
@@ -1034,6 +1161,233 @@ void AP_GPS::update(void)
     AP_Notify::flags.gps_status = state[primary_instance].status;
     AP_Notify::flags.gps_num_sats = state[primary_instance].num_sats;
 #endif
+
+    rtk_tx_state_update();
+}
+
+void AP_GPS::rtk_tx_reset_state()
+{
+    for (uint8_t  i = 0; i < GPS_MAX_RECEIVERS; ++i) {
+        rtk_tx_status.receivers[i].acked = false;
+    }
+    rtk_tx_status.num_fragment_retries = 0;
+    rtk_tx_status.num_message_retries = 0;
+    rtk_tx_status.tx_state = RTK_SENDING_COUNT;
+    rtk_tx_status.last_sent_ms = 0;
+    rtk_tx_status.retry_message = false;
+    rtk_tx_status.retry_fragment = false;
+    rtk_tx_status.fragment_id = 0;
+}
+
+bool AP_GPS::send_rtk_count(uint32_t sequence_id, uint16_t total_length, uint32_t crc) {
+    bool ret = true;
+    for (uint8_t i = 0; i < GPS_MAX_RECEIVERS; i++) {
+        if (drivers[i] != nullptr) {
+            ret = drivers[i]->send_rtk_count(sequence_id, total_length, crc) && ret;
+        }
+    }
+    return ret;
+}
+
+bool AP_GPS::send_rtk_fragment(uint32_t sequence_id, uint8_t fragment_id, const uint8_t *data, uint8_t length) {
+    bool ret = true;
+    for (uint8_t i = 0; i < GPS_MAX_RECEIVERS; i++) {
+        if (drivers[i] != nullptr) {
+            ret = drivers[i]->send_rtk_fragment(sequence_id, fragment_id, data, length) && ret;
+        }
+    }
+    return ret;
+}
+
+void AP_GPS::rtk_tx_process_acks()
+{
+    uint8_t receivers_acked = 0;
+    for (uint8_t i = 0; i < GPS_MAX_RECEIVERS; ++i) {
+        if ((rtk_tx_status.tx_state == RTK_WAITING_FOR_COUNT_ACK || rtk_tx_status.tx_state == RTK_WAITING_FOR_FRAGMENT_ACK) 
+            && rtk_tx_status.receivers[i].acked) {
+            ++receivers_acked;
+        }
+    }
+
+    if (receivers_acked == num_instances) {
+        // all acks received for what we sent last
+        if (rtk_tx_status.tx_state == RTK_WAITING_FOR_COUNT_ACK) {
+            rtk_tx_status.tx_state = RTK_SENDING_FRAGMENT;
+            rtk_tx_status.fragment_id = 0;
+        } else if (rtk_tx_status.tx_state == RTK_WAITING_FOR_FRAGMENT_ACK) {
+            rtk_tx_status.fragment_id++;
+            rtk_tx_status.num_fragment_retries = 0;
+            rtk_tx_status.tx_state = RTK_SENDING_FRAGMENT;
+        } else {
+            // Should not happen, we have a message and no one is sending.
+            return;
+        }
+
+        for (uint8_t i = 0; i < GPS_MAX_RECEIVERS; ++i) {
+            rtk_tx_status.receivers[i].acked = false;
+        }
+    }
+}
+
+void AP_GPS::rtk_tx_retransmit_if_needed()
+{
+    // check if retransmit needed for last packet
+    bool retransmit_needed = false;
+    if (AP_HAL::millis() - rtk_tx_status.last_sent_ms > RTK_ACK_TIMEOUT_MS) {
+        retransmit_needed = true;
+    }
+
+    if (rtk_tx_status.retry_message) {
+        // A receiver signaled RTK_ERROR, we should retransmit the whole message
+        retransmit_needed = true;
+        rtk_tx_status.tx_state = RTK_SENDING_COUNT;
+        rtk_tx_status.fragment_id = 0;
+    }
+    if (rtk_tx_status.retry_fragment) {
+        retransmit_needed = true;
+    }
+
+    if (retransmit_needed) {
+        rtk_tx_status.retry_message = false;
+        rtk_tx_status.retry_fragment = false;
+        if (rtk_tx_status.tx_state == RTK_SENDING_COUNT || rtk_tx_status.tx_state == RTK_WAITING_FOR_COUNT_ACK) {
+            rtk_tx_status.num_message_retries++;
+            rtk_tx_status.tx_state = RTK_SENDING_COUNT;
+        } else if (rtk_tx_status.tx_state == RTK_SENDING_FRAGMENT || rtk_tx_status.tx_state == RTK_WAITING_FOR_FRAGMENT_ACK) {
+            rtk_tx_status.num_fragment_retries++;
+            rtk_tx_status.tx_state = RTK_SENDING_FRAGMENT;
+        }
+    }
+}
+
+void AP_GPS::rtk_tx_state_update()
+{
+    WITH_SEMAPHORE(rtk_tx_status.sem);
+
+    _rtk_tx_message current_message;
+    if (!rtk_tx_status.queue.peek(current_message)) {
+        return;  // nothing to send
+    }
+
+    rtk_tx_process_acks();
+
+    uint16_t num_fragments_in_message = (uint16_t)ceilF(current_message.total_length / (ftype)RTK_FRAGMENT_SIZE);
+    if (rtk_tx_status.fragment_id == num_fragments_in_message) {
+        // message is complete, we advanced to the one-after-last fragment
+        free(current_message.data);
+        rtk_tx_status.queue.pop();
+        rtk_tx_reset_state();
+        return;
+    }
+
+    const uint32_t now_ms = AP_HAL::millis();
+    if (rtk_tx_status.tx_state == RTK_SENDING_COUNT || rtk_tx_status.tx_state == RTK_SENDING_FRAGMENT) {
+        //send next packet
+        if (rtk_tx_status.tx_state == RTK_SENDING_COUNT) {
+            rtk_tx_status.sequence_id++;
+            if (!send_rtk_count(rtk_tx_status.sequence_id, current_message.total_length, current_message.crc)) {
+                GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Failed to send count seq=%" PRIu32 " frag=%hhu", rtk_tx_status.sequence_id, rtk_tx_status.fragment_id);
+                return;
+            }
+            rtk_tx_status.tx_state = RTK_WAITING_FOR_COUNT_ACK;
+        } else if (rtk_tx_status.tx_state == RTK_SENDING_FRAGMENT) {
+            const uint8_t fragment_length = (rtk_tx_status.fragment_id == num_fragments_in_message - 1) ?
+                                            (current_message.total_length - (RTK_FRAGMENT_SIZE * rtk_tx_status.fragment_id)) :
+                                            RTK_FRAGMENT_SIZE;
+            if (!send_rtk_fragment(rtk_tx_status.sequence_id, rtk_tx_status.fragment_id, current_message.data + (RTK_FRAGMENT_SIZE * rtk_tx_status.fragment_id), fragment_length)) {
+                GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Failed to send fragment seq=%" PRIu32 " frag=%hhu", rtk_tx_status.sequence_id, rtk_tx_status.fragment_id);
+                return;
+            }
+            rtk_tx_status.tx_state = RTK_WAITING_FOR_FRAGMENT_ACK;
+        }
+        rtk_tx_status.last_sent_ms = now_ms;
+        return;
+    }
+
+    rtk_tx_retransmit_if_needed();
+
+    if (rtk_tx_status.num_fragment_retries >= MAX_ALLOWED_RTK_RETRIES || rtk_tx_status.num_message_retries >= MAX_ALLOWED_RTK_RETRIES) {
+        GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "RTK: reached max retries %" PRIu32 " %hu", rtk_tx_status.sequence_id, current_message.total_length);
+        free(current_message.data);
+        rtk_tx_status.queue.pop();
+        rtk_tx_reset_state();
+        return;
+    }
+}
+
+bool AP_GPS::is_rtk_ack_valid(uint8_t instance, uint32_t sequence_id)
+{
+    if (instance >= GPS_MAX_RECEIVERS) {
+        GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "rtk ack from unknown gps %u", instance);
+        return false;
+    }
+    _rtk_tx_message current_message;
+    if (!rtk_tx_status.queue.peek(current_message)) {
+        GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "can't handle rtk fragment ack. no messages in queue.");
+        return false;
+    }
+    if (rtk_tx_status.tx_state != RTK_WAITING_FOR_COUNT_ACK && rtk_tx_status.tx_state != RTK_WAITING_FOR_FRAGMENT_ACK) {
+        return false;  // we're not currently waiting for any ack message. not necessarily an error.
+    }
+    if (sequence_id != rtk_tx_status.sequence_id) {
+        GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "RTK ack for wrong sequnce id (%" PRIu32 " vs %" PRIu32 ")", sequence_id, rtk_tx_status.sequence_id);
+        return false;
+    }
+    return true;
+}
+
+void AP_GPS::rtk_message_header_received(uint8_t instance, uint32_t sequence_id)
+{
+    WITH_SEMAPHORE(rtk_tx_status.sem);
+    if (!is_rtk_ack_valid(instance, sequence_id)) {
+        return;
+    }
+    rtk_tx_status.receivers[instance].acked = true;
+}
+
+void AP_GPS::rtk_message_accepted(uint8_t instance, uint32_t sequence_id)
+{
+    WITH_SEMAPHORE(rtk_tx_status.sem);
+    if (!is_rtk_ack_valid(instance, sequence_id)) {
+        return;
+    }
+    rtk_tx_status.receivers[instance].acked = true;
+}
+
+void AP_GPS::rtk_message_error(uint8_t instance, uint32_t sequence_id)
+{
+    WITH_SEMAPHORE(rtk_tx_status.sem);
+    if (!is_rtk_ack_valid(instance, sequence_id)) {
+        return;
+    }
+    rtk_tx_status.retry_message = true;
+    GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "RTK_ERROR from gps %u:%" PRIu32, instance, sequence_id);
+}
+
+void AP_GPS::rtk_fragment_accepted(uint8_t instance, uint32_t sequence_id, uint8_t fragment_id)
+{
+    WITH_SEMAPHORE(rtk_tx_status.sem);
+    if (!is_rtk_ack_valid(instance, sequence_id)) {
+        return;
+    }
+    if (rtk_tx_status.fragment_id != fragment_id) {
+        return;
+    }
+
+    rtk_tx_status.receivers[instance].acked = true;
+}
+
+void AP_GPS::rtk_fragment_error(uint8_t instance, uint32_t sequence_id, uint8_t fragment_id)
+{
+    WITH_SEMAPHORE(rtk_tx_status.sem);
+    if (!is_rtk_ack_valid(instance, sequence_id)) {
+        return;
+    }
+    if (rtk_tx_status.fragment_id != fragment_id) {
+        return;
+    }
+
+    rtk_tx_status.retry_fragment = true;
 }
 
 /*
@@ -1201,10 +1555,114 @@ void AP_GPS::handle_gps_inject(const mavlink_message_t &msg)
     handle_gps_rtcm_fragment(0, packet.data, packet.len);
 }
 
+void AP_GPS::handle_gps_rtk_count(mavlink_channel_t chan, const mavlink_message_t &msg)
+{
+    mavlink_gps_rtk_count_t packet;
+    mavlink_msg_gps_rtk_count_decode(&msg, &packet);
+
+    if (rtk_rx_buffer.data != nullptr) {
+        // New message before old message is completed. Probably previous ack on count wasn't received.
+        free(rtk_rx_buffer.data);
+        rtk_rx_buffer.data = nullptr;
+    }
+
+    if (packet.total_length > (MAVLINK_MSG_GPS_RTK_DATA_FIELD_DATA_LEN * UINT8_MAX)) {
+        GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "RTK message total_length is too large");
+        mavlink_msg_gps_rtk_ack_send(chan, packet.sequence_id, 0, MAV_GPS_RTK_ERROR);
+        return;
+    }
+
+    if (num_instances == 0) {
+        GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "no GPS instances detected. can't send RTK message.");
+        mavlink_msg_gps_rtk_ack_send(chan, packet.sequence_id, 0, MAV_GPS_RTK_ERROR);
+        return;
+    }
+
+    if ((rtk_rx_buffer.total_length == packet.total_length) && (rtk_rx_buffer.sequence_id + 1 == packet.sequence_id) &&
+        (rtk_rx_buffer.crc == packet.crc) && rtk_rx_buffer.recieved_successfully) {
+        // New message is (probably) the same as previous accepted message, act as if it was accepted
+        rtk_rx_buffer.sequence_id = packet.sequence_id;
+        mavlink_msg_gps_rtk_ack_send(chan, packet.sequence_id, 0, MAV_GPS_RTK_ACCEPTED);
+        return;
+    }
+
+    rtk_rx_buffer.data = (uint8_t *)calloc(packet.total_length, sizeof(*rtk_rx_buffer.data));
+    if (rtk_rx_buffer.data == nullptr) {
+        // nothing to do but discard the data
+        GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "RTK buffer allocation error");
+        mavlink_msg_gps_rtk_ack_send(chan, packet.sequence_id, 0, MAV_GPS_RTK_ERROR);
+        return;
+    }
+    rtk_rx_buffer.sequence_id = packet.sequence_id;
+    rtk_rx_buffer.recieved_successfully = false;
+    rtk_rx_buffer.total_length = packet.total_length;
+    rtk_rx_buffer.crc = packet.crc;
+    rtk_rx_buffer.total_fragments = (uint16_t)ceilF(rtk_rx_buffer.total_length / (ftype)MAVLINK_MSG_GPS_RTK_DATA_FIELD_DATA_LEN);
+    rtk_rx_buffer.fragments_received.clearall();
+    mavlink_msg_gps_rtk_ack_send(chan, packet.sequence_id, 0, MAV_GPS_RTK_RECEIVING);
+}
+
+void AP_GPS::handle_gps_rtk_data(mavlink_channel_t chan, const mavlink_message_t &msg)
+{
+    mavlink_gps_rtk_data_t packet;
+    mavlink_msg_gps_rtk_data_decode(&msg, &packet);
+
+    if (num_instances == 0) {
+        GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "no GPS instances detected. can't send RTK message.");
+        mavlink_msg_gps_rtk_ack_send(chan, packet.sequence_id, packet.fragment_id, MAV_GPS_RTK_ERROR);
+        return;
+    }
+
+    if ((rtk_rx_buffer.sequence_id == packet.sequence_id) &&
+        (packet.fragment_id < rtk_rx_buffer.total_fragments) &&
+        (rtk_rx_buffer.recieved_successfully)) {
+        // we have already received the entire message but the sender probably didn't get the ack message
+        mavlink_msg_gps_rtk_ack_send(chan, packet.sequence_id, packet.fragment_id, MAV_GPS_RTK_ACCEPTED);
+        return;
+    }
+    if (rtk_rx_buffer.data == nullptr) {
+        GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "RTK fragment sent before allocating buffer");
+        mavlink_msg_gps_rtk_ack_send(chan, packet.sequence_id, packet.fragment_id, MAV_GPS_RTK_FRAGMENT_ERROR);
+        return;
+    }
+    if (rtk_rx_buffer.sequence_id != packet.sequence_id) {
+        GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "RTK sequence ID differ (%" PRIu32 " vs %" PRIu32 ")", packet.sequence_id, rtk_rx_buffer.sequence_id);
+        mavlink_msg_gps_rtk_ack_send(chan, packet.sequence_id, packet.fragment_id, MAV_GPS_RTK_FRAGMENT_ERROR);
+        return;
+    }
+    if (packet.fragment_id >= rtk_rx_buffer.total_fragments) {
+        GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "RTK unexpected frag id (%u >= %u)", packet.fragment_id, rtk_rx_buffer.total_fragments);
+        mavlink_msg_gps_rtk_ack_send(chan, packet.sequence_id, packet.fragment_id, MAV_GPS_RTK_FRAGMENT_ERROR);
+        return;
+    }
+
+    const uint8_t fragment_size = ((packet.fragment_id == rtk_rx_buffer.total_fragments - 1) ? (rtk_rx_buffer.total_length - (MAVLINK_MSG_GPS_RTK_DATA_FIELD_DATA_LEN * (rtk_rx_buffer.total_fragments - 1))) : MAVLINK_MSG_GPS_RTK_DATA_FIELD_DATA_LEN);
+    memcpy(rtk_rx_buffer.data + (packet.fragment_id * MAVLINK_MSG_GPS_RTK_DATA_FIELD_DATA_LEN), packet.data, fragment_size);
+    rtk_rx_buffer.fragments_received.set(packet.fragment_id);
+
+    if (rtk_rx_buffer.fragments_received.count() != rtk_rx_buffer.total_fragments) {
+        mavlink_msg_gps_rtk_ack_send(chan, packet.sequence_id, packet.fragment_id, MAV_GPS_RTK_FRAGMENT_ACCEPTED);  // only ack this single fragment
+        return;
+    }
+
+    const uint32_t checksum = crc_crc32(0, rtk_rx_buffer.data, rtk_rx_buffer.total_length);
+    if (checksum != rtk_rx_buffer.crc) {
+        GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "RTK CRC differ %" PRIu32 ". %" PRIu32 "x vs %" PRIu32 "x", rtk_rx_buffer.sequence_id, checksum, rtk_rx_buffer.crc);
+        mavlink_msg_gps_rtk_ack_send(chan, packet.sequence_id, 0, MAV_GPS_RTK_ERROR);
+    } else if (!inject_rtk_data(0, rtk_rx_buffer.data, rtk_rx_buffer.total_length, checksum)) {
+        mavlink_msg_gps_rtk_ack_send(chan, packet.sequence_id, 0, MAV_GPS_RTK_ERROR);
+    } else {
+        mavlink_msg_gps_rtk_ack_send(chan, packet.sequence_id, packet.fragment_id, MAV_GPS_RTK_ACCEPTED);
+        rtk_rx_buffer.recieved_successfully = true;
+    }
+    free(rtk_rx_buffer.data);
+    rtk_rx_buffer.data = nullptr;
+}
+
 /*
   pass along a mavlink message (for MAV type)
  */
-void AP_GPS::handle_msg(const mavlink_message_t &msg)
+void AP_GPS::handle_msg(mavlink_channel_t chan, const mavlink_message_t &msg)
 {
     switch (msg.msgid) {
     case MAVLINK_MSG_ID_GPS_RTCM_DATA:
@@ -1213,6 +1671,12 @@ void AP_GPS::handle_msg(const mavlink_message_t &msg)
         break;
     case MAVLINK_MSG_ID_GPS_INJECT_DATA:
         handle_gps_inject(msg);
+        break;
+    case MAVLINK_MSG_ID_GPS_RTK_COUNT:
+        handle_gps_rtk_count(chan, msg);
+        break;
+    case MAVLINK_MSG_ID_GPS_RTK_DATA:
+        handle_gps_rtk_data(chan, msg);
         break;
     default: {
         uint8_t i;
@@ -1290,6 +1754,36 @@ void AP_GPS::inject_data(uint8_t instance, const uint8_t *data, uint16_t len)
     }
 }
 
+bool AP_GPS::inject_rtk_data(uint8_t instance, const uint8_t *data, uint16_t len, uint32_t crc)
+{
+    WITH_SEMAPHORE(rtk_tx_status.sem);
+    _rtk_tx_message msg;
+    if (rtk_tx_status.queue.get_size() == 0 && !rtk_tx_status.queue.set_size(RTK_BUFFER_QUEUE_MAX_MESSAGES)) {
+        GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "Can't allocate RTK queue");
+        return false;
+    }
+    msg.data = (uint8_t *)calloc(1, len);
+    if (msg.data == nullptr) {
+        GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "Can't allocate RTK buffer");
+        return false;
+    }
+    memcpy(msg.data, data, len);
+    msg.total_length = len;
+    msg.crc = crc;
+    if (!rtk_tx_status.queue.push(msg)) {
+        GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "RTK queue is full");
+        free(msg.data);
+        return false;
+    }
+
+    if (rtk_tx_status.queue.available() == 1) {
+        // We just enqueued the only message into the queue, reset state and send it.
+        // This is not mandatory to do here.
+        rtk_tx_reset_state();
+    }
+    return true;
+}
+
 /*
   get GPS yaw following mavlink GPS_RAW_INT and GPS2_RAW
   convention. We return 0 if the GPS is not configured to provide
@@ -1313,38 +1807,40 @@ uint16_t AP_GPS::gps_yaw_cdeg(uint8_t instance) const
     return yaw_cd;
 }
 
-void AP_GPS::send_mavlink_gps_raw(mavlink_channel_t chan)
+void AP_GPS::send_mavlink_gps_raw(mavlink_channel_t chan, uint8_t instance)
 {
-    const Location &loc = location(0);
+    const Location &loc = location(instance);
     float hacc = 0.0f;
     float vacc = 0.0f;
     float sacc = 0.0f;
     float undulation = 0.0;
     int32_t height_elipsoid_mm = 0;
-    if (get_undulation(0, undulation)) {
+    if (get_undulation(instance, undulation)) {
         height_elipsoid_mm = loc.alt*10 - undulation*1000;
     }
-    horizontal_accuracy(0, hacc);
-    vertical_accuracy(0, vacc);
-    speed_accuracy(0, sacc);
+    horizontal_accuracy(instance, hacc);
+    vertical_accuracy(instance, vacc);
+    speed_accuracy(instance, sacc);
     mavlink_msg_gps_raw_int_send(
         chan,
-        last_fix_time_ms(0)*(uint64_t)1000,
-        status(0),
+        last_fix_time_ms(instance)*(uint64_t)1000,
+        status(instance),
         loc.lat,        // in 1E7 degrees
         loc.lng,        // in 1E7 degrees
         loc.alt * 10UL, // in mm
-        get_hdop(0),
-        get_vdop(0),
-        ground_speed(0)*100,  // cm/s
-        ground_course(0)*100, // 1/100 degrees,
-        num_sats(0),
+        get_hdop(instance),
+        get_vdop(instance),
+        ground_speed(instance)*100,  // cm/s
+        ground_course(instance)*100, // 1/100 degrees,
+        num_sats(instance),
         height_elipsoid_mm,   // Elipsoid height in mm
         hacc * 1000,          // one-sigma standard deviation in mm
         vacc * 1000,          // one-sigma standard deviation in mm
         sacc * 1000,          // one-sigma standard deviation in mm/s
         0,                    // TODO one-sigma heading accuracy standard deviation
-        gps_yaw_cdeg(0));
+        gps_yaw_cdeg(instance),
+        instance,
+        (primary_sensor() == instance) ? 1 : 0);
 }
 
 #if GPS_MAX_RECEIVERS > 1
@@ -1424,19 +1920,26 @@ void AP_GPS::broadcast_first_configuration_failure_reason(void) const
 }
 
 // pre-arm check that all GPSs are close to each other.  farthest distance between GPSs (in meters) is returned
-bool AP_GPS::all_consistent(float &distance) const
+bool AP_GPS::all_consistent(ftype &distance_xy, ftype &distance_z) const
 {
     // return true immediately if only one valid receiver
     if (num_instances <= 1 ||
         drivers[0] == nullptr || _type[0] == GPS_TYPE_NONE) {
-        distance = 0;
+        distance_xy = 0;
+        distance_z = 0;
         return true;
     }
 
-    // calculate distance
-    distance = state[0].location.get_distance_NED(state[1].location).length();
-    // success if distance is within 50m
-    return (distance < 50);
+    // calculate distances
+    distance_xy = state[0].location.get_distance_NE(state[1].location).length();
+
+    if (!state[0].location.get_alt_distance(state[1].location, distance_z)) {
+        distance_z = 0;
+        return false;
+    }
+
+    // success if distance is within maximum allowed distance (in meters)
+    return (distance_xy < _max_allowed_diff_xy) && (abs(distance_z) < _max_allowed_diff_z);
 }
 
 // pre-arm check of GPS blending.  True means healthy or that blending is not being used
@@ -1450,6 +1953,33 @@ bool AP_GPS::blend_health_check() const
  */
 void AP_GPS::handle_gps_rtcm_fragment(uint8_t flags, const uint8_t *data, uint8_t len)
 {
+    static uint8_t prev_seq = 0;
+    const uint8_t sequence = (flags >> 3U) & 0x1F;
+    const uint8_t fragment = (flags >> 1U) & 0x03;
+    const uint8_t is_fragment = flags & 1;
+    int16_t id = -1;
+
+    if (fragment == 0 && len > 5) {
+        id = ((data[3] << 8) | data[4]) >> 4;
+    }
+
+    struct log_RTCM rtcm_pkt = {
+        LOG_PACKET_HEADER_INIT(LOG_RTCM_MSG),
+        time_us      : AP_HAL::micros64(),
+        len          : len,
+        id           : id,
+        flags        : flags,
+        sequence     : sequence,
+        is_fragment  : is_fragment,
+        fragment     : fragment
+    };
+    AP::logger().WriteBlock(&rtcm_pkt, sizeof(rtcm_pkt));
+
+    if ((fragment != 0 && sequence != (prev_seq & 0x1F)) || (fragment == 0 && sequence != ((prev_seq + 1) & 0x1F))) {
+        GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "rtcm seq err. prev %hhu cur %hhu is_frag %hhu frag %hhu", prev_seq, sequence, is_fragment, fragment);
+    }
+    prev_seq = sequence;
+
     if ((flags & 1) == 0) {
         // it is not fragmented, pass direct
         inject_data(data, len);
@@ -1461,12 +1991,10 @@ void AP_GPS::handle_gps_rtcm_fragment(uint8_t flags, const uint8_t *data, uint8_
         rtcm_buffer = (struct rtcm_buffer *)calloc(1, sizeof(*rtcm_buffer));
         if (rtcm_buffer == nullptr) {
             // nothing to do but discard the data
+            GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "rtcm buffer allocation error");
             return;
         }
     }
-
-    const uint8_t fragment = (flags >> 1U) & 0x03;
-    const uint8_t sequence = (flags >> 3U) & 0x1F;
 
     // see if this fragment is consistent with existing fragments
     if (rtcm_buffer->fragments_received &&
@@ -1474,6 +2002,7 @@ void AP_GPS::handle_gps_rtcm_fragment(uint8_t flags, const uint8_t *data, uint8_
          (rtcm_buffer->fragments_received & (1U<<fragment)))) {
         // we have one or more partial fragments already received
         // which conflict with the new fragment, discard previous fragments
+        GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "rtcm conf seq:%hhu buf:%hhu rec:%hhu frag:%hhu len:%hhu", sequence, rtcm_buffer->sequence, rtcm_buffer->fragments_received, fragment, len);
         rtcm_buffer->fragment_count = 0;
         rtcm_buffer->fragments_received = 0;
     }

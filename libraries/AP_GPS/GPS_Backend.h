@@ -58,6 +58,9 @@ public:
 
     virtual void inject_data(const uint8_t *data, uint16_t len);
 
+    virtual bool send_rtk_count(uint32_t sequence_id, uint16_t total_length, uint32_t crc);
+    virtual bool send_rtk_fragment(uint32_t sequence_id, uint8_t fragment_id, const uint8_t *data, uint8_t length);
+
     //MAVLink methods
     virtual bool supports_mavlink_gps_rtk_message() const { return false; }
     virtual void send_mavlink_gps_rtk(mavlink_channel_t chan);

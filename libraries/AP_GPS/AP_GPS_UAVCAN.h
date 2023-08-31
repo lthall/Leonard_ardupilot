@@ -34,6 +34,7 @@ class StatusCb;
 class MovingBaselineDataCb;
 class RelPosHeadingCb;
 #endif
+class RTKMessageAckCb;
 
 class AP_GPS_UAVCAN : public AP_GPS_Backend {
 public:
@@ -62,8 +63,13 @@ public:
     static void handle_moving_baseline_msg_trampoline(AP_UAVCAN* ap_uavcan, uint8_t node_id, const MovingBaselineDataCb &cb);
     static void handle_relposheading_msg_trampoline(AP_UAVCAN* ap_uavcan, uint8_t node_id, const RelPosHeadingCb &cb);
 #endif
+#ifndef FTS
+    static void handle_rtk_message_ack_trampoline(AP_UAVCAN* ap_uavcan, uint8_t node_id, const RTKMessageAckCb &cb);
+#endif
     static bool backends_healthy(char failure_msg[], uint16_t failure_msg_len);
     void inject_data(const uint8_t *data, uint16_t len) override;
+    bool send_rtk_count(uint32_t sequence_id, uint16_t total_length, uint32_t crc) override;
+    bool send_rtk_fragment(uint32_t sequence_id, uint8_t fragment_id, const uint8_t *data, uint8_t length) override;
 
     bool get_error_codes(uint32_t &error_codes) const override { error_codes = error_code; return seen_status; };
 
@@ -96,6 +102,9 @@ private:
 #if GPS_MOVING_BASELINE
     void handle_moving_baseline_msg(const MovingBaselineDataCb &cb, uint8_t node_id);
     void handle_relposheading_msg(const RelPosHeadingCb &cb, uint8_t node_id);
+#endif
+#ifndef FTS
+    void handle_rtk_message_ack_msg(const RTKMessageAckCb &cb);
 #endif
 
     static bool take_registry();

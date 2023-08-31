@@ -135,6 +135,18 @@ AP_GPS_Backend::inject_data(const uint8_t *data, uint16_t len)
     }
 }
 
+bool AP_GPS_Backend::send_rtk_count(uint32_t sequence_id, uint16_t total_length, uint32_t crc)
+{
+    GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "send_rtk_count not implemented. ignoring.");
+    return true;
+}
+
+bool AP_GPS_Backend::send_rtk_fragment(uint32_t sequence_id, uint8_t fragment_id, const uint8_t *data, uint8_t length)
+{
+    GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "send_rtk_fragment not implemented. ignoring.");
+    return true;
+}
+
 void AP_GPS_Backend::_detection_message(char *buffer, const uint8_t buflen) const
 {
     const uint8_t instance = state.instance;

@@ -23,6 +23,7 @@
 #include <AP_SerialManager/AP_SerialManager.h>
 #include <AP_MSP/msp.h>
 #include <AP_ExternalAHRS/AP_ExternalAHRS.h>
+#include <AP_Common/Bitmask.h>
 
 /**
    maximum number of GPS instances available on this platform. If more
@@ -220,6 +221,11 @@ public:
         uint32_t relposheading_ts;        ///< True if new data has been received since last time it was false
     };
 
+    struct GPS_Accuracy_Level_State {
+        uint32_t start_ms[GPS_ACCURACY_LEVEL_ENUM_END]; ///< The start time (in ms) of every accuracy level of a single instance, based on horizontal accuracy value
+        GPS_ACCURACY_LEVEL level; ///< The current accuracy level of a single instance
+    };
+
     /// Startup initialisation.
     void init(const AP_SerialManager& serial_manager);
 
@@ -229,7 +235,7 @@ public:
     void update(void);
 
     // Pass mavlink data to message handlers (for MAV type)
-    void handle_msg(const mavlink_message_t &msg);
+    void handle_msg(mavlink_channel_t chan, const mavlink_message_t &msg);
 #if HAL_MSP_GPS_ENABLED
     void handle_msp(const MSP::msp_gps_data_message_t &pkt);
 #endif
@@ -466,7 +472,7 @@ public:
     void lock_port(uint8_t instance, bool locked);
 
     //MAVLink Status Sending
-    void send_mavlink_gps_raw(mavlink_channel_t chan);
+    void send_mavlink_gps_raw(mavlink_channel_t chan, uint8_t instance);
     void send_mavlink_gps2_raw(mavlink_channel_t chan);
 
     void send_mavlink_gps_rtk(mavlink_channel_t chan, uint8_t inst);
@@ -476,7 +482,7 @@ public:
     void broadcast_first_configuration_failure_reason(void) const;
 
     // pre-arm check that all GPSs are close to each other.  farthest distance between GPSs (in meters) is returned
-    bool all_consistent(float &distance) const;
+    bool all_consistent(ftype &distance_xy, ftype &distance_z) const;
 
     // pre-arm check of GPS blending.  False if blending is unhealthy, True if healthy or blending is not being used
     bool blend_health_check() const;
@@ -513,6 +519,8 @@ public:
 
     // returns true if all GPS instances have passed all final arming checks/state changes
     bool prepare_for_arming(void);
+
+    bool force_all_arming_checks(void) const { return _force_checks; }
 
     // returns true if all GPS backend drivers haven't seen any failure
     // this is for backends to be able to spout pre arm error messages
@@ -554,6 +562,8 @@ public:
         DoNotChange = 2,
     };
 
+    GPS_ACCURACY_LEVEL get_accuracy_level(void) const;
+
 #if GPS_MOVING_BASELINE
     // methods used by UAVCAN GPS driver and AP_Periph for moving baseline
     void inject_MBL_data(uint8_t* data, uint16_t length);
@@ -586,6 +596,13 @@ protected:
     AP_Float _blend_tc;
     AP_Int16 _driver_options;
     AP_Int8 _primary;
+    AP_Int8 _force_checks;
+    AP_Int16 _accuracy_level_timeout_ms;
+    AP_Float _accuracy_level_reduced_threshold;
+    AP_Float _accuracy_level_bad_threshold;
+    AP_Float _accuracy_level_unreliable_threshold;
+    AP_Float _max_allowed_diff_xy;  // maximum allowed horizontal location distance (in meters) between two GPS devices
+    AP_Float _max_allowed_diff_z;  // maximum allowed vertical location distance (in meters) between two GPS devices
 #if HAL_ENABLE_LIBUAVCAN_DRIVERS
     AP_Int32 _node_id[GPS_MAX_RECEIVERS];
     AP_Int32 _override_node_id[GPS_MAX_RECEIVERS];
@@ -625,6 +642,7 @@ private:
     // Note allowance for an additional instance to contain blended data
     GPS_timing timing[GPS_MAX_INSTANCES];
     GPS_State state[GPS_MAX_INSTANCES];
+    GPS_Accuracy_Level_State accuracy_level_state[GPS_MAX_INSTANCES];
     AP_GPS_Backend *drivers[GPS_MAX_RECEIVERS];
     AP_HAL::UARTDriver *_port[GPS_MAX_RECEIVERS];
 
@@ -682,13 +700,73 @@ private:
         uint8_t buffer[MAVLINK_MSG_GPS_RTCM_DATA_FIELD_DATA_LEN*4];
     } *rtcm_buffer;
 
+    struct rtk_rx_buffer {
+        uint32_t crc;
+        uint32_t sequence_id;
+        uint16_t total_length;
+        uint8_t total_fragments;
+        Bitmask<UINT8_MAX> fragments_received;
+        uint8_t *data;
+        bool recieved_successfully;
+    } rtk_rx_buffer;
+
+    typedef struct {
+        uint16_t total_length;
+        uint8_t *data;
+        uint32_t crc;
+    } _rtk_tx_message;
+
+    enum rtk_tx_state{
+        RTK_SENDING_COUNT,
+        RTK_WAITING_FOR_COUNT_ACK,
+        RTK_SENDING_FRAGMENT,
+        RTK_WAITING_FOR_FRAGMENT_ACK
+    };
+    struct {
+        HAL_Semaphore sem;
+        uint32_t sequence_id;
+        uint8_t fragment_id;
+        uint32_t last_sent_ms;
+        struct {
+            bool acked;
+        } receivers[GPS_MAX_RECEIVERS];
+        rtk_tx_state tx_state;
+        bool retry_message;
+        bool retry_fragment;
+        uint8_t num_fragment_retries;
+        uint8_t num_message_retries;
+        ObjectBuffer<_rtk_tx_message> queue;
+    } rtk_tx_status;
+
     // re-assemble GPS_RTCM_DATA message
     void handle_gps_rtcm_data(const mavlink_message_t &msg);
     void handle_gps_inject(const mavlink_message_t &msg);
 
+    // re-assemble GPS_RTK messages
+    void handle_gps_rtk_count(mavlink_channel_t chan, const mavlink_message_t &msg);
+    void handle_gps_rtk_data(mavlink_channel_t chan, const mavlink_message_t &msg);
+
     //Inject a packet of raw binary to a GPS
     void inject_data(const uint8_t *data, uint16_t len);
     void inject_data(uint8_t instance, const uint8_t *data, uint16_t len);
+
+    bool inject_rtk_data(uint8_t instance, const uint8_t *data, uint16_t len, uint32_t crc);
+    bool send_rtk_count(uint32_t sequence_id, uint16_t total_length, uint32_t crc);
+    bool send_rtk_fragment(uint32_t sequence_id, uint8_t fragment_id, const uint8_t *data, uint8_t length);
+
+    void rtk_tx_state_update();
+    void rtk_tx_process_acks();
+    void rtk_tx_reset_state();
+    void rtk_tx_retransmit_if_needed();
+
+    bool is_rtk_ack_valid(uint8_t instance, uint32_t sequence_id);
+    void rtk_message_header_received(uint8_t instance, uint32_t sequence_id);
+    void rtk_message_accepted(uint8_t instance, uint32_t sequence_id);
+    void rtk_message_error(uint8_t instance, uint32_t sequence_id);
+    void rtk_fragment_accepted(uint8_t instance, uint32_t sequence_id, uint8_t fragment_id);
+    void rtk_fragment_error(uint8_t instance, uint32_t sequence_id, uint8_t fragment_id);
+
+
 
     // GPS blending and switching
     Vector3f _blended_antenna_offset; // blended antenna offset
@@ -739,6 +817,8 @@ private:
 
     // logging support
     void Write_GPS(uint8_t instance);
+
+    void calculate_accuracy_level(uint8_t instance);
 
 };
 

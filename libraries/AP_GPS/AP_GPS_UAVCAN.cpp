@@ -36,6 +36,9 @@
 #include <ardupilot/gnss/MovingBaselineData.hpp>
 #include <ardupilot/gnss/RelPosHeading.hpp>
 #endif
+#ifndef FTS
+#include <uavcan/equipment/gnss/RTKMessageAck.hpp>
+#endif
 
 #include <AP_BoardConfig/AP_BoardConfig.h>
 
@@ -68,6 +71,9 @@ UC_REGISTRY_BINDER(StatusCb, ardupilot::gnss::Status);
 #if GPS_MOVING_BASELINE
 UC_REGISTRY_BINDER(MovingBaselineDataCb, ardupilot::gnss::MovingBaselineData);
 UC_REGISTRY_BINDER(RelPosHeadingCb, ardupilot::gnss::RelPosHeading);
+#endif
+#ifndef FTS
+UC_REGISTRY_BINDER(RTKMessageAckCb, uavcan::equipment::gnss::RTKMessageAck);
 #endif
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
@@ -178,6 +184,18 @@ void AP_GPS_UAVCAN::subscribe_msgs(AP_UAVCAN* ap_uavcan)
     }
     const int gnss_relposheading_start_res = gnss_relposheading->start(RelPosHeadingCb(ap_uavcan, &handle_relposheading_msg_trampoline));
     if (gnss_relposheading_start_res < 0) {
+        AP_HAL::panic("UAVCAN GNSS subscriber start problem\n\r");
+    }
+#endif
+
+#ifndef FTS
+    uavcan::Subscriber<uavcan::equipment::gnss::RTKMessageAck, RTKMessageAckCb> *gnss_rtk_message_ack;
+    gnss_rtk_message_ack = new uavcan::Subscriber<uavcan::equipment::gnss::RTKMessageAck, RTKMessageAckCb>(*node);
+    if (gnss_rtk_message_ack == nullptr) {
+        AP_BoardConfig::allocation_error("gnss_rtk_message_ack");
+    }
+    const int gnss_rtk_message_ack_start_res = gnss_rtk_message_ack->start(RTKMessageAckCb(ap_uavcan, &handle_rtk_message_ack_trampoline));
+    if (gnss_rtk_message_ack_start_res < 0) {
         AP_HAL::panic("UAVCAN GNSS subscriber start problem\n\r");
     }
 #endif
@@ -754,6 +772,32 @@ void AP_GPS_UAVCAN::clear_RTCMV3(void)
 
 #endif // GPS_MOVING_BASELINE
 
+#ifndef FTS
+void AP_GPS_UAVCAN::handle_rtk_message_ack_msg(const RTKMessageAckCb &cb)
+{
+    switch (cb.msg->type) {
+        case uavcan::equipment::gnss::RTKMessageAck::RTK_ACCEPTED:
+            gps.rtk_message_accepted(state.instance, cb.msg->sequence_id);
+            break;
+        case uavcan::equipment::gnss::RTKMessageAck::RTK_FRAGMENT_ACCEPTED:
+            gps.rtk_fragment_accepted(state.instance, cb.msg->sequence_id, cb.msg->fragment_id);
+            break;
+        case uavcan::equipment::gnss::RTKMessageAck::RTK_ERROR:
+            gps.rtk_message_error(state.instance, cb.msg->sequence_id);
+            break;
+        case uavcan::equipment::gnss::RTKMessageAck::RTK_FRAGMENT_ERROR:
+            gps.rtk_fragment_error(state.instance, cb.msg->sequence_id, cb.msg->fragment_id);
+            break;
+        case uavcan::equipment::gnss::RTKMessageAck::RTK_RECEIVING:
+            gps.rtk_message_header_received(state.instance, cb.msg->sequence_id);
+            break;
+        default:
+            GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "received unknown RTK ack type (%u)", cb.msg->type);
+            break;
+    }
+}
+#endif
+
 void AP_GPS_UAVCAN::handle_fix_msg_trampoline(AP_UAVCAN* ap_uavcan, uint8_t node_id, const FixCb &cb)
 {
     WITH_SEMAPHORE(_sem_registry);
@@ -822,6 +866,18 @@ void AP_GPS_UAVCAN::handle_relposheading_msg_trampoline(AP_UAVCAN* ap_uavcan, ui
     AP_GPS_UAVCAN* driver = get_uavcan_backend(ap_uavcan, node_id);
     if (driver != nullptr) {
         driver->handle_relposheading_msg(cb, node_id);
+    }
+}
+#endif
+
+#ifndef FTS
+void AP_GPS_UAVCAN::handle_rtk_message_ack_trampoline(AP_UAVCAN* ap_uavcan, uint8_t node_id, const RTKMessageAckCb &cb)
+{
+    WITH_SEMAPHORE(_sem_registry);
+
+    AP_GPS_UAVCAN* driver = get_uavcan_backend(ap_uavcan, node_id);
+    if (driver != nullptr) {
+        driver->handle_rtk_message_ack_msg(cb);
     }
 }
 #endif
@@ -936,6 +992,28 @@ void AP_GPS_UAVCAN::inject_data(const uint8_t *data, uint16_t len)
     if (_detected_module == 0) {
         _detected_modules[0].ap_uavcan->send_RTCMStream(data, len);
     }
+}
+
+bool AP_GPS_UAVCAN::send_rtk_count(uint32_t sequence_id, uint16_t total_length, uint32_t crc)
+{
+    // we only handle this if we are the first UAVCAN GPS, as we send
+    // the data as broadcast on all UAVCAN devive ports and we don't
+    // want to send duplicates
+    if (_detected_module == 0) {
+        return _detected_modules[_detected_module].ap_uavcan->send_rtk_count(sequence_id, total_length, crc);
+    }
+    return true;
+}
+
+bool AP_GPS_UAVCAN::send_rtk_fragment(uint32_t sequence_id, uint8_t fragment_id, const uint8_t *data, uint8_t length)
+{
+    // we only handle this if we are the first UAVCAN GPS, as we send
+    // the data as broadcast on all UAVCAN devive ports and we don't
+    // want to send duplicates
+    if (_detected_module == 0) {
+        return _detected_modules[_detected_module].ap_uavcan->send_rtk_data_fragment(sequence_id, fragment_id, data, length);
+    }
+    return true;
 }
 
 /*
