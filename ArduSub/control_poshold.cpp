@@ -15,8 +15,8 @@ bool Sub::poshold_init()
     }
 
     // initialize vertical speeds and acceleration
-    pos_control.set_max_speed_accel_xy(wp_nav.get_default_speed_xy(), wp_nav.get_wp_acceleration());
-    pos_control.set_correction_speed_accel_xy(wp_nav.get_default_speed_xy(), wp_nav.get_wp_acceleration());
+    pos_control.set_max_speed_accel_xy(wp_nav.get_default_speed_xy_cms(), wp_nav.get_wp_acceleration());
+    pos_control.set_correction_speed_accel_xy(wp_nav.get_default_speed_xy_cms(), wp_nav.get_wp_acceleration());
     pos_control.set_max_speed_accel_z(-get_pilot_speed_dn(), g.pilot_speed_up, g.pilot_accel_z);
     pos_control.set_correction_speed_accel_z(-get_pilot_speed_dn(), g.pilot_speed_up, g.pilot_accel_z);
 
