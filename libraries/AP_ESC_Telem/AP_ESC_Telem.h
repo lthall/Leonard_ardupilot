@@ -1,6 +1,7 @@
 #pragma once
 
 #include <AP_HAL/AP_HAL.h>
+#include <AP_Param/AP_Param.h>
 #include "AP_ESC_Telem_Backend.h"
 
 #if HAL_WITH_ESC_TELEM
@@ -8,6 +9,9 @@
 #define ESC_TELEM_MAX_ESCS   12
 #define ESC_TELEM_DATA_TIMEOUT_MS 5000UL
 #define ESC_RPM_DATA_TIMEOUT_US 1000000UL
+
+#define MAX_MOTOR_POWER_DIFF_MS         600
+#define MOTOR_POWER_DIFF_ALLOWED        40
 
 class AP_ESC_Telem {
 public:
@@ -20,6 +24,9 @@ public:
     AP_ESC_Telem &operator=(const AP_ESC_Telem&) = delete;
 
     static AP_ESC_Telem *get_singleton();
+
+    // get an individual ESC's raw error flag bits, returns true on success
+    bool get_raw_error_flags(uint8_t esc_index, uint16_t& error_flags) const;
 
     // get an individual ESC's slewed rpm if available, returns true on success
     bool get_rpm(uint8_t esc_index, float& rpm) const;
@@ -69,6 +76,9 @@ public:
     // get mask of ESCs that sent valid telemetry data in the last
     // ESC_TELEM_DATA_TIMEOUT_MS
     uint16_t get_active_esc_mask() const;
+    
+    // get num of expected motors from the parameter (or from the frame class if the parameter is unset)
+    int8_t get_num_expected_motors() const;
 
     // return the last time telemetry data was received in ms for the given ESC or 0 if never
     uint32_t get_last_telem_data_ms(uint8_t esc_index) const {
@@ -82,6 +92,11 @@ public:
     // udpate at 10Hz to log telemetry
     void update();
 
+    // indicate which bit in LOG_BITMASK indicates esc logging enabled
+    void set_log_esc_bit(uint32_t bit) { _log_esc_bit = bit; }
+
+    static const struct AP_Param::GroupInfo var_info[];
+
 private:
     // callback to update the rpm in the frontend, should be called by the driver when new data is available
     void update_rpm(const uint8_t esc_index, const uint16_t new_rpm, const float error_rate);
@@ -93,10 +108,21 @@ private:
     // telemetry data
     volatile AP_ESC_Telem_Backend::TelemetryData _telem_data[ESC_TELEM_MAX_ESCS];
 
+    uint32_t _last_matching_motor_power_ms[ESC_TELEM_MAX_ESCS];
+
     uint32_t _last_telem_log_ms[ESC_TELEM_MAX_ESCS];
     uint32_t _last_rpm_log_us[ESC_TELEM_MAX_ESCS];
 
+    uint16_t _last_max_message_delta_time_ms[ESC_TELEM_MAX_ESCS];
+
+    uint32_t _log_esc_bit = -1;
+
     bool _have_data;
+
+    AP_Int8 _motor_power_diff_allowed_pct;
+    AP_Int16 _max_motor_power_diff_ms;
+
+    AP_Int8 _expected_motors;
 
     static AP_ESC_Telem *_singleton;
 };

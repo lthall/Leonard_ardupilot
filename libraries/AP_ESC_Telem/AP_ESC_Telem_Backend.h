@@ -18,11 +18,13 @@ public:
         float voltage;              // Volt
         float current;              // Ampere
         float consumption_mah;      // milli-Ampere.hours
+        uint8_t power_rating_pct;   // power_rating is in percent of maximum power
         uint32_t usage_s;           // usage seconds
         int16_t  motor_temp_cdeg;   // centi-degrees C, negative values allowed
         uint32_t last_update_ms;    // last update time in milliseconds, determines whether active
         uint16_t types;             // telemetry types present
         uint16_t count;             // number of times updated
+        uint16_t error_flags;       // last error bits set by the ESC;
     };
 
     struct RpmData {
@@ -39,7 +41,9 @@ public:
         VOLTAGE     = 1 << 2,
         CURRENT     = 1 << 3,
         CONSUMPTION = 1 << 4,
-        USAGE       = 1 << 5
+        USAGE       = 1 << 5,
+        POWER       = 1 << 6,
+        ERROR_FLAGS = 1 << 7
     };
 
 

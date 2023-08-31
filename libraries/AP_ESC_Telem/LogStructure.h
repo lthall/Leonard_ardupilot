@@ -28,9 +28,13 @@ struct PACKED log_Esc {
     int16_t esc_temp;
     float current_tot;
     int16_t motor_temp;
+    uint8_t power_rating;
+    uint8_t desired_power;
     float error_rate;
+    uint16_t error_flags;
+    uint16_t delta_ms;
 };
 
 #define LOG_STRUCTURE_FROM_ESC_TELEM \
     { LOG_ESC_MSG, sizeof(log_Esc), \
-      "ESC",  "QBeeffcfcf", "TimeUS,Instance,RPM,RawRPM,Volt,Curr,Temp,CTot,MotTemp,Err", "s#qqvAOaO%", "F-BB--BCB-" , true },
+      "ESC",  "QBeeffcfcBBfHH", "TimeUS,I,RPM,RRPM,Volt,Cur,Temp,CTot,MotTemp,Pow,DPow,ER,EF,dt", "s#qqvAOaO%%%-s", "F-BB--BCB----C" , true },

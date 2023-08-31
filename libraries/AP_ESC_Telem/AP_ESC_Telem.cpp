@@ -17,10 +17,40 @@
 #include <AP_HAL/AP_HAL.h>
 #include <GCS_MAVLink/GCS.h>
 #include <AP_Logger/AP_Logger.h>
+#include <AP_Vehicle/AP_Vehicle.h>
 
 #if HAL_WITH_ESC_TELEM
 
 #include <AP_BoardConfig/AP_BoardConfig.h>
+
+const AP_Param::GroupInfo AP_ESC_Telem::var_info[] = {
+
+    // @Param: PDF_PC
+    // @DisplayName: Maximum power diff allowed between motor output and esc input
+    // @Description: Maximum power diff allowed between motor output and esc input
+    // @Range: 0 100
+    // @Units: %
+    // @User: Advanced
+    AP_GROUPINFO("PDF_PC", 0, AP_ESC_Telem, _motor_power_diff_allowed_pct, MOTOR_POWER_DIFF_ALLOWED),
+
+    // @Param: PDF_MS
+    // @DisplayName: Maximal time allowed for power diff between motor output and esc input
+    // @Description: Maximal time allowed for power diff between motor output and esc input
+    // @Range: 0 2000
+    // @Units: ms
+    // @User: Advanced
+    AP_GROUPINFO("PDF_MS", 1, AP_ESC_Telem, _max_motor_power_diff_ms, MAX_MOTOR_POWER_DIFF_MS),
+
+    // @Param: EXPECTED
+    // @DisplayName: Number of expected motors
+    // @Description: Number of expected motors to monitor. When set to (-1), it's getting the num of motors from the motors frame class.
+    // @Range: -1 12
+    // @Increment: 1
+    // @User: Standard
+    AP_GROUPINFO("EXPECTED", 2, AP_ESC_Telem, _expected_motors, -1),
+
+    AP_GROUPEND
+};
 
 //#define ESC_TELEM_DEBUG
 
@@ -32,6 +62,8 @@ AP_ESC_Telem::AP_ESC_Telem()
         AP_HAL::panic("Too many AP_ESC_Telem instances");
     }
     _singleton = this;
+
+    AP_Param::setup_object_defaults(this, var_info);
 }
 
 // return the average motor RPM
@@ -96,6 +128,27 @@ uint16_t AP_ESC_Telem::get_active_esc_mask() const {
 uint8_t AP_ESC_Telem::get_num_active_escs() const {
     uint16_t active = get_active_esc_mask();
     return __builtin_popcount(active);
+}
+
+// get num of expected motors from the parameter (or from the frame class if the parameter is unset)
+int8_t AP_ESC_Telem::get_num_expected_motors() const {
+    AP_Motors *motors = AP_Motors::get_singleton();
+    if (_expected_motors == -1) {
+        return __builtin_popcount(motors->get_motor_mask());
+    }
+    return _expected_motors;
+}
+
+// get an individual ESC's raw error flag bits, returns true on success
+bool AP_ESC_Telem::get_raw_error_flags(uint8_t esc_index, uint16_t& error_flags) const
+{
+    if (esc_index >= ESC_TELEM_MAX_ESCS
+        || AP_HAL::millis() - _telem_data[esc_index].last_update_ms > ESC_TELEM_DATA_TIMEOUT_MS
+        || !(_telem_data[esc_index].types & AP_ESC_Telem_Backend::TelemetryType::ERROR_FLAGS)) {
+        return false;
+    }
+    error_flags = _telem_data[esc_index].error_flags;
+    return true;
 }
 
 // get an individual ESC's slewed rpm if available, returns true on success
@@ -313,6 +366,7 @@ void AP_ESC_Telem::update_telem_data(const uint8_t esc_index, const AP_ESC_Telem
         return;
     }
 
+    const uint32_t now_ms = AP_HAL::millis();
     _have_data = true;
 
     if (data_mask & AP_ESC_Telem_Backend::TelemetryType::TEMPERATURE) {
@@ -333,10 +387,45 @@ void AP_ESC_Telem::update_telem_data(const uint8_t esc_index, const AP_ESC_Telem
     if (data_mask & AP_ESC_Telem_Backend::TelemetryType::USAGE) {
         _telem_data[esc_index].usage_s = new_data.usage_s;
     }
+    if (data_mask & AP_ESC_Telem_Backend::TelemetryType::POWER) {
+        _telem_data[esc_index].power_rating_pct = new_data.power_rating_pct;
+    }
+    if (data_mask & AP_ESC_Telem_Backend::TelemetryType::ERROR_FLAGS) {
+        _telem_data[esc_index].error_flags = new_data.error_flags;
+    }
+
+    uint16_t delta_ms = now_ms - _telem_data[esc_index].last_update_ms;
+    if (delta_ms > _last_max_message_delta_time_ms[esc_index]) {
+        _last_max_message_delta_time_ms[esc_index] = delta_ms;
+    }
 
     _telem_data[esc_index].count++;
     _telem_data[esc_index].types |= data_mask;
-    _telem_data[esc_index].last_update_ms = AP_HAL::millis();
+    _telem_data[esc_index].last_update_ms = now_ms;
+
+    AP_Motors *motors = AP_Motors::get_singleton();
+    if (motors && (motors->get_motor_mask() & (1U << (uint16_t)esc_index))) {
+        float desired_power = motors->get_motor_output_value(esc_index);
+        float motor_power_diff = fabs(desired_power - (new_data.power_rating_pct / 100.0f));
+        if (motor_power_diff < (_motor_power_diff_allowed_pct / 100.0f)) {
+            _last_matching_motor_power_ms[esc_index] = now_ms;
+        } else {
+            AP::motors()->set_lost_motor(esc_index);
+        }
+        if (motors->armed() && (!AP_Notify::flags.in_arming_delay) && (!AP::vehicle()->get_motor_failure())) {
+            uint32_t time_from_last_healthy = now_ms - _last_matching_motor_power_ms[esc_index];
+            if (time_from_last_healthy >= ((uint32_t)_max_motor_power_diff_ms)) {
+                gcs().send_text(MAV_SEVERITY_ERROR, "High motor power diff for %u", esc_index);
+                AP::vehicle()->set_motor_failure();
+            }
+
+            if (new_data.error_flags != 0) {
+                gcs().send_text(MAV_SEVERITY_ERROR, "ESC #%u error flags: %u", esc_index, new_data.error_flags);
+                AP::motors()->set_lost_motor(esc_index);
+                AP::vehicle()->set_motor_failure();
+            }
+        }
+    }
 }
 
 // record an update to the RPM together with timestamp, this allows the notch values to be slewed
@@ -369,9 +458,10 @@ void AP_ESC_Telem::update_rpm(const uint8_t esc_index, const uint16_t new_rpm, c
 void AP_ESC_Telem::update()
 {
     AP_Logger *logger = AP_Logger::get_singleton();
+    AP_Motors *motors = AP_Motors::get_singleton();
 
     // Push received telemetry data into the logging system
-    if (logger && logger->logging_enabled()) {
+    if (logger && logger->logging_enabled() && logger->should_log(_log_esc_bit)) {
 
         for (uint8_t i = 0; i < ESC_TELEM_MAX_ESCS; i++) {
             if (_telem_data[i].last_update_ms != _last_telem_log_ms[i]
@@ -393,20 +483,25 @@ void AP_ESC_Telem::update()
                 //   error_rate is in percentage
                 const struct log_Esc pkt{
                     LOG_PACKET_HEADER_INIT(uint8_t(LOG_ESC_MSG)),
-                    time_us     : AP_HAL::micros64(),
-                    instance    : i,
-                    rpm         : (int32_t) rpm * 100,
-                    raw_rpm     : (int32_t) rawrpm * 100,
-                    voltage     : _telem_data[i].voltage,
-                    current     : _telem_data[i].current,
-                    esc_temp    : _telem_data[i].temperature_cdeg,
-                    current_tot : _telem_data[i].consumption_mah,
-                    motor_temp  : _telem_data[i].motor_temp_cdeg,
-                    error_rate  : _rpm_data[i].error_rate
+                    time_us         : AP_HAL::micros64(),
+                    instance        : i,
+                    rpm             : (int32_t) rpm * 100,
+                    raw_rpm         : (int32_t) rawrpm * 100,
+                    voltage         : _telem_data[i].voltage,
+                    current         : _telem_data[i].current,
+                    esc_temp        : _telem_data[i].temperature_cdeg,
+                    current_tot     : _telem_data[i].consumption_mah,
+                    motor_temp      : _telem_data[i].motor_temp_cdeg,
+                    power_rating    : _telem_data[i].power_rating_pct,
+                    desired_power   : (uint8_t)roundf(motors->get_motor_output_value(i) * 100),
+                    error_rate      : _rpm_data[i].error_rate,
+                    error_flags     : _telem_data[i].error_flags,
+                    delta_ms        : _last_max_message_delta_time_ms[i],
                 };
                 AP::logger().WriteBlock(&pkt, sizeof(pkt));
                 _last_telem_log_ms[i] = _telem_data[i].last_update_ms;
                 _last_rpm_log_us[i] = _rpm_data[i].last_update_us;
+                _last_max_message_delta_time_ms[i] = 0;
             }
         }
     }
