@@ -22,6 +22,7 @@
 #include <string.h>
 
 #include <AP_InternalError/AP_InternalError.h>
+#include <AP_HAL/AP_HAL_Boards.h>
 
 template<uint16_t num_bits>
 class Bitmask {

@@ -72,7 +72,11 @@ const AP_FWVersion AP_FWVersion::fwver{
 #endif
     .fw_string_original = ORIGINAL_FWSTR,
     .fw_short_string = ACTIVE_FWSTR,
-    .middleware_name = nullptr,
+    .mw_major = MW_MAJOR,
+    .mw_minor = MW_MINOR,
+    .mw_patch = MW_PATCH,
+    .mw_type = (FIRMWARE_VERSION_TYPE)MW_TYPE,
+    .middleware_name = MW_NAME,
     .middleware_hash_str = nullptr,
 #ifdef CHIBIOS_GIT_VERSION
     .os_name = "ChibiOS",

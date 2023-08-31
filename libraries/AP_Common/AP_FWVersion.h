@@ -31,6 +31,10 @@ public:
     const uint32_t fw_hash;
     const char *fw_string_original;
     const char *fw_short_string;
+    uint8_t mw_major;
+    uint8_t mw_minor;
+    uint8_t mw_patch;
+    FIRMWARE_VERSION_TYPE mw_type;
     const char *middleware_name;
     const char *middleware_hash_str;
     const char *os_name;
