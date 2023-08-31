@@ -164,7 +164,8 @@ void AP_Mount_SToRM32::send_do_mount_control(float pitch_deg, float roll_deg, fl
                                   roll_deg,
                                   yaw_deg,
                                   0, 0, 0,  // param4 ~ param6 unused
-                                  mount_mode);
+                                  mount_mode,
+                                  0);  // we don't care about the tid since we're not waiting for ack
 
     // store time of send
     _last_send = AP_HAL::millis();
