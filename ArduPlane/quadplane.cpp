@@ -2147,6 +2147,8 @@ void QuadPlane::run_xy_controller(float accel_limit)
     pos_control->set_max_speed_accel_xy(speed_cms, accel_cmss);
     pos_control->set_correction_speed_accel_xy(speed_cms, accel_cmss);
     if (!pos_control->is_active_xy()) {
+        pos_control->set_max_speed_accel_xy(wp_nav->get_default_speed_xy(), wp_nav->get_wp_acceleration());
+        pos_control->set_correction_speed_accel_xy(wp_nav->get_default_speed_xy(), wp_nav->get_wp_acceleration());
         pos_control->init_xy_controller();
     }
     pos_control->set_lean_angle_max_cd(MIN(4500, MAX(accel_to_angle(accel_limit)*100, aparm.angle_max)));
@@ -2886,7 +2888,7 @@ void QuadPlane::takeoff_controller(void)
         pos_control->relax_velocity_controller_xy();
     } else {
         pos_control->set_accel_desired_xy_cmss(zero);
-        pos_control->set_vel_desired_xy_cms(vel);
+        pos_control->set_vel_desired_xy(vel);
         pos_control->input_vel_accel_xy(vel, zero);
 
         // nav roll and pitch are controller by position controller

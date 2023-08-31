@@ -8,7 +8,6 @@ void Plane::parachute_check()
 {
 #if PARACHUTE == ENABLED
     parachute.update();
-    parachute.check_sink_rate();
 #endif
 }
 
