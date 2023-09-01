@@ -184,6 +184,10 @@ const AP_Param::GroupInfo SIM::var_info2[] = {
 const AP_Param::GroupInfo SIM::var_info3[] = {
     AP_GROUPINFO("ODOM_ENABLE",   1, SIM,  odom_enable, 0),
 
+    AP_GROUPINFO("MOTOR_STOP",    2, SIM, motor_stop, 0),
+
+    AP_GROUPINFO("MOT_FAIL_ACT",  3, SIM, motor_failure_activate, 0),
+
     AP_GROUPINFO("LED_LAYOUT",    11, SIM, led_layout, 0),
 
     // Scenario for thermalling simulation, for soaring

@@ -29,6 +29,8 @@
 
 namespace SITL {
 
+#define PASSENGER_PORT 3000
+
 enum class LedLayout {
     ROWS=0,
     LUMINOUSBEE=1,
@@ -230,6 +232,8 @@ public:
     AP_Int32 loop_delay; // extra delay to add to every loop
     AP_Float mag_scaling[MAX_CONNECTED_MAGS]; // scaling factor
     AP_Int32 mag_devid[MAX_CONNECTED_MAGS]; // Mag devid
+    AP_Int8 motor_stop; // stopping all motors
+    AP_Int8 motor_failure_activate; // activate motor failure state (without actually failuing any motor)
     AP_Float buoyancy; // submarine buoyancy in Newtons
     AP_Int16 loop_rate_hz;
 
