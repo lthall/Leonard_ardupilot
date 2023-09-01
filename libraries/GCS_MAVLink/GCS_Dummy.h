@@ -7,6 +7,11 @@
 #define FW_MINOR 1
 #define FW_PATCH 4
 #define FW_TYPE FIRMWARE_VERSION_TYPE_DEV
+#define MW_NAME ""
+#define MW_MAJOR 2
+#define MW_MINOR 0
+#define MW_PATCH 0
+#define MW_TYPE FIRMWARE_VERSION_TYPE_RC
 
 /*
  *  GCS backend used for many examples and tools
@@ -31,6 +36,8 @@ protected:
     // dummy information:
     MAV_MODE base_mode() const override { return (MAV_MODE)MAV_MODE_FLAG_CUSTOM_MODE_ENABLED; }
     MAV_STATE vehicle_system_status() const override { return MAV_STATE_CALIBRATING; }
+    uint8_t failsafe_status() const override { return 0; }
+    void check_simulated_failsafe_gcs(mavlink_message_t msg) const override { };
 
     bool set_home_to_current_location(bool _lock) override { return false; }
     bool set_home(const Location& loc, bool _lock) override { return false; }

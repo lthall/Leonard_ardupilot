@@ -6,7 +6,7 @@ class MissionItemProtocol_Rally : public MissionItemProtocol {
 public:
     MissionItemProtocol_Rally(class AP_Rally &_rally) :
         rally(_rally) {}
-    void truncate(const mavlink_mission_count_t &packet) override;
+    void truncate(uint16_t mission_items) override;
     MAV_MISSION_TYPE mission_type() const override { return MAV_MISSION_TYPE_RALLY; }
 
     MAV_MISSION_RESULT complete(const GCS_MAVLINK &_link) override;

@@ -79,6 +79,7 @@
 #include <AP_BattMonitor/AP_BattMonitor.h>
 #endif
 #include <AP_GPS/AP_GPS.h>
+#include <AP_Parachute/AP_Parachute.h>
 
 #include <ctype.h>
 
@@ -263,7 +264,7 @@ void GCS_MAVLINK::send_battery_status(const uint8_t instance) const
     const int8_t percentage = battery_remaining_pct(instance);
     
     if (battery.current_amps(current, instance)) {
-         current = constrain_float(current * 100,-INT16_MAX,INT16_MAX);
+        current = constrain_float(current * 100,-INT16_MAX,INT16_MAX);
     } else {
         current = -1;
     }
@@ -275,6 +276,7 @@ void GCS_MAVLINK::send_battery_status(const uint8_t instance) const
     } else {
         consumed_wh = -1;
     }
+
     uint32_t time_remaining;
     if (!battery.time_remaining(time_remaining, instance)) {
         time_remaining = 0;
@@ -295,9 +297,57 @@ void GCS_MAVLINK::send_battery_status(const uint8_t instance) const
                                     cell_volts_ext, // Cell 11..14 voltages
                                     0, // battery mode
                                     battery.get_mavlink_fault_bitmask(instance));   // fault_bitmask
-#else
-    (void)instance;
 #endif
+}
+
+void GCS_MAVLINK::send_flyhawk_smart_battery_status(const uint8_t instance) const
+{
+    const AP_BattMonitor &battery = AP::battery();
+    float temp;
+    bool got_temperature = battery.get_temperature(temp, instance);
+    float current = -1, current2 = -1;
+    bool is_powering_off, is_on;
+    const int8_t percentage = battery_remaining_pct(instance);
+    if (battery.current_amps(current, instance)) {
+        current = constrain_float(current * 100, -INT16_MAX, INT16_MAX);
+    }
+    if (battery.current2_amps(current2, instance)) {
+        current2 = constrain_float(current2 * 100,-INT16_MAX,INT16_MAX);
+    }
+    if (!battery.is_powering_off(is_powering_off, instance)) {
+        is_powering_off = false;
+    }
+    if (!battery.is_battery_on(is_on, instance)) {
+        is_on = false;
+    }
+
+    uint16_t voltages[MAVLINK_MSG_FLYHAWK_SMART_BATTERY_STATUS_FIELD_VOLTAGES_LEN] = { 0 };
+    if (battery.has_cell_voltages(instance)) {
+        const AP_BattMonitor::cells& batt_cells = battery.get_cell_voltages(instance);
+        memcpy(voltages, batt_cells.cells, sizeof(voltages));
+    }
+    
+    uint8_t unk1 = 0, unk2 = 0, unk4 = 0, unk5 = 0;
+    uint16_t unk3 = 0;
+    AP_BattMonitor::BattMonitor_Info info;
+    if (battery.get_battery_info(info, instance)) {
+        unk1 = info.unk1;
+        unk2 = info.unk2;
+        unk3 = info.unk3;
+        unk4 = info.unk4;
+        unk5 = info.unk5;
+    }
+    mavlink_msg_flyhawk_smart_battery_status_send(chan,
+                                                    instance,
+                                                    got_temperature ? ((int16_t) (temp * 100)) : INT16_MAX, // temperature. INT16_MAX if unknown
+                                                    battery.voltage(instance) * 1000.0f, // converting V to mV
+                                                    voltages,
+                                                    current,
+                                                    current2,
+                                                    percentage,
+                                                    is_powering_off,
+                                                    is_on,
+                                                    unk1, unk2, unk3, unk4, unk5);
 }
 
 // returns true if all battery instances were reported
@@ -308,7 +358,8 @@ bool GCS_MAVLINK::send_battery_status()
 
     for(uint8_t i = 0; i < AP_BATT_MONITOR_MAX_INSTANCES; i++) {
         const uint8_t battery_id = (last_battery_status_idx + 1) % AP_BATT_MONITOR_MAX_INSTANCES;
-        if (battery.get_type(battery_id) != AP_BattMonitor::Type::NONE) {
+        if ((battery.get_type(battery_id) != AP_BattMonitor::Type::NONE) &&
+            (battery.get_type(battery_id) != AP_BattMonitor::Type::UAVCAN_FlyhawkSmartBattery)) {  // The UAVCAN_FlyhawkSmartBattery status is being sent from send_flyhawk_smart_battery_status()
             CHECK_PAYLOAD_SIZE(BATTERY_STATUS);
             send_battery_status(battery_id);
             last_battery_status_idx = battery_id;
@@ -504,6 +555,8 @@ MissionItemProtocol *GCS::get_prot_for_mission_type(const MAV_MISSION_TYPE missi
         return _missionitemprotocol_rally;
     case MAV_MISSION_TYPE_FENCE:
         return _missionitemprotocol_fence;
+    case MAV_MISSION_TYPE_FALLBACK:
+        return _missionitemprotocol_fallback;
     default:
         return nullptr;
     }
@@ -522,7 +575,8 @@ void GCS_MAVLINK::handle_mission_request_list(const mavlink_message_t &msg)
                                      msg.sysid,
                                      msg.compid,
                                      MAV_MISSION_UNSUPPORTED,
-                                     packet.mission_type);
+                                     packet.mission_type,
+                                     packet.tid);
         return;
     }
 
@@ -574,7 +628,8 @@ void GCS_MAVLINK::handle_mission_set_current(AP_Mission &mission, const mavlink_
     mavlink_msg_mission_set_current_decode(&msg, &packet);
 
     // set current command
-    if (mission.set_current_cmd(packet.seq)) {
+
+    if (mission.set_index_boundaries(0, 0) && mission.set_current_cmd(packet.seq)) {
         // because MISSION_SET_CURRENT is a message not a command,
         // there is not ACK associated with us successfully changing
         // our waypoint.  Some GCSs use the fact we return exactly the
@@ -607,7 +662,8 @@ void GCS_MAVLINK::handle_mission_count(const mavlink_message_t &msg)
                                      msg.sysid,
                                      msg.compid,
                                      MAV_MISSION_UNSUPPORTED,
-                                     packet.mission_type);
+                                     packet.mission_type,
+                                     packet.tid);
         return;
     }
 
@@ -626,7 +682,7 @@ void GCS_MAVLINK::handle_mission_clear_all(const mavlink_message_t &msg) const
     const MAV_MISSION_TYPE mission_type = (MAV_MISSION_TYPE)packet.mission_type;
     MissionItemProtocol *prot = gcs().get_prot_for_mission_type(mission_type);
     if (prot == nullptr) {
-        send_mission_ack(msg, mission_type, MAV_MISSION_UNSUPPORTED);
+        send_mission_ack(msg, mission_type, MAV_MISSION_UNSUPPORTED, packet.tid);
         return;
     }
 
@@ -652,7 +708,7 @@ void GCS_MAVLINK::handle_mission_write_partial_list(const mavlink_message_t &msg
 
     MissionItemProtocol *use_prot = gcs().get_prot_for_mission_type((MAV_MISSION_TYPE)packet.mission_type);
     if (use_prot == nullptr) {
-        send_mission_ack(msg, (MAV_MISSION_TYPE)packet.mission_type, MAV_MISSION_UNSUPPORTED);
+        send_mission_ack(msg, (MAV_MISSION_TYPE)packet.mission_type, MAV_MISSION_UNSUPPORTED, packet.tid);
         return;
     }
     use_prot->handle_mission_write_partial_list(*this, msg, packet);
@@ -768,7 +824,7 @@ void GCS_MAVLINK::handle_mission_item(const mavlink_message_t &msg)
         MAV_MISSION_RESULT ret = AP_Mission::convert_MISSION_ITEM_to_MISSION_ITEM_INT(mission_item, packet);
         if (ret != MAV_MISSION_ACCEPTED) {
             const MAV_MISSION_TYPE type = (MAV_MISSION_TYPE)packet.mission_type;
-            send_mission_ack(msg, type, ret);
+            send_mission_ack(msg, type, ret, packet.tid);
             return;
         }
     } else {
@@ -782,7 +838,7 @@ void GCS_MAVLINK::handle_mission_item(const mavlink_message_t &msg)
         MAV_MISSION_RESULT result = AP_Mission::mavlink_int_to_mission_cmd(packet, cmd);
         if (result != MAV_MISSION_ACCEPTED) {
             //decode failed
-            send_mission_ack(msg, MAV_MISSION_TYPE_MISSION, result);
+            send_mission_ack(msg, MAV_MISSION_TYPE_MISSION, result, packet.tid);
             return;
         }
         // guided or change-alt
@@ -799,23 +855,26 @@ void GCS_MAVLINK::handle_mission_item(const mavlink_message_t &msg)
             // verify we recevied the command
             result = MAV_MISSION_ACCEPTED;
         }
-        send_mission_ack(msg, MAV_MISSION_TYPE_MISSION, result);
+        send_mission_ack(msg, MAV_MISSION_TYPE_MISSION, result, packet.tid);
         return;
     }
 
     // not a guided-mode reqest
     MissionItemProtocol *prot = gcs().get_prot_for_mission_type(type);
     if (prot == nullptr) {
-        send_mission_ack(msg, type, MAV_MISSION_UNSUPPORTED);
+        send_mission_ack(msg, type, MAV_MISSION_UNSUPPORTED, packet.tid);
         return;
     }
 
     if (!prot->receiving) {
-        send_mission_ack(msg, type, MAV_MISSION_ERROR);
+        send_mission_ack(msg, type, MAV_MISSION_NOT_RECEIVING, packet.tid);
         return;
     }
 
     prot->handle_mission_item(msg, packet);
+
+
+    AP::logger().Write_Mission_Item(packet);
 }
 
 ap_message GCS_MAVLINK::mavlink_id_to_ap_message_id(const uint32_t mavlink_id) const
@@ -903,6 +962,9 @@ ap_message GCS_MAVLINK::mavlink_id_to_ap_message_id(const uint32_t mavlink_id) c
         { MAVLINK_MSG_ID_HIGH_LATENCY2,         MSG_HIGH_LATENCY2},
         { MAVLINK_MSG_ID_AIS_VESSEL,            MSG_AIS_VESSEL},
         { MAVLINK_MSG_ID_UAVIONIX_ADSB_OUT_STATUS, MSG_UAVIONIX_ADSB_OUT_STATUS},
+        { MAVLINK_MSG_ID_FLYHAWK_SMART_BATTERY_STATUS,  MSG_FLYHAWK_SMART_BATTERY_STATUS},
+        { MAVLINK_MSG_ID_FLYHAWK_SMART_BATTERY_INFO,  MSG_FLYHAWK_SMART_BATTERY_INFO},
+        { MAVLINK_MSG_ID_COMPONENT_HEALTH_STATUS, MSG_COMPONENT_HEALTH_STATUS},
             };
 
     for (uint8_t i=0; i<ARRAY_SIZE(map); i++) {
@@ -1964,7 +2026,8 @@ void GCS::send_textv(MAV_SEVERITY severity, const char *fmt, va_list arg_list, u
     // don't hold the statustext semaphore while doing them:
     AP_Logger *logger = AP_Logger::get_singleton();
     if (logger != nullptr) {
-        logger->Write_Message(first_piece_of_text);
+        bool is_debug = (severity == MAV_SEVERITY_DEBUG);
+        logger->Write_Message(first_piece_of_text, is_debug);
     }
 
     frsky = AP::frsky_telem();
@@ -2120,6 +2183,10 @@ void GCS::update_send()
         if (fence != nullptr) {
             _missionitemprotocol_fence = new MissionItemProtocol_Fence(*fence);
         }
+        AP_Fallback_Mission *fallback_mission = AP::fallback_mission();
+        if (fallback_mission != nullptr) {
+            _missionitemprotocol_fallback = new MissionItemProtocol_Fallback(*fallback_mission);
+        }
     }
     if (_missionitemprotocol_waypoints != nullptr) {
         _missionitemprotocol_waypoints->update();
@@ -2129,6 +2196,9 @@ void GCS::update_send()
     }
     if (_missionitemprotocol_fence != nullptr) {
         _missionitemprotocol_fence->update();
+    }
+    if (_missionitemprotocol_fallback != nullptr) {
+        _missionitemprotocol_fallback->update();
     }
 #endif // HAL_BUILD_AP_PERIPH
     // round-robin the GCS_MAVLINK backend that gets to go first so
@@ -2275,7 +2345,8 @@ void GCS_MAVLINK::handle_set_mode(const mavlink_message_t &msg)
         mavlink_msg_command_ack_send(chan, MAVLINK_MSG_ID_SET_MODE, result,
                                      0, 0,
                                      msg.sysid,
-                                     msg.compid);
+                                     msg.compid,
+                                     packet.tid);
     }
 }
 
@@ -2390,6 +2461,12 @@ void GCS_MAVLINK::send_autopilot_version() const
                         version.minor << (8 * 2) | \
                         version.patch << (8 * 1) | \
                         (uint32_t)(version.fw_type) << (8 * 0);
+
+    middleware_sw_version = version.mw_major << (8 * 3) | \
+                            version.mw_minor << (8 * 2) | \
+                            version.mw_patch << (8 * 1) | \
+                            (uint32_t)(version.mw_type) << (8 * 0);
+
 
     if (version.fw_hash_str) {
         strncpy_noterm(flight_custom_version, version.fw_hash_str, ARRAY_SIZE(flight_custom_version));
@@ -2730,7 +2807,7 @@ void GCS_MAVLINK::send_accelcal_vehicle_position(uint32_t position)
             MAV_CMD_ACCELCAL_VEHICLE_POS,
             0,
             (float) position,
-            0, 0, 0, 0, 0, 0);
+            0, 0, 0, 0, 0, 0, 0);
     }
 }
 
@@ -2861,7 +2938,7 @@ MAV_RESULT GCS_MAVLINK::handle_preflight_reboot(const mavlink_command_long_t &pa
 
     // send ack before we reboot
     mavlink_msg_command_ack_send(chan, packet.command, MAV_RESULT_ACCEPTED,
-                                 0, 0, 0, 0);
+                                 0, 0, 0, 0, packet.tid);
 
     // when packet.param1 == 3 we reboot to hold in bootloader
     const bool hold_in_bootloader = is_equal(packet.param1, 3.0f);
@@ -3530,9 +3607,12 @@ void GCS_MAVLINK::handle_common_message(const mavlink_message_t &msg)
         break;
     case MAVLINK_MSG_ID_LOG_REQUEST_LIST:
     case MAVLINK_MSG_ID_LOG_REQUEST_DATA:
+    case MAVLINK_MSG_ID_LOG_REQUEST_DATA_BY_LABEL:
     case MAVLINK_MSG_ID_LOG_ERASE:
     case MAVLINK_MSG_ID_LOG_REQUEST_END:
     case MAVLINK_MSG_ID_REMOTE_LOG_BLOCK_STATUS:
+    case MAVLINK_MSG_ID_SET_LOG_LABEL:
+    case MAVLINK_MSG_ID_LOG_REQUEST_LABEL_LIST:
         AP::logger().handle_mavlink_msg(*this, msg);
         break;
 
@@ -3601,7 +3681,9 @@ void GCS_MAVLINK::handle_common_message(const mavlink_message_t &msg)
     case MAVLINK_MSG_ID_GPS_INPUT:
     case MAVLINK_MSG_ID_HIL_GPS:
     case MAVLINK_MSG_ID_GPS_INJECT_DATA:
-        AP::gps().handle_msg(msg);
+    case MAVLINK_MSG_ID_GPS_RTK_COUNT:
+    case MAVLINK_MSG_ID_GPS_RTK_DATA:
+        AP::gps().handle_msg(chan, msg);
         break;
 
     case MAVLINK_MSG_ID_STATUSTEXT:
@@ -3622,6 +3704,15 @@ void GCS_MAVLINK::handle_common_message(const mavlink_message_t &msg)
         // send message to Notify
         AP_Notify::handle_play_tune(msg);
         break;
+
+#ifdef FTS
+    case MAVLINK_MSG_ID_PLAY_TONE:
+        mavlink_play_tone_t packet;
+        mavlink_msg_play_tone_decode(&msg, &packet);
+        AP::parachute()->play_tone(packet.duration);
+        break;
+
+#endif
 
     case MAVLINK_MSG_ID_RALLY_POINT:
     case MAVLINK_MSG_ID_RALLY_FETCH_POINT:
@@ -3798,6 +3889,8 @@ void GCS_MAVLINK::handle_common_mission_message(const mavlink_message_t &msg)
         /* not used */
         break;
     }
+
+    check_simulated_failsafe_gcs(msg);
 }
 
 void GCS_MAVLINK::handle_send_autopilot_version(const mavlink_message_t &msg)
@@ -3812,18 +3905,23 @@ void GCS_MAVLINK::send_banner()
 
     send_text(MAV_SEVERITY_INFO, "%s", fwver.fw_string);
 
-    if (fwver.middleware_name && fwver.os_name) {
+    if (fwver.middleware_name && fwver.middleware_hash_str && fwver.os_name && fwver.os_hash_str) {
         send_text(MAV_SEVERITY_INFO, "%s: %s %s: %s",
                   fwver.middleware_name, fwver.middleware_hash_str,
                   fwver.os_name, fwver.os_hash_str);
-    } else if (fwver.os_name) {
+    } else if (fwver.os_name && fwver.os_hash_str) {
         send_text(MAV_SEVERITY_INFO, "%s: %s",
                   fwver.os_name, fwver.os_hash_str);
     }
 
     // send system ID if we can
     char sysid[40];
-    if (hal.util->get_system_id(sysid)) {
+    uint8_t sysid_len = sizeof(sysid) / 2 - 1;  // each byte is two chars, minus 1 char for '\0'
+    uint8_t raw_sysid[sysid_len] = {};
+    if (hal.util->get_system_id_unformatted(raw_sysid, sysid_len)) {
+        for (uint8_t i = 0; i < sysid_len; ++i) {
+            snprintf(sysid + (i * 2), 3, "%02x", raw_sysid[i]);
+        }
         send_text(MAV_SEVERITY_INFO, "%s", sysid);
     }
 
@@ -4022,6 +4120,16 @@ MAV_RESULT GCS_MAVLINK::handle_command_run_prearm_checks(const mavlink_command_l
     }
     (void)AP::arming().pre_arm_checks(true);
     return MAV_RESULT_ACCEPTED;
+}
+
+MAV_RESULT GCS_MAVLINK::handle_command_uavcan_get_node_info(const mavlink_command_long_t &packet)
+{
+#if HAL_MAX_CAN_PROTOCOL_DRIVERS
+    AP::uavcan_dna_server().send_mavlink_uavcan_node_info(chan);
+    return MAV_RESULT_ACCEPTED;
+#else
+    return MAV_RESULT_UNSUPPORTED;
+#endif
 }
 
 MAV_RESULT GCS_MAVLINK::handle_command_preflight_can(const mavlink_command_long_t &packet)
@@ -4306,7 +4414,11 @@ MAV_RESULT GCS_MAVLINK::handle_command_component_arm_disarm(const mavlink_comman
             return MAV_RESULT_ACCEPTED;
         }
         // run pre_arm_checks and arm_checks and display failures
+#ifdef FTS
+        const bool do_arming_checks = false;  // In FTS mode, we skip all the arming checks
+#else
         const bool do_arming_checks = !is_equal(packet.param2,magic_force_arm_value);
+#endif
         if (AP::arming().arm(AP_Arming::Method::MAVLINK, do_arming_checks)) {
             return MAV_RESULT_ACCEPTED;
         }
@@ -4428,6 +4540,10 @@ MAV_RESULT GCS_MAVLINK::handle_command_long_packet(const mavlink_command_long_t 
 
     case MAV_CMD_PREFLIGHT_UAVCAN:
         result = handle_command_preflight_can(packet);
+        break;
+
+    case MAV_CMD_UAVCAN_GET_NODE_INFO:
+        result = handle_command_uavcan_get_node_info(packet);
         break;
 
     case MAV_CMD_RUN_PREARM_CHECKS:
@@ -4574,6 +4690,7 @@ void GCS_MAVLINK::convert_COMMAND_LONG_to_COMMAND_INT(const mavlink_command_long
         out.y = in.param6;
     }
     out.z = in.param7;
+    out.tid = in.tid;
 }
 
 void GCS_MAVLINK::handle_command_long(const mavlink_message_t &msg)
@@ -4601,7 +4718,8 @@ void GCS_MAVLINK::handle_command_long(const mavlink_message_t &msg)
     mavlink_msg_command_ack_send(chan, packet.command, result,
                                  0, 0,
                                  msg.sysid,
-                                 msg.compid);
+                                 msg.compid,
+                                 packet.tid);
 
     // log the packet:
     mavlink_command_int_t packet_int;
@@ -4782,7 +4900,8 @@ void GCS_MAVLINK::handle_command_int(const mavlink_message_t &msg)
     mavlink_msg_command_ack_send(chan, packet.command, result,
                                  0, 0,
                                  msg.sysid,
-                                 msg.compid);
+                                 msg.compid,
+                                 packet.tid);
 
     AP::logger().Write_Command(packet, msg.sysid, msg.compid, result);
 
@@ -4829,6 +4948,11 @@ bool GCS_MAVLINK::try_send_mission_message(const enum ap_message id)
     case MSG_NEXT_MISSION_REQUEST_FENCE:
         CHECK_PAYLOAD_SIZE(MISSION_REQUEST);
         gcs().try_send_queued_message_for_type(MAV_MISSION_TYPE_FENCE);
+        ret = true;
+        break;
+    case MSG_NEXT_MISSION_REQUEST_FALLBACK:
+        CHECK_PAYLOAD_SIZE(MISSION_REQUEST);
+        gcs().try_send_queued_message_for_type(MAV_MISSION_TYPE_FALLBACK);
         ret = true;
         break;
     default:
@@ -4878,9 +5002,10 @@ void GCS_MAVLINK::send_sys_status()
 #if !defined(HAL_BUILD_AP_PERIPH) || defined(HAL_PERIPH_ENABLE_BATTERY)
     const AP_BattMonitor &battery = AP::battery();
     float battery_current;
-    const int8_t battery_remaining = battery_remaining_pct(AP_BATT_PRIMARY_INSTANCE);
+    uint8_t battery_remaining;
 
-    if (battery.healthy() && battery.current_amps(battery_current)) {
+    IGNORE_RETURN(battery.capacity_remaining_pct(battery_remaining));
+    if (battery.current_amps(battery_current)) {
         battery_current = constrain_float(battery_current * 100,-INT16_MAX,INT16_MAX);
     } else {
         battery_current = -1;
@@ -4890,8 +5015,12 @@ void GCS_MAVLINK::send_sys_status()
     uint32_t control_sensors_present;
     uint32_t control_sensors_enabled;
     uint32_t control_sensors_health;
+    uint32_t control_sensors_extension_present;
+    uint32_t control_sensors_extension_enabled;
+    uint32_t control_sensors_extension_health;
 
-    gcs().get_sensor_status_flags(control_sensors_present, control_sensors_enabled, control_sensors_health);
+    gcs().get_sensor_status_flags(control_sensors_present, control_sensors_enabled, control_sensors_health,
+                                  control_sensors_extension_present, control_sensors_extension_enabled, control_sensors_extension_health);
 
     const uint32_t errors = AP::internalerror().errors();
     const uint16_t errors1 = errors & 0xffff;
@@ -4918,7 +5047,11 @@ void GCS_MAVLINK::send_sys_status()
         errors1,
         errors2,
         0,  // errors3
-        errors4); // errors4
+        errors4, // errors4
+        failsafe_status(),
+        control_sensors_extension_present,
+        control_sensors_extension_enabled,
+        control_sensors_extension_health);
 }
 
 void GCS_MAVLINK::send_extended_sys_state() const
@@ -5137,6 +5270,85 @@ void GCS_MAVLINK::send_received_message_deprecation_warning(const char * message
     send_text(MAV_SEVERITY_WARNING, "Received message (%s) is deprecated", message);
 }
 
+void GCS_MAVLINK::send_flyhawk_smart_battery_status()
+{
+    const AP_BattMonitor &battery = AP::battery();
+
+    if (gcs().frame_type() == MAV_TYPE::MAV_TYPE_FTS) {
+        return;  // do not send battery status when in FTS mode
+    }
+    if (AP::logger().in_log_download()) {
+        return;  // do not send battery status when in log download so the log will be downloaded faster
+    }
+
+    for(uint8_t i = 0; i < AP_BATT_MONITOR_MAX_INSTANCES; i++) {
+        const uint8_t battery_id = (last_flyhawk_smart_battery_status_idx + 1) % AP_BATT_MONITOR_MAX_INSTANCES;
+        if (battery.get_type(battery_id) != AP_BattMonitor::Type::UAVCAN_FlyhawkSmartBattery) {
+            last_flyhawk_smart_battery_status_idx = battery_id;
+            continue;
+        }
+        if (!HAVE_PAYLOAD_SPACE(chan, FLYHAWK_SMART_BATTERY_STATUS)) {
+            return;
+        }
+        send_flyhawk_smart_battery_status(battery_id);
+
+        last_flyhawk_smart_battery_status_idx = battery_id;
+        return;
+    }
+}
+
+void GCS_MAVLINK::send_flyhawk_smart_battery_info()
+{
+    const AP_BattMonitor &battery = AP::battery();
+
+    if (gcs().frame_type() == MAV_TYPE::MAV_TYPE_FTS) {
+        return;  // do not send battery info when in FTS mode
+    }
+    if (AP::logger().in_log_download()) {
+        return;  // do not send battery info when in log download so the log will be downloaded faster
+    }
+
+    for(uint8_t i = 0; i < AP_BATT_MONITOR_MAX_INSTANCES; i++) {
+        const uint8_t battery_id = (last_flyhawk_smart_battery_info_idx + 1) % AP_BATT_MONITOR_MAX_INSTANCES;
+        if (battery.get_type(battery_id) != AP_BattMonitor::Type::UAVCAN_FlyhawkSmartBattery) {
+            last_flyhawk_smart_battery_info_idx = battery_id;
+            continue;
+        }
+        if (!HAVE_PAYLOAD_SPACE(chan, FLYHAWK_SMART_BATTERY_INFO)) {
+            return;
+        }
+        AP_BattMonitor::BattMonitor_Info info;
+        if (!battery.get_battery_info(info, battery_id)) {
+            return;
+        }
+        mavlink_msg_flyhawk_smart_battery_info_send(chan,
+                                                    battery_id,
+                                                    info.capacity_initial_mah,
+                                                    info.capacity_current_mah,
+                                                    info.cycles,
+                                                    info.serial_num,
+                                                    info.model_name,
+                                                    info.firmware_id,
+                                                    info.lifetime_pct,
+                                                    info.made_year,
+                                                    info.info_unk1,
+                                                    info.info_unk2,
+                                                    info.info_unk3,
+                                                    info.info_serial,
+                                                    info.info_unk4,
+                                                    info.info_unk5,
+                                                    info.version_unk1,
+                                                    info.version_unk2);
+        last_flyhawk_smart_battery_info_idx = battery_id;
+        return;
+    }
+}
+
+void GCS_MAVLINK::send_component_health_status()
+{
+    mavlink_msg_component_health_status_send(chan, AP::gps().get_accuracy_level());
+}
+
 bool GCS_MAVLINK::try_send_message(const enum ap_message id)
 {
     bool ret = true;
@@ -5199,6 +5411,7 @@ bool GCS_MAVLINK::try_send_message(const enum ap_message id)
     case MSG_NEXT_MISSION_REQUEST_WAYPOINTS:
     case MSG_NEXT_MISSION_REQUEST_RALLY:
     case MSG_NEXT_MISSION_REQUEST_FENCE:
+    case MSG_NEXT_MISSION_REQUEST_FALLBACK:
         ret = try_send_mission_message(id);
         break;
 
@@ -5260,8 +5473,13 @@ bool GCS_MAVLINK::try_send_message(const enum ap_message id)
         send_system_time();
         break;
     case MSG_GPS_RAW:
-        CHECK_PAYLOAD_SIZE(GPS_RAW_INT);
-        AP::gps().send_mavlink_gps_raw(chan);
+        static uint8_t instance = 0;
+        for (; instance < AP::gps().num_sensors(); ++instance) {
+            // if ther'es no room for the message it will return false and "remember" the instance number (static var) to start sending from on the next try_send_message call
+            CHECK_PAYLOAD_SIZE(GPS_RAW_INT);
+            AP::gps().send_mavlink_gps_raw(chan, instance);
+        }
+        instance = 0;  // we sent all of them, reset the counter
         break;
     case MSG_GPS_RTK:
         CHECK_PAYLOAD_SIZE(GPS_RTK);
@@ -5469,6 +5687,21 @@ bool GCS_MAVLINK::try_send_message(const enum ap_message id)
     case MSG_UAVIONIX_ADSB_OUT_STATUS:
         CHECK_PAYLOAD_SIZE(UAVIONIX_ADSB_OUT_STATUS);
         send_uavionix_adsb_out_status();
+        break;
+
+    case MSG_FLYHAWK_SMART_BATTERY_STATUS:
+        CHECK_PAYLOAD_SIZE(FLYHAWK_SMART_BATTERY_STATUS);
+        send_flyhawk_smart_battery_status();
+        break;
+
+    case MSG_FLYHAWK_SMART_BATTERY_INFO:
+        CHECK_PAYLOAD_SIZE(FLYHAWK_SMART_BATTERY_INFO);
+        send_flyhawk_smart_battery_info();
+        break;
+
+    case MSG_COMPONENT_HEALTH_STATUS:
+        CHECK_PAYLOAD_SIZE(COMPONENT_HEALTH_STATUS);
+        send_component_health_status();
         break;
 
     default:
@@ -6031,7 +6264,11 @@ void GCS_MAVLINK::send_high_latency2() const
     uint32_t present;
     uint32_t enabled;
     uint32_t health;
-    gcs().get_sensor_status_flags(present, enabled, health);
+    uint32_t extension_present;
+    uint32_t extension_enabled;
+    uint32_t extension_health;
+    gcs().get_sensor_status_flags(present, enabled, health, extension_present, extension_enabled, extension_health);
+
     // Remap HL_FAILURE_FLAG from system status flags
     static const struct PACKED status_map_t {
         MAV_SYS_STATUS_SENSOR sensor;

@@ -52,9 +52,20 @@ bool MissionItemProtocol_Waypoints::clear_all_items()
 
 MAV_MISSION_RESULT MissionItemProtocol_Waypoints::complete(const GCS_MAVLINK &_link)
 {
-    _link.send_text(MAV_SEVERITY_INFO, "Flight plan received");
+    MAV_MISSION_RESULT result = MissionItemProtocol::complete(_link);
+    if (!_next_mission.is_update) {
+        mission.set_current_cmd(0);
+    }
+
+    if (result == MAV_MISSION_ACCEPTED) {
+        if (_next_mission.is_update) {
+            _link.send_text(MAV_SEVERITY_INFO, "Flight plan updated");
+        } else {
+            _link.send_text(MAV_SEVERITY_INFO, "Flight plan received");
+        }
+    }
     AP::logger().Write_EntireMission();
-    return MAV_MISSION_ACCEPTED;
+    return result;
 }
 
 MAV_MISSION_RESULT MissionItemProtocol_Waypoints::get_item(const GCS_MAVLINK &_link,
@@ -69,7 +80,8 @@ MAV_MISSION_RESULT MissionItemProtocol_Waypoints::get_item(const GCS_MAVLINK &_l
                                        msg.sysid,
                                        msg.compid,
                                        mission.num_commands(),
-                                       MAV_MISSION_TYPE_MISSION);
+                                       MAV_MISSION_TYPE_MISSION,
+                                       packet.tid);
         return MAV_MISSION_ERROR;
     }
 
@@ -131,8 +143,20 @@ void MissionItemProtocol_Waypoints::timeout()
     link->send_text(MAV_SEVERITY_WARNING, "Mission upload timeout");
 }
 
-void MissionItemProtocol_Waypoints::truncate(const mavlink_mission_count_t &packet)
+void MissionItemProtocol_Waypoints::truncate(uint16_t mission_items)
 {
     // new mission arriving, truncate mission to be the same length
-    mission.truncate(packet.count);
+    mission.truncate(mission_items);
+}
+
+// replace_cmd - replaces the command at position 'index' in the command list with the provided cmd
+//     returns true if successfully replaced, false on failure
+bool MissionItemProtocol_Waypoints::replace_cmd(uint16_t index, const AP_Mission::Mission_Command& cmd) {
+    return mission.replace_cmd(index, cmd);
+}
+
+// add_cmd - adds a command to the end of the command list and writes to storage
+//     returns true if successfully added, false on failure
+bool MissionItemProtocol_Waypoints::add_cmd(AP_Mission::Mission_Command& cmd) {
+    return mission.add_cmd(cmd);
 }

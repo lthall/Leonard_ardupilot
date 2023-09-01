@@ -15,6 +15,7 @@
 #include <AP_Common/AP_Common.h>
 #include "GCS_MAVLink.h"
 #include <AP_Mission/AP_Mission.h>
+#include <AP_Fallback_Mission/AP_Fallback_Mission.h>
 #include <stdint.h>
 #include "MAVLink_routing.h"
 #include <AP_Frsky_Telem/AP_Frsky_Telem.h>
@@ -33,6 +34,7 @@
 #include "MissionItemProtocol_Waypoints.h"
 #include "MissionItemProtocol_Rally.h"
 #include "MissionItemProtocol_Fence.h"
+#include "MissionItemProtocol_Fallback.h"
 #include "ap_message.h"
 
 #define GCS_DEBUG_SEND_MESSAGE_TIMINGS 0
@@ -174,15 +176,17 @@ public:
 
     void send_mission_ack(const mavlink_message_t &msg,
                           MAV_MISSION_TYPE mission_type,
-                          MAV_MISSION_RESULT result) const {
+                          MAV_MISSION_RESULT result,
+                          uint8_t tid) const {
         mavlink_msg_mission_ack_send(chan,
                                      msg.sysid,
                                      msg.compid,
                                      result,
-                                     mission_type);
+                                     mission_type,
+                                     tid);
     }
 
-    static const MAV_MISSION_TYPE supported_mission_types[3];
+    static const MAV_MISSION_TYPE supported_mission_types[4];
 
     // packetReceived is called on any successful decode of a mavlink message
     virtual void packetReceived(const mavlink_status_t &status,
@@ -271,6 +275,7 @@ public:
 #if HAL_WITH_MCU_MONITORING
     void send_mcu_status(void);
 #endif
+    void send_flyhawk_smart_battery_status(const uint8_t instance) const;
     void send_battery_status(const uint8_t instance) const;
     bool send_battery_status();
     void send_distance_sensor();
@@ -327,6 +332,9 @@ public:
     void send_high_latency2() const;
 #endif // HAL_HIGH_LATENCY2_ENABLED
     void send_uavionix_adsb_out_status() const;
+    void send_flyhawk_smart_battery_status();
+    void send_flyhawk_smart_battery_info();
+    void send_component_health_status();
 
     // lock a channel, preventing use by MAVLink
     void lock(bool _lock) {
@@ -412,6 +420,8 @@ protected:
     virtual MAV_MODE base_mode() const = 0;
     MAV_STATE system_status() const;
     virtual MAV_STATE vehicle_system_status() const = 0;
+    virtual uint8_t failsafe_status() const = 0;
+    virtual void check_simulated_failsafe_gcs(mavlink_message_t msg) const = 0;
 
     virtual MAV_VTOL_STATE vtol_state() const { return MAV_VTOL_STATE_UNDEFINED; }
     virtual MAV_LANDED_STATE landed_state() const { return MAV_LANDED_STATE_UNDEFINED; }
@@ -541,6 +551,8 @@ protected:
     virtual MAV_RESULT _handle_command_preflight_calibration_baro();
 
     MAV_RESULT handle_command_preflight_can(const mavlink_command_long_t &packet);
+
+    MAV_RESULT handle_command_uavcan_get_node_info(const mavlink_command_long_t &packet);
 
     virtual MAV_RESULT handle_command_do_set_mission_current(const mavlink_command_long_t &packet);
 
@@ -963,6 +975,8 @@ private:
     uint32_t last_mavlink_stats_logged;
 
     uint8_t last_battery_status_idx;
+    uint8_t last_flyhawk_smart_battery_status_idx;
+    uint8_t last_flyhawk_smart_battery_info_idx;
 
     // if we've ever sent a DISTANCE_SENSOR message out of an
     // orientation we continue to send it out, even if it is not
@@ -1055,6 +1069,7 @@ public:
     static MissionItemProtocol_Waypoints *_missionitemprotocol_waypoints;
     static MissionItemProtocol_Rally *_missionitemprotocol_rally;
     static MissionItemProtocol_Fence *_missionitemprotocol_fence;
+    static MissionItemProtocol_Fallback *_missionitemprotocol_fallback;
     MissionItemProtocol *get_prot_for_mission_type(const MAV_MISSION_TYPE mission_type) const;
     void try_send_queued_message_for_type(MAV_MISSION_TYPE type) const;
 
@@ -1097,7 +1112,8 @@ public:
     // update uart pass-thru
     void update_passthru();
 
-    void get_sensor_status_flags(uint32_t &present, uint32_t &enabled, uint32_t &health);
+    void get_sensor_status_flags(uint32_t &present, uint32_t &enabled, uint32_t &health,
+                                 uint32_t &present_extension, uint32_t &enabled_extension, uint32_t &health_extension);
     virtual bool vehicle_initialised() const { return true; }
 
     virtual bool simple_input_active() const { return false; }
@@ -1119,6 +1135,9 @@ protected:
     uint32_t control_sensors_present;
     uint32_t control_sensors_enabled;
     uint32_t control_sensors_health;
+    uint32_t control_sensors_extension_present;
+    uint32_t control_sensors_extension_enabled;
+    uint32_t control_sensors_extension_health;
     virtual void update_vehicle_sensor_status_flags() {}
 
     GCS_MAVLINK_Parameters chan_parameters[MAVLINK_COMM_NUM_BUFFERS];
@@ -1140,6 +1159,8 @@ private:
     }
 
     void update_sensor_status_flags();
+
+    bool is_escs_healthy();
 
     // time we last saw traffic from our GCS
     uint32_t _sysid_mygcs_last_seen_time_ms;

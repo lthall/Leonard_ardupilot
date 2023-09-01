@@ -13,7 +13,7 @@ public:
         return MAV_MISSION_TYPE_FENCE;
     }
 
-    void truncate(const mavlink_mission_count_t &packet) override;
+    void truncate(uint16_t mission_items) override;
     MAV_MISSION_RESULT complete(const GCS_MAVLINK &_link) override;
     void timeout() override;
 
@@ -45,7 +45,7 @@ private:
 
     void free_upload_resources() override;
     MAV_MISSION_RESULT allocate_receive_resources(const uint16_t count) override WARN_IF_UNUSED;
-    MAV_MISSION_RESULT allocate_update_resources() override WARN_IF_UNUSED;
+    MAV_MISSION_RESULT allocate_update_resources(const uint16_t count = 0) override WARN_IF_UNUSED;
 
     class AC_PolyFenceItem *_new_items;
     uint16_t _new_items_count;

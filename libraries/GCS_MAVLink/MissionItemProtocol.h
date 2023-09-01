@@ -6,6 +6,8 @@
 
 #include <stdint.h>
 
+#include <AP_Mission/AP_Mission.h>
+
 // MissionItemProtocol objects are used for transfering missions from
 // a GCS to ArduPilot and vice-versa.
 //
@@ -24,6 +26,10 @@
 class MissionItemProtocol
 {
 public:
+    MissionItemProtocol() {
+        _next_mission.count = 0;
+        _next_mission.commands = nullptr;
+    }
 
     // note that all of these methods are named after the packet they
     // are handling; the "mission" part just comes as part of that.
@@ -37,7 +43,7 @@ public:
                                 const mavlink_mission_request_t &packet,
                                 const mavlink_message_t &msg);
 
-    void handle_mission_count(class GCS_MAVLINK &link,
+    virtual void handle_mission_count(class GCS_MAVLINK &link,
                               const mavlink_mission_count_t &packet,
                               const mavlink_message_t &msg);
     void handle_mission_write_partial_list(GCS_MAVLINK &link,
@@ -46,7 +52,7 @@ public:
 
     // called on receipt of a MISSION_ITEM or MISSION_ITEM_INT packet;
     // the former is converted to the latter.
-    void handle_mission_item(const mavlink_message_t &msg,
+    virtual void handle_mission_item(const mavlink_message_t &msg,
                              const mavlink_mission_item_int_t &cmd);
 
     void handle_mission_clear_all(const GCS_MAVLINK &link,
@@ -73,18 +79,23 @@ protected:
 
     uint16_t        request_last; // last request index
 
-private:
-
-    virtual void truncate(const mavlink_mission_count_t &packet) = 0;
-
     uint16_t        request_i; // request index
 
     // waypoints
     uint8_t         dest_sysid;  // where to send requests
     uint8_t         dest_compid; // "
+    uint8_t         _tid;
     uint32_t        timelast_receive_ms;
     uint32_t        timelast_request_ms;
-    const uint16_t  upload_timeout_ms = 8000;
+    const uint16_t  upload_timeout_ms = 3000;
+
+    void init_send_requests(GCS_MAVLINK &_link,
+                            const mavlink_message_t &msg,
+                            const int16_t _request_first,
+                            const int16_t _request_last,
+                            uint8_t tid);
+    virtual MAV_MISSION_RESULT allocate_receive_resources(const uint16_t count) WARN_IF_UNUSED;
+
 
     // support for GCS getting waypoints etc from us:
     virtual MAV_MISSION_RESULT get_item(const GCS_MAVLINK &_link,
@@ -92,20 +103,41 @@ private:
                                         const mavlink_mission_request_int_t &packet,
                                         mavlink_mission_item_int_t &ret_packet) = 0;
 
-    void init_send_requests(GCS_MAVLINK &_link,
-                            const mavlink_message_t &msg,
-                            const int16_t _request_first,
-                            const int16_t _request_last);
-    virtual MAV_MISSION_RESULT allocate_receive_resources(const uint16_t count) WARN_IF_UNUSED {
-        return MAV_MISSION_ACCEPTED;
-    }
-    virtual MAV_MISSION_RESULT allocate_update_resources() WARN_IF_UNUSED {
-        return MAV_MISSION_ACCEPTED;
-    }
-    virtual void free_upload_resources() { }
+    void send_mission_ack(const mavlink_message_t &msg, MAV_MISSION_RESULT result, uint8_t tid) const;
+    void send_mission_ack(const GCS_MAVLINK &link, const mavlink_message_t &msg, MAV_MISSION_RESULT result, uint8_t tid) const;
 
-    void send_mission_ack(const mavlink_message_t &msg, MAV_MISSION_RESULT result) const;
-    void send_mission_ack(const GCS_MAVLINK &link, const mavlink_message_t &msg, MAV_MISSION_RESULT result) const;
+    // transfer_is_complete - tidy up after a transfer is complete;
+    // this method will call complete() so the backends can do their
+    // bit.
+    void transfer_is_complete(const GCS_MAVLINK &_link, const mavlink_message_t &msg, uint8_t tid);
+
+    bool mavlink2_requirement_met(const GCS_MAVLINK &_link, const mavlink_message_t &msg, uint8_t tid) const;
+
+    // complete - method called when transfer is complete - backends
+    // are expected to override this method to do any required tidy up.
+    virtual MAV_MISSION_RESULT complete(const GCS_MAVLINK &_link);
+
+    // replace_cmd - replaces the command at position 'index' in the command list with the provided cmd
+    //     returns true if successfully replaced, false on failure
+    virtual bool replace_cmd(uint16_t index, const AP_Mission::Mission_Command& cmd) { return false; }
+
+    // add_cmd - adds a command to the end of the command list and writes to storage
+    //     returns true if successfully added, false on failure
+    virtual bool add_cmd(AP_Mission::Mission_Command& cmd) { return false; }
+
+    struct {
+        bool is_update;
+        uint16_t count;
+        AP_Mission::Mission_Command* commands;
+        uint16_t next_index;
+    } _next_mission;
+
+private:
+
+    virtual void truncate(const uint16_t mission_items) = 0;
+    
+    virtual MAV_MISSION_RESULT allocate_update_resources(const uint16_t count = 0) WARN_IF_UNUSED;
+    virtual void free_upload_resources();
 
     virtual uint16_t item_count() const = 0;
     virtual uint16_t max_items() const = 0;
@@ -113,20 +145,8 @@ private:
     virtual MAV_MISSION_RESULT replace_item(const mavlink_mission_item_int_t &mission_item_int) = 0;
     virtual MAV_MISSION_RESULT append_item(const mavlink_mission_item_int_t &mission_item_int) = 0;
 
-    // complete - method called when transfer is complete - backends
-    // are expected to override this method to do any required tidy up.
-    virtual MAV_MISSION_RESULT complete(const GCS_MAVLINK &_link) {
-        return MAV_MISSION_ACCEPTED;
-    };
-    // transfer_is_complete - tidy up after a transfer is complete;
-    // this method will call complete() so the backends can do their
-    // bit.
-    void transfer_is_complete(const GCS_MAVLINK &_link, const mavlink_message_t &msg);
-
     // timeout - called if the GCS fails to continue to supply items
     // in a transfer.  Backends are expected to tidy themselves up in
     // this routine
     virtual void timeout() {};
-
-    bool mavlink2_requirement_met(const GCS_MAVLINK &_link, const mavlink_message_t &msg) const;
 };

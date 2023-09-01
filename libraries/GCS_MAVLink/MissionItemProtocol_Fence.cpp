@@ -192,7 +192,7 @@ uint16_t MissionItemProtocol_Fence::max_items() const
     return _fence.polyfence().max_items();
 }
 
-void MissionItemProtocol_Fence::truncate(const mavlink_mission_count_t &packet)
+void MissionItemProtocol_Fence::truncate(uint16_t mission_items)
 {
     // FIXME: validate packet.count is same as allocated number of items
 }
@@ -223,7 +223,7 @@ MAV_MISSION_RESULT MissionItemProtocol_Fence::allocate_receive_resources(const u
     return MAV_MISSION_ACCEPTED;
 }
 
-MAV_MISSION_RESULT MissionItemProtocol_Fence::allocate_update_resources()
+MAV_MISSION_RESULT MissionItemProtocol_Fence::allocate_update_resources(const uint16_t count/* = 0 */)
 {
     const uint16_t _item_count = _fence.polyfence().num_stored_items();
     _updated_mask = new uint8_t[(_item_count+7/8)];

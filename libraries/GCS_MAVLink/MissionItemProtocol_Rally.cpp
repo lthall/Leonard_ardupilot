@@ -133,7 +133,7 @@ void MissionItemProtocol_Rally::timeout()
     link->send_text(MAV_SEVERITY_WARNING, "Rally upload timeout");
 }
 
-void MissionItemProtocol_Rally::truncate(const mavlink_mission_count_t &packet)
+void MissionItemProtocol_Rally::truncate(uint16_t mission_items)
 {
-    rally.truncate(packet.count);
+    rally.truncate(mission_items);
 }
