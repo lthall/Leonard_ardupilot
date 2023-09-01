@@ -341,8 +341,12 @@ void AP_OpenDroneID::send_location_message()
 
     // FIX we need to only set this if w have a GPS lock is 2D good enough for that?
     float timestamp = ODID_INV_TIMESTAMP;
+    location_odid_timestamp = 0;
     if (!got_bad_gps_fix) {
         uint32_t time_week_ms = gps.time_week_ms();
+        uint32_t time_week = gps.time_week();
+        uint64_t epoch_timestamp_ms = gps.istate_time_to_epoch_ms(time_week, time_week_ms);
+        location_odid_timestamp = (epoch_timestamp_ms / 1000) - 1546300800; //Drone ID time starts at 1/1/2019, offset it
         timestamp = float(time_week_ms % (3600 * 1000)) * 0.001;
         timestamp = create_location_timestamp(timestamp);   //make sure timestamp is within Remote ID limit
     }
@@ -394,6 +398,9 @@ void AP_OpenDroneID::send_system_message()
     // note that packet is filled in by the GCS
     need_send_system |= dronecan_send_all;
     if (_chan != MAV_CHAN_INVALID) {
+        if (location_odid_timestamp != 0) {
+            pkt_system.timestamp = location_odid_timestamp;
+        }
         mavlink_msg_open_drone_id_system_send_struct(_chan, &pkt_system);
     }
 }
@@ -415,7 +422,7 @@ void AP_OpenDroneID::send_system_update_message()
         operator_latitude : pkt_system.operator_latitude,
         operator_longitude : pkt_system.operator_longitude,
         operator_altitude_geo : pkt_system.operator_altitude_geo,
-        timestamp : pkt_system.timestamp,
+        timestamp : (location_odid_timestamp == 0 ? pkt_system.timestamp : location_odid_timestamp),
         target_system : pkt_system.target_system,
         target_component : pkt_system.target_component,
         };

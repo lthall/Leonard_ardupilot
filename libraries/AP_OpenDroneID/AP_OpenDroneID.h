@@ -122,7 +122,7 @@ private:
     uint32_t _last_send_location_ms;
     uint32_t _last_send_system_update_ms;
     uint32_t _last_send_static_messages_ms;
-    const uint32_t _mavlink_dynamic_period_ms = 1000; //how often are mavlink dynamic messages sent in ms. E.g. 1000 = 1 Hz
+    const uint32_t _mavlink_dynamic_period_ms = 500; //how often are mavlink dynamic messages sent in ms. E.g. 1000 = 1 Hz
     const uint32_t _mavlink_static_period_ms = 5000; //how often are mavlink static messages sent in ms
 
     bool     _have_height_above_takeoff;
@@ -152,6 +152,9 @@ private:
 
     // last time we sent a lost operator location notice
     uint32_t last_lost_operator_msg_ms;
+
+    // The epoch timestamp of the time used in the last location message
+    uint32_t location_odid_timestamp;
     
     // transmit functions to manually send a static MAVLink message
     void send_dynamic_out();
