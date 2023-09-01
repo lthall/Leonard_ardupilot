@@ -294,6 +294,13 @@ public:
     virtual void get_osd_roll_pitch_rad(float &roll, float &pitch) const;
 #endif
 
+    bool get_motor_failure() const { return _motor_failure; }
+
+    bool get_battery_failure() const { return _battery_failure; }
+
+    virtual void set_motor_failure();
+    virtual void set_battery_failure();
+
 protected:
 
     virtual void init_ardupilot() = 0;
@@ -425,6 +432,9 @@ private:
     bool done_safety_init;
 
     uint32_t _last_internal_errors;  // backup of AP_InternalError::internal_errors bitmask
+    
+    bool _motor_failure; // true if we are in motor failure state
+    bool _battery_failure; // true if we are in battery failure state
 };
 
 namespace AP {

@@ -97,6 +97,9 @@ extern AP_Vehicle& vehicle;
  */
 void AP_Vehicle::setup()
 {
+    _motor_failure = false;
+    _battery_failure = false;
+
     // load the default values of variables listed in var_info[]
     AP_Param::setup_sketch_defaults();
 
@@ -605,6 +608,19 @@ void AP_Vehicle::accel_cal_update()
     }
 #endif
 #endif // HAL_INS_ENABLED
+}
+
+void AP_Vehicle::set_motor_failure()
+{
+    _motor_failure = true;  // we allow only setting motor failure. not clearing.
+}
+
+void AP_Vehicle::set_battery_failure()
+{
+    if (!_battery_failure) {  // we allow only setting battery failure. not clearing.
+        _battery_failure = true;
+        GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Battery failure!");
+    }
 }
 
 AP_Vehicle *AP_Vehicle::_singleton = nullptr;
