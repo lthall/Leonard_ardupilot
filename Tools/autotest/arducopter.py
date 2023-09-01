@@ -8240,8 +8240,8 @@ class AutoTestCopter(AutoTest):
              self.test_set_position_global_int),
 
             ("ThrowDoubleDrop",
-             "Test a more complicated drop-mode scenario",
-             self.ThrowDoubleDrop),
+            "Test a more complicated drop-mode scenario",
+            self.ThrowDoubleDrop),
 
             ("SetpointGlobalVel",
              "Test setpoint global velocity",
@@ -8512,6 +8512,20 @@ class AutoTestCopter(AutoTest):
              self.test_mag_calibration),
         ])
         return ret
+    
+    def AHRSTrimLand(self):
+        '''test land detector with significant AHRS trim'''
+        self.context_push()
+        self.set_parameters({
+            "SIM_ACC_TRIM_X": 0.12,
+            "AHRS_TRIM_X": 0.12,
+        })
+        self.reboot_sitl()
+        self.wait_ready_to_arm()
+        self.takeoff(alt_min=20, mode='LOITER')
+        self.land_and_disarm()
+        self.context_pop()
+        self.reboot_sitl()
 
     def tests2b(self):  # this block currently around 9.5mins here
         '''return list of all tests'''
@@ -8659,6 +8673,10 @@ class AutoTestCopter(AutoTest):
             Test("LogUpload",
                  "Log upload",
                  self.log_upload),
+
+            Test("AHRSTrimLand",
+                 "test land detector with significant AHRS trim",
+                 self.AHRSTrimLand),
         ])
         return ret
 

@@ -37,6 +37,7 @@ COMMON_VEHICLE_DEPENDENT_LIBRARIES = [
     'AP_InertialSensor',
     'AP_Math',
     'AP_Mission',
+    'AP_Fallback_Mission',
     'AP_DAL',
     'AP_NavEKF',
     'AP_NavEKF2',

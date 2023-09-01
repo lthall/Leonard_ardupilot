@@ -64,6 +64,20 @@ class VehicleInfo(object):
                     "default_params/copter-hexa-dji.parm"
                 ],
             },
+            "flyhawk": {
+                "make_target": "sitl",
+                "waf_target": "bin/arducopter",
+                "default_params_filename": ["default_params/copter.parm",
+                                            "default_params/copter-hexa.parm",
+                                            "default_params/copter-hexa-flyhawk.parm" ],
+            },
+            "passenger": {
+                "make_target": "sitl",
+                "waf_target": "bin/arducopter",
+                "default_params_filename": ["default_params/copter.parm",
+                                            "default_params/copter-passenger.parm",
+                                            "default_params/copter-hexa-fts.parm" ],
+            },
              "octa-cwx": {
                 "waf_target": "bin/arducopter",
                 "default_params_filename": [
