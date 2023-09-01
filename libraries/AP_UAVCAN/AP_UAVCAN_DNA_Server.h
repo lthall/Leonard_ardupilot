@@ -5,7 +5,10 @@
 #include <uavcan/uavcan.hpp>
 #include <AP_Common/Bitmask.h>
 #include <StorageManager/StorageManager.h>
+#include <GCS_MAVLink/GCS.h>
 #include <AP_CANManager/AP_CANManager.h>
+
+#define MAX_NODES   128
 
 //Forward declaring classes
 class AllocationCb;
@@ -15,6 +18,19 @@ class AP_UAVCAN;
 
 class AP_UAVCAN_DNA_Server
 {
+public:
+    struct NodeInfo {
+        uint32_t uptime_sec;
+        char name[MAVLINK_MSG_UAVCAN_NODE_INFO_FIELD_NAME_LEN];
+        uint8_t hw_major;
+        uint8_t hw_minor;
+        uint8_t unique_id[MAVLINK_MSG_UAVCAN_NODE_INFO_FIELD_HW_UNIQUE_ID_LEN];
+        uint8_t sw_major;
+        uint8_t sw_minor;
+        uint32_t vcs_commit;
+    };
+
+private:
     StorageAccess storage;
 
     struct NodeData {
@@ -34,10 +50,13 @@ class AP_UAVCAN_DNA_Server
     uint8_t self_node_id[HAL_MAX_CAN_PROTOCOL_DRIVERS];
     bool nodeInfo_resp_rcvd;
 
-    Bitmask<128> occupation_mask;
-    Bitmask<128> verified_mask;
-    Bitmask<128> node_seen_mask;
-    Bitmask<128> logged;
+    Bitmask<MAX_NODES> occupation_mask; // nodes exist in persistent storage
+    Bitmask<MAX_NODES> verified_mask;   // nodes verified correctly by NodeInfo message
+    Bitmask<MAX_NODES> node_seen_mask;  // nodes that sent NodeStatus message
+    Bitmask<MAX_NODES> node_exist_mask; // nodes verified since last boot (once verified bit will not clear until reboot)
+    Bitmask<MAX_NODES> logged;
+
+    NodeInfo* verified_nodes[MAX_NODES];
 
     uint8_t last_logging_count;
 
@@ -91,7 +110,7 @@ class AP_UAVCAN_DNA_Server
     AP_UAVCAN *_ap_uavcan;
 
 public:
-    AP_UAVCAN_DNA_Server(StorageAccess _storage) : storage(_storage) {}
+    AP_UAVCAN_DNA_Server(StorageAccess _storage) : storage(_storage) { memset(verified_nodes, 0, sizeof(verified_nodes)); }
 
     // Do not allow copies
     AP_UAVCAN_DNA_Server(const AP_UAVCAN_DNA_Server &other) = delete;
@@ -119,10 +138,12 @@ public:
     //Callbacks
     void handleAllocation(uint8_t driver_index, uint8_t node_id, const AllocationCb &cb);
     void handleNodeStatus(uint8_t node_id, const NodeStatusCb &cb);
-    void handleNodeInfo(uint8_t node_id, uint8_t unique_id[], char name[], uint8_t major, uint8_t minor, uint32_t vcs_commit);
+    void handleNodeInfo(uint8_t node_id, const NodeInfo &node_info);
 
     //Run through the list of seen node ids for verification
     void verify_nodes(AP_UAVCAN *ap_uavcan);
+
+    void send_mavlink_uavcan_node_info(mavlink_channel_t chan);
 };
 
 namespace AP

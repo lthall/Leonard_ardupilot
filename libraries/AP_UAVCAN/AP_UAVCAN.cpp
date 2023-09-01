@@ -153,6 +153,8 @@ static uavcan::Publisher<uavcan::equipment::indication::BeepCommand>* buzzer[HAL
 static uavcan::Publisher<ardupilot::indication::SafetyState>* safety_state[HAL_MAX_CAN_PROTOCOL_DRIVERS];
 static uavcan::Publisher<uavcan::equipment::safety::ArmingStatus>* arming_status[HAL_MAX_CAN_PROTOCOL_DRIVERS];
 static uavcan::Publisher<uavcan::equipment::gnss::RTCMStream>* rtcm_stream[HAL_MAX_CAN_PROTOCOL_DRIVERS];
+static uavcan::Publisher<uavcan::equipment::gnss::RTKCount>* rtk_count[HAL_MAX_CAN_PROTOCOL_DRIVERS];
+static uavcan::Publisher<uavcan::equipment::gnss::RTKData>* rtk_data[HAL_MAX_CAN_PROTOCOL_DRIVERS];
 static uavcan::Publisher<ardupilot::indication::NotifyState>* notify_state[HAL_MAX_CAN_PROTOCOL_DRIVERS];
 
 // Clients
@@ -351,6 +353,14 @@ void AP_UAVCAN::init(uint8_t driver_index, bool enable_filters)
     rtcm_stream[driver_index]->setTxTimeout(uavcan::MonotonicDuration::fromMSec(20));
     rtcm_stream[driver_index]->setPriority(uavcan::TransferPriority::OneHigherThanLowest);
 
+    rtk_count[driver_index] = new uavcan::Publisher<uavcan::equipment::gnss::RTKCount>(*_node);
+    rtk_count[driver_index]->setTxTimeout(uavcan::MonotonicDuration::fromMSec(20));
+    rtk_count[driver_index]->setPriority(uavcan::TransferPriority::OneHigherThanLowest);
+
+    rtk_data[driver_index] = new uavcan::Publisher<uavcan::equipment::gnss::RTKData>(*_node);
+    rtk_data[driver_index]->setTxTimeout(uavcan::MonotonicDuration::fromMSec(20));
+    rtk_data[driver_index]->setPriority(uavcan::TransferPriority::OneHigherThanLowest);
+
     notify_state[driver_index] = new uavcan::Publisher<ardupilot::indication::NotifyState>(*_node);
     notify_state[driver_index]->setTxTimeout(uavcan::MonotonicDuration::fromMSec(20));
     notify_state[driver_index]->setPriority(uavcan::TransferPriority::OneHigherThanLowest);
@@ -452,6 +462,7 @@ void AP_UAVCAN::loop(void)
 
         led_out_send();
         buzzer_send();
+        rtk_send();
         rtcm_stream_send();
         safety_state_send();
         notify_state_send();
@@ -758,6 +769,39 @@ void AP_UAVCAN::notify_state_send()
     _last_notify_state_ms = AP_HAL::native_millis();
 }
 
+
+void AP_UAVCAN::rtk_send()
+{
+    const uint32_t now = AP_HAL::native_millis();
+    if (now - _rtk_buffer.last_send_ms < 20) {
+        return;  // don't send more than 50 per second
+    }
+
+    WITH_SEMAPHORE(_rtk_buffer.sem);
+
+    if (!_rtk_buffer.send_count && !_rtk_buffer.send_fragment) {
+        return; // nothing to send
+    }
+
+    _rtk_buffer.last_send_ms = now;
+
+    if (_rtk_buffer.send_count) {
+        if (rtk_count[_driver_index]->broadcast(_rtk_buffer.count_message) < 0) {
+            GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "Can't broadcast RTK COUNT message %lu", (unsigned long)_rtk_buffer.count_message.sequence_id);
+        }
+        _rtk_buffer.send_count = false;
+        return;
+    }
+
+    if (_rtk_buffer.send_fragment) {
+        if (rtk_data[_driver_index]->broadcast(_rtk_buffer.fragment) < 0) {
+            GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "Can't broadcast RTK DATA message %lu %hhu", (unsigned long)_rtk_buffer.fragment.sequence_id, _rtk_buffer.fragment.fragment_id);
+        }
+        _rtk_buffer.send_fragment = false;
+        return;
+    }
+}
+
 void AP_UAVCAN::rtcm_stream_send()
 {
     WITH_SEMAPHORE(_rtcm_stream.sem);
@@ -831,12 +875,38 @@ void AP_UAVCAN::send_RTCMStream(const uint8_t *data, uint32_t len)
     if (_rtcm_stream.buf == nullptr) {
         // give enough space for a full round from a NTRIP server with all
         // constellations
-        _rtcm_stream.buf = new ByteBuffer(2400);
+        _rtcm_stream.buf = new ByteBuffer(10240);
     }
     if (_rtcm_stream.buf == nullptr) {
         return;
     }
-    _rtcm_stream.buf->write(data, len);
+    if (_rtcm_stream.buf->write(data, len) != len) {
+        GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "RTCM stream buffer is full");
+    }
+}
+
+bool AP_UAVCAN::send_rtk_count(uint32_t sequence_id, uint16_t total_length, uint32_t crc)
+{
+    WITH_SEMAPHORE(_rtk_buffer.sem);
+    _rtk_buffer.count_message.sequence_id = sequence_id;
+    _rtk_buffer.count_message.total_length = total_length;
+    _rtk_buffer.count_message.crc = crc;
+    _rtk_buffer.send_count = true;
+    _rtk_buffer.send_fragment = false;
+    return true;
+}
+
+bool AP_UAVCAN::send_rtk_data_fragment(uint32_t sequence_id, uint8_t fragment_id, const uint8_t *data, uint32_t len)
+{
+    WITH_SEMAPHORE(_rtk_buffer.sem);
+    _rtk_buffer.fragment.sequence_id = sequence_id;
+    _rtk_buffer.fragment.fragment_id = fragment_id;
+    _rtk_buffer.fragment.data.clear();
+    for (uint8_t i = 0; i < len; ++i) {
+        _rtk_buffer.fragment.data.push_back(data[i]);
+    }
+    _rtk_buffer.send_fragment = true;
+    return true;
 }
 
 /*
@@ -959,13 +1029,22 @@ void AP_UAVCAN::handle_ESC_status(AP_UAVCAN* ap_uavcan, uint8_t node_id, const E
         .temperature_cdeg = int16_t((KELVIN_TO_C(cb.msg->temperature)) * 100),
         .voltage = cb.msg->voltage,
         .current = cb.msg->current,
+        .consumption_mah = 0,
+        .power_rating_pct = cb.msg->power_rating_pct,
     };
+    t.error_flags = 0;
+    for (int i = 0; i < cb.msg->error_flags.size(); ++i) {
+        uint16_t error_bit = cb.msg->error_flags[i] ? 1 : 0;
+        t.error_flags |= (error_bit << i);
+    }
 
-    ap_uavcan->update_rpm(esc_index, cb.msg->rpm);
+    ap_uavcan->update_rpm(esc_index, cb.msg->rpm, cb.msg->error_count);
     ap_uavcan->update_telem_data(esc_index, t,
         AP_ESC_Telem_Backend::TelemetryType::CURRENT
             | AP_ESC_Telem_Backend::TelemetryType::VOLTAGE
-            | AP_ESC_Telem_Backend::TelemetryType::TEMPERATURE);
+            | AP_ESC_Telem_Backend::TelemetryType::TEMPERATURE
+            | AP_ESC_Telem_Backend::TelemetryType::POWER
+            | AP_ESC_Telem_Backend::TelemetryType::ERROR_FLAGS);
 #endif
 }
 
@@ -984,13 +1063,46 @@ void AP_UAVCAN::handle_debug(AP_UAVCAN* ap_uavcan, uint8_t node_id, const DebugC
 {
 #if HAL_LOGGING_ENABLED
     const auto &msg = *cb.msg;
-    if (AP::can().get_log_level() != AP_CANManager::LOG_NONE) {
-        // log to onboard log and mavlink
-        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "CAN[%u] %s", node_id, msg.text.c_str());
-    } else {
-        // only log to onboard log
-        AP::logger().Write_MessageF("CAN[%u] %s", node_id, msg.text.c_str());
+    const char *level = nullptr;
+    MAV_SEVERITY severity = MAV_SEVERITY_ENUM_END;
+    switch (msg.level.value) {
+        case uavcan::protocol::debug::LogLevel::DEBUG:
+            level = (level == nullptr) ? "DEBUG" : level;
+            severity = (severity == MAV_SEVERITY_ENUM_END) ? MAV_SEVERITY_DEBUG : severity;
+            break;
+        case uavcan::protocol::debug::LogLevel::INFO:
+            level = (level == nullptr) ? "INFO" : level;
+            severity = (severity == MAV_SEVERITY_ENUM_END) ? MAV_SEVERITY_INFO : severity;
+            FALLTHROUGH;
+        case uavcan::protocol::debug::LogLevel::WARNING:
+            level = (level == nullptr) ? "WARNING" : level;
+            severity = (severity == MAV_SEVERITY_ENUM_END) ? MAV_SEVERITY_WARNING : severity;
+            FALLTHROUGH;
+        case uavcan::protocol::debug::LogLevel::ERROR:
+            level = (level == nullptr) ? "ERROR" : level;
+            severity = (severity == MAV_SEVERITY_ENUM_END) ? MAV_SEVERITY_ERROR : severity;
+            FALLTHROUGH;
+        default:
+            severity = (severity == MAV_SEVERITY_ENUM_END) ? MAV_SEVERITY_INFO : severity;
+            if (AP::can().get_log_level() != AP_CANManager::LOG_NONE) {
+                // log to onboard log and mavlink
+                GCS_SEND_TEXT(severity, "CAN[%u] %s", node_id, msg.text.c_str());
+            } else {
+                // only log to onboard log
+                AP::logger().Write_MessageF("CAN[%u] %s", node_id, msg.text.c_str());
+            }
+            break;
     }
+
+    AP::logger().Write("CANL",
+                       "TimeUS,I,Level,Source,Text",
+                       "s#---", "F----", "QBNZZ", 
+                       AP_HAL::micros64(),
+                       node_id,
+                       level,
+                       msg.source.c_str(),
+                       msg.text.c_str());
+
 #endif
 }
 

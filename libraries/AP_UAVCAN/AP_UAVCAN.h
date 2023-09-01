@@ -30,6 +30,8 @@
 #include <AP_ESC_Telem/AP_ESC_Telem_Backend.h>
 #include <uavcan/protocol/param/GetSet.hpp>
 #include <uavcan/protocol/param/ExecuteOpcode.hpp>
+#include <uavcan/equipment/gnss/RTKCount.hpp>
+#include <uavcan/equipment/gnss/RTKData.hpp>
 
 #ifndef UAVCAN_NODE_POOL_SIZE
 #define UAVCAN_NODE_POOL_SIZE 8192
@@ -134,6 +136,12 @@ public:
 
     // send RTCMStream packets
     void send_RTCMStream(const uint8_t *data, uint32_t len);
+
+    // queue sending RTK count message
+    bool send_rtk_count(uint32_t sequence_id, uint16_t total_length, uint32_t crc);
+
+    // queue sending RTK data fragment message
+    bool send_rtk_data_fragment(uint32_t sequence_id, uint8_t fragment_id, const uint8_t *data, uint32_t len);
 
     // Send Reboot command
     // Note: Do not call this from outside UAVCAN thread context,
@@ -242,6 +250,9 @@ private:
     // send GNSS injection
     void rtcm_stream_send();
 
+    // send waiting RTK messages
+    void rtk_send();
+
     // send parameter get/set request
     void send_parameter_request();
     
@@ -322,6 +333,16 @@ private:
         uint32_t last_send_ms;
         ByteBuffer *buf;
     } _rtcm_stream;
+
+    struct {
+        HAL_Semaphore sem;
+        uint32_t last_send_ms;
+        uavcan::equipment::gnss::RTKCount count_message;
+        uavcan::equipment::gnss::RTKData fragment;
+        uint8_t fragment_buffer[uavcan::equipment::gnss::RTKData::FieldTypes::data::MaxSize];
+        bool send_count;
+        bool send_fragment;
+    } _rtk_buffer;
     
      // ESC
 

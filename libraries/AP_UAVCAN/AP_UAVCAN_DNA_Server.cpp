@@ -42,6 +42,9 @@ UC_REGISTRY_BINDER(AllocationCb, uavcan::protocol::dynamic_node_id::Allocation);
 UC_REGISTRY_BINDER(NodeStatusCb, uavcan::protocol::NodeStatus);
 
 static void trampoline_handleNodeInfo(const uavcan::ServiceCallResult<uavcan::protocol::GetNodeInfo>& resp);
+#ifdef FTS
+__attribute__ ((unused))
+#endif
 static void trampoline_handleAllocation(AP_UAVCAN* ap_uavcan, uint8_t node_id, const AllocationCb &cb);
 static void trampoline_handleNodeStatus(AP_UAVCAN* ap_uavcan, uint8_t node_id, const NodeStatusCb &cb);
 
@@ -58,6 +61,8 @@ void AP_UAVCAN_DNA_Server::subscribe_msgs(AP_UAVCAN* ap_uavcan)
     }
 
     auto* node = ap_uavcan->get_node();
+
+#ifndef FTS
     //Register Allocation Message Handler
     uavcan::Subscriber<uavcan::protocol::dynamic_node_id::Allocation, AllocationCb> *AllocationListener;
     AllocationListener = new uavcan::Subscriber<uavcan::protocol::dynamic_node_id::Allocation, AllocationCb>(*node);
@@ -71,6 +76,7 @@ void AP_UAVCAN_DNA_Server::subscribe_msgs(AP_UAVCAN* ap_uavcan)
     }
     //We allow anonymous transfers, as they are specifically for Node Allocation
     AllocationListener->allowAnonymousTransfers();
+#endif
 
     //Register Node Status Listener
     uavcan::Subscriber<uavcan::protocol::NodeStatus, NodeStatusCb> *NodeStatusListener;
@@ -513,7 +519,7 @@ Handle responses from GetNodeInfo Request. We verify the node info
 against our records. Marks Verification mask if already recorded,
 Or register if the node id is available and not recorded for the
 received Unique ID */
-void AP_UAVCAN_DNA_Server::handleNodeInfo(uint8_t node_id, uint8_t unique_id[], char name[], uint8_t major, uint8_t minor, uint32_t vcs_commit)
+void AP_UAVCAN_DNA_Server::handleNodeInfo(uint8_t node_id, const NodeInfo &node_info)
 {
     if (node_id > MAX_NODE_ID) {
         return;
@@ -526,7 +532,7 @@ void AP_UAVCAN_DNA_Server::handleNodeInfo(uint8_t node_id, uint8_t unique_id[], 
     if (!logged.get(node_id) && AP::logger().logging_started()) {
         logged.set(node_id);
         uint64_t uid[2];
-        memcpy(uid, unique_id, sizeof(uid));
+        memcpy(uid, node_info.unique_id, sizeof(uid));
         // @LoggerMessage: CAND
         // @Description: Info from GetNodeInfo request
         // @Field: TimeUS: Time since system startup
@@ -542,17 +548,32 @@ void AP_UAVCAN_DNA_Server::handleNodeInfo(uint8_t node_id, uint8_t unique_id[], 
                            AP_HAL::micros64(),
                            node_id,
                            uid[0], uid[1],
-                           name,
-                           major,
-                           minor,
-                           vcs_commit);
+                           node_info.name,
+                           node_info.sw_major,
+                           node_info.sw_minor,
+                           node_info.vcs_commit);
+    }
+
+    uint8_t prev_node_id = getNodeIDForUniqueID(node_info.unique_id, 16);
+    if (isNodeIDOccupied(node_id) &&        // is exist in storage 
+        (node_id != prev_node_id) &&        // and same unique_id had different node_id 
+        (!node_exist_mask.get(node_id))) {  // but not since we powered on
+        // then it's a new device with this node_id and not duplicate devices, so we forget the old one
+        freeNodeID(node_id);           
     }
 
     if (isNodeIDOccupied(node_id)) {
         //if node_id already registered, just verify if Unique ID matches as well
-        if (node_id == getNodeIDForUniqueID(unique_id, 16)) {
+        if (node_id == prev_node_id) {
             if (node_id == curr_verifying_node) {
                 nodeInfo_resp_rcvd = true;
+            }
+            if (nodeInfo_resp_rcvd || (!isNodeIDVerified(node_id))) {
+                if (!(verified_nodes[node_id])) {
+                    verified_nodes[node_id] = new NodeInfo(node_info);
+                } else {
+                    *(verified_nodes[node_id]) = node_info;
+                }
             }
             setVerificationMask(node_id);
         } else if (!_ap_uavcan->option_is_set(AP_UAVCAN::Options::DNA_IGNORE_DUPLICATE_NODE)) {
@@ -560,18 +581,22 @@ void AP_UAVCAN_DNA_Server::handleNodeInfo(uint8_t node_id, uint8_t unique_id[], 
             for another device */
             server_state = DUPLICATE_NODES;
             fault_node_id = node_id;
-            memcpy(fault_node_name, name, sizeof(fault_node_name));
+            if (strnlen(node_info.name, sizeof(node_info.name)) > (sizeof(fault_node_name) - 1)) {
+                memcpy(fault_node_name, node_info.name, sizeof(fault_node_name) - 1);
+                fault_node_name[sizeof(fault_node_name) - 1] = '\0';
+            } else {
+                strcpy(fault_node_name, node_info.name);
+            }
         }
     } else {
         /* Node Id was not allocated by us, or during this boot, let's register this in our records
         Check if we allocated this Node before */
-        uint8_t prev_node_id = getNodeIDForUniqueID(unique_id, 16);
         if (prev_node_id != 255) {
             //yes we did, remove this registration
             freeNodeID(prev_node_id);
         }
         //add a new server record
-        addNodeIDForUniqueID(node_id, unique_id, 16);
+        addNodeIDForUniqueID(node_id, node_info.unique_id, 16);
         //Verify as well
         setVerificationMask(node_id);
         if (node_id == curr_verifying_node) {
@@ -583,8 +608,8 @@ void AP_UAVCAN_DNA_Server::handleNodeInfo(uint8_t node_id, uint8_t unique_id[], 
 //Trampoline call for handleNodeInfo member call
 void trampoline_handleNodeInfo(const uavcan::ServiceCallResult<uavcan::protocol::GetNodeInfo>& resp)
 {
-    uint8_t node_id, unique_id[16] = {0};
-    char name[50] = {0};
+    uint8_t node_id, unique_id[MAVLINK_MSG_UAVCAN_NODE_INFO_FIELD_HW_UNIQUE_ID_LEN] = {0};
+    char name[MAVLINK_MSG_UAVCAN_NODE_INFO_FIELD_NAME_LEN] = {0};
 
     node_id = resp.getResponse().getSrcNodeID().get();
 
@@ -597,10 +622,16 @@ void trampoline_handleNodeInfo(const uavcan::ServiceCallResult<uavcan::protocol:
 
     auto &dna_server = AP::uavcan_dna_server();
 
-    dna_server.handleNodeInfo(node_id, unique_id, name,
-                              r.software_version.major,
-                              r.software_version.minor,
-                              r.software_version.vcs_commit);
+    AP_UAVCAN_DNA_Server::NodeInfo node_info;
+    node_info.uptime_sec = r.status.uptime_sec;
+    strncpy(node_info.name, name, MIN(ARRAY_SIZE(name), ARRAY_SIZE(node_info.name)));
+    node_info.hw_major = r.hardware_version.major;
+    node_info.hw_minor = r.hardware_version.minor;
+    memcpy(node_info.unique_id, unique_id, MIN(ARRAY_SIZE(unique_id), ARRAY_SIZE(node_info.unique_id)));
+    node_info.sw_major = r.software_version.major;
+    node_info.sw_minor = r.software_version.minor;
+    node_info.vcs_commit = r.software_version.vcs_commit;
+    dna_server.handleNodeInfo(node_id, node_info);
 }
 
 /* Handle the allocation message from the devices supporting
@@ -736,6 +767,29 @@ bool AP_UAVCAN_DNA_Server::prearm_check(char* fail_msg, uint8_t fail_msg_len) co
     }
     // should never get; compiler should enforce all server_states are covered
     return false;
+}
+
+void AP_UAVCAN_DNA_Server::send_mavlink_uavcan_node_info(mavlink_channel_t chan)
+{
+    for (uint8_t i = 0; i < verified_mask.size(); ++i) {
+        if (!verified_mask.get(i)) {
+            continue;
+        }
+        if (!(verified_nodes[i])) {
+            continue;
+        }
+        mavlink_msg_uavcan_node_info_send(
+            chan,
+            AP_HAL::micros(),
+            verified_nodes[i]->uptime_sec,
+            verified_nodes[i]->name,
+            verified_nodes[i]->hw_major,
+            verified_nodes[i]->hw_minor,
+            verified_nodes[i]->unique_id,
+            verified_nodes[i]->sw_major,
+            verified_nodes[i]->sw_minor,
+            verified_nodes[i]->vcs_commit);
+    }
 }
 
 namespace AP
