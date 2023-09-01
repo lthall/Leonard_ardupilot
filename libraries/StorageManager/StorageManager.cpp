@@ -61,37 +61,41 @@ const StorageManager::StorageArea StorageManager::layout[STORAGE_NUM_AREAS] = {
     { StorageFence,   3936,   160}, // 20 fence points
 #else
     { StorageParam,   0,     1536}, // 0x600 param bytes
-    { StorageMission, 1536,  2422},
+    { StorageFallback,1536,   808},
+    { StorageMission, 2344,  1614},
     { StorageRally,   3958,    90}, // 6 rally points
     { StorageFence,   4048,    48}, // 6 fence points
 #endif
-#if STORAGE_NUM_AREAS >= 10
+#if STORAGE_NUM_AREAS >= 12
     { StorageParam,   4096,  1280},
     { StorageRally,   5376,   300},
     { StorageFence,   5676,   256},
-    { StorageMission, 5932,  2132},
+    { StorageFallback,5932,   710},
+    { StorageMission, 6642,  1422},
     { StorageKeys,    8064,    64}, 
     { StorageBindInfo,8128,    56},
 #endif
-#if STORAGE_NUM_AREAS == 11
+#if STORAGE_NUM_AREAS == 13
     // optimised for lots of parameters for 15k boards with OSD
     { StorageParam,    8192,  7168},
-#elif STORAGE_NUM_AREAS == 12
+#elif STORAGE_NUM_AREAS == 14
     // optimised for lots of parameters for 15k boards with OSD, plus room for CAN DNA
     { StorageParam,    8192,  6144},
     { StorageCANDNA,   14336, 1024},
 #endif
-#if STORAGE_NUM_AREAS >= 15
+#if STORAGE_NUM_AREAS >= 18
     { StorageParam,    8192,  1280},
     { StorageRally,    9472,   300},
     { StorageFence,    9772,   256},
-    { StorageMission,  10028,  5204}, // leave 128 byte gap for expansion
+    { StorageFallback, 10028,  1734},
+    { StorageMission,  11762,  3470}, // leave 128 byte gap for expansion
     { StorageCANDNA,   15232,  1024},
     // 128 byte gap at end of first 16k
 #endif
-#if STORAGE_NUM_AREAS >= 18
+#if STORAGE_NUM_AREAS >= 22
     { StorageParam,    16384, 1280},
-    { StorageMission,  17664, 9842},
+    { StorageFallback, 17664, 3280},
+    { StorageMission,  20944, 6562},
     { StorageParamBak, 27506, 5262},
 #endif
 };
