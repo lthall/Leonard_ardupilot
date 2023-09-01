@@ -282,7 +282,10 @@ uint32_t AP_RCTelemetry::sensor_status_flags() const
     uint32_t present;
     uint32_t enabled;
     uint32_t health;
-    gcs().get_sensor_status_flags(present, enabled, health);
+    uint32_t present_extension;
+    uint32_t enabled_extension;
+    uint32_t health_extension;
+    gcs().get_sensor_status_flags(present, enabled, health, present_extension, enabled_extension, health_extension);
 
     return ~health & enabled & present;
 }
