@@ -78,6 +78,16 @@ uint16_t AP_TemperatureSensor_TSYS03::read_adc() const
     if (!_dev->transfer(&TSYS03_CMD_READ_ADC, 1, val, 3)) {
         return 0;
     }
+
+    // ensure crc is correct:
+    uint8_t expected_crc = 0;
+    for (uint8_t i=0; i<2; i++) {
+        expected_crc = crc8_dvb(expected_crc, val[i], 0x31);
+    }
+    if (expected_crc != val[2]) {
+        return 0;
+    }
+
     return UINT16_VALUE(val[0],val[1]);
 }
 
