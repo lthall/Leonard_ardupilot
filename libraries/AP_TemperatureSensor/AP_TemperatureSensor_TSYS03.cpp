@@ -21,6 +21,8 @@
 #include <AP_HAL/I2CDevice.h>
 #include <AP_Math/AP_Math.h>
 
+#include <GCS_MAVLink/GCS.h>
+
 #ifndef AP_TEMPERATURE_SENSOR_TSYS03_ENFORCE_KNOWN_VALID_I2C_ADDRESS
 #define AP_TEMPERATURE_SENSOR_TSYS03_ENFORCE_KNOWN_VALID_I2C_ADDRESS 1
 #endif
@@ -38,14 +40,14 @@ void AP_TemperatureSensor_TSYS03::init()
 #if AP_TEMPERATURE_SENSOR_TSYS03_ENFORCE_KNOWN_VALID_I2C_ADDRESS
     // I2C Address: Default to using TSYS03_ADDR_CSB0 & Check I2C Address is Correct
     if ((_params.bus_address != TSYS03_ADDR_CSB0) ) {
-        printf("%s wrong I2C addr of 0x%2X, setting to 0x%2X", name, (unsigned)_params.bus_address.get(), (unsigned)TSYS03_ADDR_CSB0);
+        GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "%s wrong I2C addr of 0x%2X, setting to 0x%2X", name, (unsigned)_params.bus_address.get(), (unsigned)TSYS03_ADDR_CSB0);
         _params.bus_address.set(TSYS03_ADDR_CSB0);
     }
 #endif
 
     _dev = std::move(hal.i2c_mgr->get_device(_params.bus, _params.bus_address));
     if (!_dev) {
-        printf("%s device is null!", name);
+        GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "%s device is null!", name);
         return;
     }
 
@@ -55,7 +57,7 @@ void AP_TemperatureSensor_TSYS03::init()
 
     // reset
     if (!_dev->transfer(&TSYS03_CMD_RESET, 1, nullptr, 0)) {
-        printf("%s reset failed", name);
+        GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "%s reset failed", name);
         return;
     }
 
