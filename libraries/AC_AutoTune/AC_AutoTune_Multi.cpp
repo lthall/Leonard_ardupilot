@@ -71,11 +71,11 @@
 #define AUTOTUNE_ACCEL_Y_BACKOFF           1.0f     // back off from maximum acceleration
 
 // roll and pitch axes
-#define AUTOTUNE_TARGET_RATE_RLLPIT_CDS     18000   // target roll/pitch rate during AUTOTUNE_STEP_TWITCHING step
+#define AUTOTUNE_TARGET_RATE_RLLPIT_CDS     7500   // target roll/pitch rate during AUTOTUNE_STEP_TWITCHING step
 #define AUTOTUNE_TARGET_MIN_RATE_RLLPIT_CDS 4500    // target roll/pitch rate during AUTOTUNE_STEP_TWITCHING step
 
 // yaw axis
-#define AUTOTUNE_TARGET_RATE_YAW_CDS        9000    // target yaw rate during AUTOTUNE_STEP_TWITCHING step
+#define AUTOTUNE_TARGET_RATE_YAW_CDS        3000    // target yaw rate during AUTOTUNE_STEP_TWITCHING step
 #define AUTOTUNE_TARGET_MIN_ANGLE_YAW_CD     500    // minimum target angle during TESTING_RATE step that will cause us to move to next step
 #define AUTOTUNE_TARGET_MIN_RATE_YAW_CDS    1500    // minimum target yaw rate during AUTOTUNE_STEP_TWITCHING step
 
