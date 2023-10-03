@@ -236,6 +236,8 @@ public:
     friend class ModeTurtle;
     friend class AP_ExternalControl_Copter;
 
+    friend class PayloadPlace;
+
     Copter(void);
 
 private:
