@@ -14,7 +14,6 @@ public:
     bool verify();
 
     enum class State : uint8_t {
-        FlyToLocation,
         Descent_Start,
         Descent,
         Release,
@@ -526,6 +525,7 @@ public:
     virtual bool has_user_takeoff(bool must_navigate) const override { return false; }
 
     void payload_place_start();
+    void payload_place_run();
 
     // for GCS_MAVLink to call:
     bool do_guided(const AP_Mission::Mission_Command& cmd);
@@ -667,6 +667,13 @@ private:
     // Delay Mission Scripting Command
     int32_t condition_value;  // used in condition commands (eg delay, change alt, etc.)
     uint32_t condition_start;
+
+    enum class PayloadPlaceState {
+        FlyToLocation = 0,
+        Placing = 1,
+        Done = 2,
+    };
+    PayloadPlaceState payload_place_state = PayloadPlaceState::FlyToLocation;
 
     enum class State {
         FlyToLocation = 0,
