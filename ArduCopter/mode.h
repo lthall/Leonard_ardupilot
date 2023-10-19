@@ -1477,6 +1477,8 @@ public:
         PAYLOAD_PLACE
     };
     SubMode state() { return _state; }
+    const char *state_name(SubMode mode) const;
+    void set_state(SubMode mode);
 
     // SHIP_OPS states
     enum class ApproachMode : uint8_t {
