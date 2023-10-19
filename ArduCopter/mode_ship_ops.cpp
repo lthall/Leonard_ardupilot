@@ -9,6 +9,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @DisplayName: Angle from the bow of the ship of the perch position
     // @Description: Angle from the bow of the ship of the perch position where the aircraft will wait until it is commanded to land.
     // @Range: 0 1
+    // @Units: deg
     // @User: Advanced
     AP_GROUPINFO("PCH_ANG", 1, ModeShipOperation, ship_perch_angle, 180.0f),
 
@@ -16,6 +17,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @DisplayName: Distance of the perch position from the ship
     // @Description: Distance in m of the perch position from the ship where the aircraft will wait until it is commanded to land.
     // @Range: 0 1
+    // @Units: m
     // @User: Advanced
     AP_GROUPINFO("PCH_RAD", 2, ModeShipOperation, ship_perch_radius, 25.0f),
 
@@ -23,6 +25,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @DisplayName: Altitude of the perch position from the ship
     // @Description: Altitude in m of the perch position relative to the ship where the aircraft will wait until it is commanded to land.
     // @Range: 0 1
+    // @Units: m
     // @User: Advanced
     AP_GROUPINFO("PCH_ALT", 3, ModeShipOperation, ship_perch_altitude, 25.0f),
 
@@ -30,6 +33,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @DisplayName: Acceleration limit for the horizontal kinematic input shaping
     // @Description: Acceleration limit of the horizontal kinematic path generation used to determine how quickly the ship varies in velocity
     // @Range: 0 1
+    // @Units: m/s/s
     // @User: Advanced
     AP_GROUPINFO("ACCELXY", 4, ModeShipOperation, ship_accel_xy, 2.5f),
 
@@ -37,6 +41,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @DisplayName: Jerk limit for the horizontal kinematic input shaping
     // @Description: Jerk limit of the horizontal kinematic path generation used to determine how quickly the ship varies in acceleration
     // @Range: 0 1
+    // @Units: m/s/s/s
     // @User: Advanced
     AP_GROUPINFO("JERKXY", 5, ModeShipOperation, ship_jerk_xy, 5.0f),
 
@@ -44,6 +49,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @DisplayName: Acceleration limit for the vertical kinematic input shaping
     // @Description: Acceleration limit of the vertical kinematic path generation used to determine how quickly the ship varies in velocity
     // @Range: 0 1
+    // @Units: m/s/s
     // @User: Advanced
     AP_GROUPINFO("ACCELZ", 6, ModeShipOperation, ship_accel_z, 2.5f),
 
@@ -51,6 +57,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @DisplayName: Jerk limit for the vertical kinematic input shaping
     // @Description: Jerk limit of the vertical kinematic path generation used to determine how quickly the ship varies in acceleration
     // @Range: 0 1
+    // @Units: m/s/s/s
     // @User: Advanced
     AP_GROUPINFO("JERKZ", 7, ModeShipOperation, ship_jerk_z, 5.0f),
 
@@ -58,6 +65,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @DisplayName: Angular acceleration limit for the heading kinematic input shaping
     // @Description: Angular acceleration limit of the heading kinematic path generation used to determine how quickly the ship varies in angular velocity
     // @Range: 0 1
+    // @Units: deg/s/s
     // @User: Advanced
     AP_GROUPINFO("ACCELH", 8, ModeShipOperation, ship_accel_h, 90.0f),
 
@@ -65,6 +73,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @DisplayName: Angular jerk limit for the heading kinematic input shaping
     // @Description: Angular jerk limit of the heading kinematic path generation used to determine how quickly the ship varies in angular acceleration
     // @Range: 0 1
+    // @Units: deg/s/s/s
     // @User: Advanced
     AP_GROUPINFO("JERKH", 9, ModeShipOperation, ship_jerk_h, 360.0f),
 
