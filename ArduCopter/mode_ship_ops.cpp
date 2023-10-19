@@ -149,12 +149,12 @@ bool ModeShipOperation::init(const bool ignore_checks)
     if (get_alt_hold_state(0.0f) == AltHold_Flying) {
         // we are flying so we will initialise at the climb to RTL altitude.
         _state = SubMode::CLIMB_TO_RTL;
-        gcs().send_text(MAV_SEVERITY_INFO, "ShipLand: ShipOps_ClimbToRTL");
+        gcs().send_text(MAV_SEVERITY_INFO, "ShipOps: ClimbToRTL");
         ship_takeoff = false;
     } else {
         // we are landed so we will initialise in the Final state.
         _state = SubMode::LAUNCH_RECOVERY;
-        gcs().send_text(MAV_SEVERITY_INFO, "ShipLand: ShipOps_LaunchRecovery");
+        gcs().send_text(MAV_SEVERITY_INFO, "ShipOps: LaunchRecovery");
         ship_takeoff = true;
     }
 
@@ -326,6 +326,8 @@ void ModeShipOperation::run()
             offset.z = -perch_height;
             break;
         case SubMode::OVER_SPOT:
+            // FALLTHROUGH
+        case SubMode::PAYLOAD_PLACE:
             // move over landing Spot at Perch altitude
             offset.zero();
             offset.z = -perch_height;
@@ -364,6 +366,8 @@ void ModeShipOperation::run()
         case SubMode::OVER_SPOT:
             // FALLTHROUGH
         case SubMode::LAUNCH_RECOVERY:
+            // FALLTHROUGH
+        case SubMode::PAYLOAD_PLACE:
             // move to target position and velocity
             Vector3p pos = ship_pos.topostype();
             pos += offset.topostype();
@@ -419,6 +423,9 @@ void ModeShipOperation::run()
             }
             pos_control->land_at_climb_rate_cm(target_climb_rate, enforce_descent_limit);
             break;
+        case SubMode::PAYLOAD_PLACE:
+            payload_place.run_vertical_control();
+            break;
         }
 
         // calculate vehicle heading
@@ -433,6 +440,8 @@ void ModeShipOperation::run()
         case SubMode::PERCH:
             // FALLTHROUGH
         case SubMode::OVER_SPOT:
+            // FALLTHROUGH
+        case SubMode::PAYLOAD_PLACE:
             switch (g2.follow.get_yaw_behave()) {
                 case AP_Follow::YAW_BEHAVE_FACE_LEAD_VEHICLE: {
                     if (ship_pos.xy().length() > 1.0f) {
@@ -481,7 +490,7 @@ void ModeShipOperation::run()
             // check altitude is within 5% of perch_height from RTL altitude
             if (ship_available && alt_check) {
                 _state = SubMode::RETURN_TO_PERCH;
-                gcs().send_text(MAV_SEVERITY_INFO, "ShipLand: ShipOps_ReturnToPerch");
+                gcs().send_text(MAV_SEVERITY_INFO, "ShipOps: ReturnToPerch");
             }
             break;
         case SubMode::RETURN_TO_PERCH:
@@ -490,14 +499,14 @@ void ModeShipOperation::run()
             pos_check = pos_error.xy().length() < ship_perch_radius * 10.0f;
             if (pos_check) {
                 _state = SubMode::PERCH;
-                gcs().send_text(MAV_SEVERITY_INFO, "ShipLand: ShipOps_Perch");
+                gcs().send_text(MAV_SEVERITY_INFO, "ShipOps: Perch");
             }
             break;
         case SubMode::PERCH:
             // if altitude is correct and throttle is low then continue landing
             if (alt_check && is_negative(target_climb_rate)) {
                 _state = SubMode::OVER_SPOT;
-                gcs().send_text(MAV_SEVERITY_INFO, "ShipLand: ShipOps_OverSpot");
+                gcs().send_text(MAV_SEVERITY_INFO, "ShipOps: OverSpot");
             }
             break;
         case SubMode::OVER_SPOT:
@@ -506,26 +515,46 @@ void ModeShipOperation::run()
             // if decent requested then continue recovery
             pos_check = pos_error.xy().length() < perch_height * 0.1f;
             if (pos_check && is_negative(target_climb_rate)) {
-                gcs().send_text(MAV_SEVERITY_INFO, "ShipLand: ShipOps_LaunchRecovery");
-                _state = SubMode::LAUNCH_RECOVERY;
+                switch (_approach_mode) {
+                case ApproachMode::LAUNCH_RECOVERY:
+                    gcs().send_text(MAV_SEVERITY_INFO, "ShipOps: LaunchRecovery");
+                    _state = SubMode::LAUNCH_RECOVERY;
 #if AP_LANDINGGEAR_ENABLED
-                // optionally deploy landing gear
-                copter.landinggear.deploy_for_landing();
+                    // optionally deploy landing gear
+                    copter.landinggear.deploy_for_landing();
 #endif
-            } else if (is_positive(target_climb_rate)) {
+                    break;
+                case ApproachMode::PAYLOAD_PLACE:
+                    gcs().send_text(MAV_SEVERITY_INFO, "ShipOps: Payload Place");
+                    payload_place.init(0.0);
+                    _state = SubMode::PAYLOAD_PLACE;
+                    break;
+                }
+            } else if (alt_check && is_positive(target_climb_rate)) {
                 _state = SubMode::PERCH;
-                gcs().send_text(MAV_SEVERITY_INFO, "ShipLand: ShipOps_ReturnToPerch");
+                gcs().send_text(MAV_SEVERITY_INFO, "ShipOps: ReturnToPerch");
             }
             break;
         case SubMode::LAUNCH_RECOVERY:
             // if accent requested and altitude has reached or exceeded the perch altitude then move to Perch
             if (alt_check && is_positive(target_climb_rate)) {
                 _state = SubMode::PERCH;
-                gcs().send_text(MAV_SEVERITY_INFO, "ShipLand: ShipOps_ReturnToPerch");
+                gcs().send_text(MAV_SEVERITY_INFO, "ShipOps: ReturnToPerch");
 #if AP_LANDINGGEAR_ENABLED
                 // optionally retract landing gear
                 copter.landinggear.retract_after_takeoff();
 #endif
+            }
+            break;
+        case SubMode::PAYLOAD_PLACE:
+            if(payload_place.verify()) {
+                _state = SubMode::OVER_SPOT;
+                set_approach_mode(ApproachMode::LAUNCH_RECOVERY);
+                gcs().send_text(MAV_SEVERITY_INFO, "ShipOps: OverSpot");
+            }
+            if(is_positive(target_climb_rate) || _approach_mode != ApproachMode::PAYLOAD_PLACE) {
+                _state = SubMode::OVER_SPOT;
+                gcs().send_text(MAV_SEVERITY_INFO, "ShipOps: OverSpot");
             }
             break;
         }
@@ -569,6 +598,20 @@ bool ModeShipOperation::get_wp(Location &loc) const
     loc = copter.current_loc;
     loc.offset_bearing(bearing, dist);
     return true;
+}
+
+void ModeShipOperation::set_approach_mode(ApproachMode approach_mode)
+{
+    _approach_mode = approach_mode;
+    switch (_approach_mode) {
+    case ApproachMode::LAUNCH_RECOVERY:
+        gcs().send_text(MAV_SEVERITY_INFO, "ShipOps: Mode Launch/Recovery");
+        break;
+    case ApproachMode::PAYLOAD_PLACE:
+        gcs().send_text(MAV_SEVERITY_INFO, "ShipOps: Mode Payload Place");
+        break;
+    }
+
 }
 
 #endif // MODE_SHIP_OPS_ENABLED == ENABLED

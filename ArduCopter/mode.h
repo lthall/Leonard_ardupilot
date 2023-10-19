@@ -1467,15 +1467,25 @@ public:
     // for reporting to GCS
     bool get_wp(Location &loc) const override;
 
-    // RTL states
+    // SHIP_OPS states
     enum class SubMode : uint8_t {
         CLIMB_TO_RTL,
         RETURN_TO_PERCH,
         PERCH,
         OVER_SPOT,
-        LAUNCH_RECOVERY
+        LAUNCH_RECOVERY,
+        PAYLOAD_PLACE
     };
     SubMode state() { return _state; }
+
+    // SHIP_OPS states
+    enum class ApproachMode : uint8_t {
+        LAUNCH_RECOVERY,
+        PAYLOAD_PLACE
+    };
+
+    void set_approach_mode(ApproachMode approach_mode);
+    ApproachMode approach_mode() { return _approach_mode; }
 
     virtual bool is_landing() const override;
 
@@ -1490,6 +1500,7 @@ protected:
 private:
 
     SubMode _state = SubMode::CLIMB_TO_RTL;  // records state of rtl (initial climb, returning home, etc)
+    ApproachMode _approach_mode = ApproachMode::LAUNCH_RECOVERY;  // records state of rtl (initial climb, returning home, etc)
     uint32_t wp_distance() const override;
     int32_t wp_bearing() const override;
 
