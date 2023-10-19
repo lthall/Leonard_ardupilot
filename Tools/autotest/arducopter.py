@@ -7997,6 +7997,50 @@ class AutoTestCopter(AutoTest):
         # ship will have moved on, so we land on the water which isn't moving
         self.wait_groundspeed(0, 2)
 
+    def ShipOps(self):
+        '''Fly Simulated Ship Operations'''
+        self.load_params_file("ShipLanding.param")
+
+        self.progress("Change to ShipOps mode")
+        self.change_mode(29)  # 29 is ship ops
+        self.wait_ready_to_arm()
+
+        ship_speed = self.get_parameter('SIM_SHIP_SPEED')
+
+        self.progress("ensure we are be moving with the ship")
+        self.wait_groundspeed(ship_speed-0.1, ship_speed+0.1)
+
+        self.progress("arm vehicle and make sure we continue to move with ship")
+        self.arm_vehicle()
+        self.wait_groundspeed(ship_speed-0.1, ship_speed+0.1, minimum_duration=2)
+
+        self.progress("put system into launch/retrieve mode")
+        aux_func_ship_ops = 175
+        self.run_auxfunc(aux_func_ship_ops, 2)
+
+        abs_alt = self.get_altitude(relative=False)
+
+        perch_alt = self.get_parameter('SHIP_PCH_ALT')
+
+#        self.set_parameter("SIM_SPEEDUP", 1)
+
+        self.progress("trigger launch")
+        self.set_rc(3, 2000)
+
+        self.wait_altitude(perch_alt-0.5, perch_alt+0.5, minimum_duration=5, relative=True, timeout=30)
+
+        # should retain our groundspeed to match the vehicle we are following
+        self.wait_groundspeed(ship_speed-0.1, ship_speed+0.1, minimum_duration=10)
+
+        # check offsets here
+#        self.mavproxy.interact()
+        self.progress("trigger recovery")
+        self.set_rc(3, 1000)
+
+        self.wait_altitude(abs_alt-5, abs_alt+5, minimum_duration=5, timeout=60)
+        self.wait_disarmed()
+
+
     def ParameterValidation(self):
         '''Test parameters are checked for validity'''
         # wait 10 seconds for initialisation
@@ -9810,6 +9854,7 @@ class AutoTestCopter(AutoTest):
             self.FlyMissionTwice,
             self.IMUConsistency,
             self.AHRSTrimLand,
+            self.ShipOps,
         ])
         return ret
 
