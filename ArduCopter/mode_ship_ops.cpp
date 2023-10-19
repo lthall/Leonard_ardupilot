@@ -272,7 +272,7 @@ void ModeShipOperation::run()
         // transform offset and perch to earth frame
         perch_offset.rotate(ship_heading);
     } else {
-        set_state(SubMode::CLIMB_TO_RTL);
+        copter.do_failsafe_action(Copter::FailsafeAction::AUTO_DO_LAND_START, ModeReason::UNKNOWN);
         ship_available = false;
     }
 

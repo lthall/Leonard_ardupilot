@@ -1460,7 +1460,7 @@ public:
     bool has_manual_throttle() const override { return false; }
     bool allows_arming(AP_Arming::Method method) const override { return true; };
     bool is_autopilot() const override { return true; }
-    bool has_user_takeoff(bool must_navigate) const override { return false; }
+    bool has_user_takeoff(bool must_navigate) const override { return true; }
 
     bool requires_terrain_failsafe() const override { return false; }
 
