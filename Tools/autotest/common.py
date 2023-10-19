@@ -1669,9 +1669,9 @@ class AutoTest(ABC):
     def vehicleinfo_key(self):
         return self.log_name()
 
-    def repeatedly_apply_parameter_file(self, filepath):
+    def repeatedly_apply_parameter_filepath(self, filepath):
         if False:
-            return self.repeatedly_apply_parameter_file_mavproxy(filepath)
+            return self.repeatedly_apply_parameter_filepath_mavproxy(filepath)
         parameters = mavparm.MAVParmDict()
 #        correct_parameters = set()
         if not parameters.load(filepath):
@@ -1681,7 +1681,7 @@ class AutoTest(ABC):
             param_dict[p] = parameters[p]
         self.set_parameters(param_dict)
 
-    def repeatedly_apply_parameter_file_mavproxy(self, filepath):
+    def repeatedly_apply_parameter_filepath_mavproxy(self, filepath):
         '''keep applying a parameter file until no parameters changed'''
         for i in range(0, 3):
             self.mavproxy.send("param load %s\n" % filepath)
@@ -1702,7 +1702,7 @@ class AutoTest(ABC):
         if self.params is None:
             self.params = self.model_defaults_filepath(self.frame)
         for x in self.params:
-            self.repeatedly_apply_parameter_file(x)
+            self.repeatedly_apply_parameter_filepath(x)
 
     def count_lines_in_filepath(self, filepath):
         return len([i for i in open(filepath)])
@@ -13341,7 +13341,7 @@ SERIAL5_BAUD 128
     def load_default_params_file(self, filename):
         '''load a file from Tools/autotest/default_params'''
         filepath = util.reltopdir(os.path.join("Tools", "autotest", "default_params", filename))
-        self.repeatedly_apply_parameter_file(filepath)
+        self.repeatedly_apply_parameter_filepath(filepath)
 
     def send_pause_command(self):
         '''pause AUTO/GUIDED modes'''
