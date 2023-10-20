@@ -7998,6 +7998,8 @@ class AutoTestCopter(AutoTest):
         self.wait_groundspeed(0, 2)
 
     def ShipOps_wait_perch_distance(self, distance):
+        self.context_push()
+        self.context_collect('GLOBAL_POSITION_INT')
         positions = {}
         def current_value_getter():
             self.drain_mav()
@@ -8019,8 +8021,11 @@ class AutoTestCopter(AutoTest):
             timeout=30,
             minimum_duration=5,
         )
+        self.context_pop()
 
     def ShipOps_wait_perch_angle(self, angle):
+        self.context_push()
+        self.context_collect('GLOBAL_POSITION_INT')
         positions = {}
         def current_value_getter():
             self.drain_mav()
@@ -8044,18 +8049,18 @@ class AutoTestCopter(AutoTest):
             timeout=30,
             minimum_duration=5,
         )
+        self.context_pop()
 
     def ShipOps(self):
         '''Fly Simulated Ship Operations'''
         self.load_params_file("ShipLanding.param")
-        self.set_parameter('TERRAIN_ENABLE', 0)
-
-        self.progress("Change to ShipOps mode")
 
         # FIXME: change to mode shipops before ready to arm (code
         # needs to be fixed....)
         self.change_mode("GUIDED")
         self.wait_ready_to_arm()
+
+        self.progress("Change to ShipOps mode")
         self.change_mode(29)  # 29 is ship ops
 
         ship_speed = self.get_parameter('SIM_SHIP_SPEED')
@@ -8066,10 +8071,6 @@ class AutoTestCopter(AutoTest):
         self.progress("arm vehicle and make sure we continue to move with ship")
         self.arm_vehicle()
         self.wait_groundspeed(ship_speed-0.1, ship_speed+0.1, minimum_duration=2)
-
-        self.progress("put system into launch/retrieve mode")
-        aux_func_ship_ops = 175
-#        self.run_auxfunc(aux_func_ship_ops, 2)
 
         perch_alt = self.get_parameter('SHIP_PCH_ALT')
 
@@ -8087,20 +8088,14 @@ class AutoTestCopter(AutoTest):
 #        self.set_parameter("SIM_SPEEDUP", 1)
 
         self.start_subtest('Check various perch distances')
-        self.context_push()
-        self.context_collect('GLOBAL_POSITION_INT')
         for perch_distance in 20, 25, 15, 0:
             self.set_parameter('SHIP_PCH_RAD', perch_distance)
             self.ShipOps_wait_perch_distance(perch_distance)
-        self.context_pop()
 
         self.start_subtest('Check various perch angles')
-        self.context_push()
-        self.context_collect('GLOBAL_POSITION_INT')
         for perch_angle in 180, 90, 270, 0, 300:
             self.set_parameter('SHIP_PCH_ANG', perch_angle)
             self.ShipOps_wait_perch_angle(perch_angle)
-        self.context_pop()
 
         self.progress("trigger recovery")
         self.set_rc(3, 1000)
@@ -8108,6 +8103,73 @@ class AutoTestCopter(AutoTest):
         self.wait_altitude(abs_alt-5, abs_alt+5, minimum_duration=5, timeout=60)
         self.wait_disarmed()
 
+    def ShipOps_PayloadPlace(self):
+        '''Fly Simulated Ship Operations'''
+        self.context_push()
+        grip_rc_channel = 8
+        self.set_rc(8, 2000)  # grab
+        self.load_params_file("ShipLanding.param")
+        self.reboot_sitl(startup_location_dist_max=1000)  # for gripper
+
+        # FIXME: change to mode shipops before ready to arm (code
+        # needs to be fixed....)
+        self.change_mode("GUIDED")
+        self.wait_ready_to_arm()
+
+        abs_alt = self.get_altitude(relative=False)
+
+        self.progress("Change to ShipOps mode")
+        self.change_mode(29)  # 29 is ship ops
+
+        self.arm_vehicle()
+
+        self.progress("trigger launch")
+        self.set_rc(3, 2000)
+
+        self.start_subtest('Ensure we get to perch altitude and distance')
+        perch_alt = self.get_parameter('SHIP_PCH_ALT')
+        perch_distance = self.get_parameter('SHIP_PCH_RAD')
+        self.wait_altitude(perch_alt-2, perch_alt+2, minimum_duration=5, relative=True, timeout=60)
+        self.ShipOps_wait_perch_distance(perch_distance)
+
+        self.start_subtest("Ensure shippos reconnects with ship")
+        ship_speed = self.get_parameter('SIM_SHIP_SPEED')
+        self.progress("Moving to front of ship")
+        perch_angle = 0
+        self.set_parameter('SHIP_PCH_ANG', perch_angle)
+        self.ShipOps_wait_perch_angle(perch_angle)
+
+        self.progress("Changing mode out of shipops")
+        self.change_mode('LOITER')
+        self.delay_sim_time(2)
+        self.change_mode(29)  # 29 is ship ops
+
+        self.ShipOps_wait_perch_angle(perch_angle)
+
+        self.start_subtest('Ensure we are matching ship speed')
+        self.wait_groundspeed(ship_speed-0.1, ship_speed+0.1, minimum_duration=10)
+
+#        self.set_parameter("SIM_SPEEDUP", 1)
+        self.start_subtest("Do a payload place")
+        self.progress("putting into payload place approach mode")
+        self.wait_servo_channel_value(10, 1000)  # this is the gripper grabbed
+        aux_func_ship_ops = 175
+        self.run_auxfunc(aux_func_ship_ops, 0)
+        self.progress("triggering place with RC")
+        self.set_rc(3, 1000)
+
+        self.progress("Waiting for gripper release")
+        self.wait_servo_channel_value(10, 2000, timeout=120)  # this is the gripper released
+        self.progress("Ensuring we are on the deck when release happens")
+        self.assert_altitude(abs_alt-5, abs_alt+5)
+
+        self.progress("Waiting for climb-out after releasing load")
+        self.wait_altitude(perch_alt-5, perch_alt+5, minimum_duration=5, timeout=60, relative=True)
+        self.ShipOps_wait_perch_distance(perch_distance)
+
+        self.wait_disarmed()
+
+        self.context_pop()
 
     def ParameterValidation(self):
         '''Test parameters are checked for validity'''
@@ -9923,6 +9985,7 @@ class AutoTestCopter(AutoTest):
             self.IMUConsistency,
             self.AHRSTrimLand,
             self.ShipOps,
+            self.ShipOps_PayloadPlace,
         ])
         return ret
 
