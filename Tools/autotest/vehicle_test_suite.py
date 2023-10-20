@@ -2012,7 +2012,7 @@ class TestSuite(ABC):
                                        0,
                                        0)
 
-    def reboot_sitl(self, required_bootcount=None, force=False, check_position=True):
+    def reboot_sitl(self, required_bootcount=None, force=False, check_position=True, startup_location_dist_max=1):
         """Reboot SITL instance and wait for it to reconnect."""
         if self.armed() and not force:
             raise NotAchievedException("Reboot attempted while armed")
@@ -2020,7 +2020,7 @@ class TestSuite(ABC):
         self.reboot_sitl_mav(required_bootcount=required_bootcount, force=force)
         self.do_heartbeats(force=True)
         if check_position and self.frame != 'sailboat':  # sailboats drift with wind!
-            self.assert_simstate_location_is_at_startup_location()
+            self.assert_simstate_location_is_at_startup_location(dist_max=startup_location_dist_max)
 
     def reboot_sitl_mavproxy(self, required_bootcount=None):
         """Reboot SITL instance using MAVProxy and wait for it to reconnect."""
