@@ -5934,6 +5934,23 @@ class AutoTest(ABC):
         return mp_util.gps_distance(loc1.lat, lon1, loc2.lat, lon2)
 
     @staticmethod
+    def get_bearing_int(loc1, loc2):
+        """Get ground distance between two locations."""
+        try:
+            lon1 = loc1.lng
+            lon2 = loc2.lng
+        except AttributeError:
+            lon1 = loc1.lon
+            lon2 = loc2.lon
+
+        lat1 = loc1.lat * 1e-7
+        lon1 *= 1e-7
+        lat2 = loc2.lat * 1e-7
+        lon2 *= 1e-7
+
+        return util.gps_bearing(lat1, lon1, lat2, lon2)
+
+    @staticmethod
     def get_latlon_attr(loc, attrs):
         '''return any found latitude attribute from loc'''
         ret = None
@@ -6634,7 +6651,7 @@ class AutoTest(ABC):
         if minimum_duration >= timeout:
             raise ValueError("minimum_duration >= timeout")
         if print_diagnostics_as_target_not_range:
-            self.progress("Waiting for %s=%.02f with accuracy %.02f" % (value_name, target, accuracy))
+            self.progress("Waiting for %s=%.02f with accuracy %.02f" % (value_name, target + accuracy, accuracy))
         else:
             self.progress("Waiting for %s between (%s) and (%s)" % (value_name, str(minimum), str(maximum)))
         last_print_time = 0
@@ -6665,7 +6682,7 @@ class AutoTest(ABC):
                         (value_name,
                          last_value,
                          want_or_got,
-                         target,
+                         target + accuracy,
                          accuracy,
                          achieved_duration_bit)
                     )

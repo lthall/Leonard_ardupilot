@@ -7997,13 +7997,66 @@ class AutoTestCopter(AutoTest):
         # ship will have moved on, so we land on the water which isn't moving
         self.wait_groundspeed(0, 2)
 
+    def ShipOps_wait_perch_distance(self, distance):
+        positions = {}
+        def current_value_getter():
+            self.drain_mav()
+            for pos in self.context_collection('GLOBAL_POSITION_INT'):
+                positions[pos.get_srcSystem()] = pos
+            self.context_clear_collection('GLOBAL_POSITION_INT')
+            if len(positions) < 2:
+                return -10000
+            if len(positions) > 2:
+                raise ValueError("Bad number of positions")
+            distance = self.get_distance_int(positions[1], positions[17])
+            return distance
+
+        self.wait_and_maintain(
+            value_name="PerchOffset",
+            target=distance,
+            current_value_getter=current_value_getter,
+            accuracy=2,
+            timeout=30,
+            minimum_duration=5,
+        )
+
+    def ShipOps_wait_perch_angle(self, angle):
+        positions = {}
+        def current_value_getter():
+            self.drain_mav()
+            for pos in self.context_collection('GLOBAL_POSITION_INT'):
+                positions[pos.get_srcSystem()] = pos
+            self.context_clear_collection('GLOBAL_POSITION_INT')
+            if len(positions) < 2:
+                return -10000
+            if len(positions) > 2:
+                raise ValueError("Bad number of positions")
+            ship_gpi = positions[17]
+            vehicle_gpi = positions[1]
+            angle = AutoTest.get_bearing_int(ship_gpi, vehicle_gpi)
+            return angle - ship_gpi.hdg * 0.01
+
+        self.wait_and_maintain(
+            value_name="PerchAngle",
+            target=angle,
+            current_value_getter=current_value_getter,
+            accuracy=5,
+            timeout=30,
+            minimum_duration=5,
+        )
+
     def ShipOps(self):
         '''Fly Simulated Ship Operations'''
         self.load_params_file("ShipLanding.param")
+        self.set_parameter('TERRAIN_ENABLE', 0)
 
         self.progress("Change to ShipOps mode")
-        self.change_mode(29)  # 29 is ship ops
+
+        # FIXME: change to mode shipops before ready to arm (code
+        # needs to be fixed....)
+        self.change_mode("GUIDED")
         self.wait_ready_to_arm()
+        self.change_mode(29)  # 29 is ship ops
 
         ship_speed = self.get_parameter('SIM_SHIP_SPEED')
 
@@ -8016,24 +8069,39 @@ class AutoTestCopter(AutoTest):
 
         self.progress("put system into launch/retrieve mode")
         aux_func_ship_ops = 175
-        self.run_auxfunc(aux_func_ship_ops, 2)
-
-        abs_alt = self.get_altitude(relative=False)
+#        self.run_auxfunc(aux_func_ship_ops, 2)
 
         perch_alt = self.get_parameter('SHIP_PCH_ALT')
 
-#        self.set_parameter("SIM_SPEEDUP", 1)
+        abs_alt = self.get_altitude(relative=False)
 
         self.progress("trigger launch")
         self.set_rc(3, 2000)
 
+        self.start_subtest('Ensure we get to perch altitude')
         self.wait_altitude(perch_alt-0.5, perch_alt+0.5, minimum_duration=5, relative=True, timeout=30)
 
-        # should retain our groundspeed to match the vehicle we are following
+        self.start_subtest('Ensure we are matching ship speed')
         self.wait_groundspeed(ship_speed-0.1, ship_speed+0.1, minimum_duration=10)
 
-        # check offsets here
-#        self.mavproxy.interact()
+#        self.set_parameter("SIM_SPEEDUP", 1)
+
+        self.start_subtest('Check various perch distances')
+        self.context_push()
+        self.context_collect('GLOBAL_POSITION_INT')
+        for perch_distance in 20, 25, 15, 0:
+            self.set_parameter('SHIP_PCH_RAD', perch_distance)
+            self.ShipOps_wait_perch_distance(perch_distance)
+        self.context_pop()
+
+        self.start_subtest('Check various perch angles')
+        self.context_push()
+        self.context_collect('GLOBAL_POSITION_INT')
+        for perch_angle in 180, 90, 270, 0, 300:
+            self.set_parameter('SHIP_PCH_ANG', perch_angle)
+            self.ShipOps_wait_perch_angle(perch_angle)
+        self.context_pop()
+
         self.progress("trigger recovery")
         self.set_rc(3, 1000)
 
