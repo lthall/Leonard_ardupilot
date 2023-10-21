@@ -574,10 +574,10 @@ void ModeShipOperation::run()
             }
             break;
         case SubMode::PAYLOAD_PLACE:
-            if(payload_place.verify()) {
-                set_state(SubMode::OVER_SPOT);
-                set_approach_mode(ApproachMode::LAUNCH_RECOVERY);
-            }
+            // if(payload_place.verify()) {
+            //     set_state(SubMode::OVER_SPOT);
+            //     set_approach_mode(ApproachMode::LAUNCH_RECOVERY);
+            // }
             if(is_positive(target_climb_rate) || _approach_mode != ApproachMode::PAYLOAD_PLACE) {
                 set_state(SubMode::OVER_SPOT);
             }
