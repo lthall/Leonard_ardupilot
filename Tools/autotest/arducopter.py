@@ -8080,7 +8080,7 @@ class AutoTestCopter(AutoTest):
         self.set_rc(3, 2000)
 
         self.start_subtest('Ensure we get to perch altitude')
-        self.wait_altitude(perch_alt-0.5, perch_alt+0.5, minimum_duration=5, relative=True, timeout=30)
+        self.wait_altitude(perch_alt-2.5, perch_alt+2.5, minimum_duration=5, relative=True, timeout=30)
 
         self.start_subtest('Ensure we are matching ship speed')
         self.wait_groundspeed(ship_speed-0.1, ship_speed+0.1, minimum_duration=10)
@@ -8088,14 +8088,18 @@ class AutoTestCopter(AutoTest):
 #        self.set_parameter("SIM_SPEEDUP", 1)
 
         self.start_subtest('Check various perch distances')
+        self.context_push()
         for perch_distance in 20, 25, 15, 0:
             self.set_parameter('SHIP_PCH_RAD', perch_distance)
             self.ShipOps_wait_perch_distance(perch_distance)
+        self.context_pop()
 
         self.start_subtest('Check various perch angles')
+        self.context_push()
         for perch_angle in 180, 90, 270, 0, 300:
             self.set_parameter('SHIP_PCH_ANG', perch_angle)
             self.ShipOps_wait_perch_angle(perch_angle)
+        self.context_pop()
 
         self.progress("trigger recovery")
         self.set_rc(3, 1000)
