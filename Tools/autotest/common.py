@@ -7887,7 +7887,7 @@ Also, ignores heartbeats not from our target system'''
                 self.reset_SITL_commandline()
             else:
                 self.progress("Force-rebooting SITL")
-                self.reboot_sitl() # that'll learn it
+                self.reboot_sitl(startup_location_dist_max=1000000) # that'll learn it
             passed = False
 
         if self._mavproxy is not None:
@@ -9961,7 +9961,7 @@ Also, ignores heartbeats not from our target system'''
             if m.id != message_id:
                 continue
             if (m.get_srcSystem() != target_sysid or
-                m.get_srcComponent() != target_compid):
+                    m.get_srcComponent() != target_compid):
                 continue
             return m
 
