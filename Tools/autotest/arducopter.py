@@ -286,6 +286,7 @@ class AutoTestCopter(AutoTest):
 
     def change_alt(self, alt_min, climb_throttle=1920, descend_throttle=1080):
         """Change altitude."""
+
         def adjust_altitude(current_alt, target_alt, accuracy):
             if math.fabs(current_alt - target_alt) <= accuracy:
                 self.hover()
@@ -293,6 +294,7 @@ class AutoTestCopter(AutoTest):
                 self.set_rc(3, climb_throttle)
             else:
                 self.set_rc(3, descend_throttle)
+
         self.wait_altitude(
             (alt_min - 5),
             alt_min,
@@ -8001,6 +8003,7 @@ class AutoTestCopter(AutoTest):
         self.context_push()
         self.context_collect('GLOBAL_POSITION_INT')
         positions = {}
+
         def current_value_getter():
             self.drain_mav()
             for pos in self.context_collection('GLOBAL_POSITION_INT'):
@@ -8027,6 +8030,7 @@ class AutoTestCopter(AutoTest):
         self.context_push()
         self.context_collect('GLOBAL_POSITION_INT')
         positions = {}
+
         def current_value_getter():
             self.drain_mav()
             for pos in self.context_collection('GLOBAL_POSITION_INT'):
@@ -8107,10 +8111,78 @@ class AutoTestCopter(AutoTest):
         self.wait_altitude(abs_alt-5, abs_alt+5, minimum_duration=5, timeout=60)
         self.wait_disarmed()
 
+    def ShipOps_WeirdOrigin(self):
+        '''Fly Simulated Ship Operations'''
+        self.load_params_file("ShipLanding.param")
+
+        # glitch the GPS position so that our origin becomes
+        # significantly different to our home height:
+        self.set_parameter('SIM_GPS_ALT_OFS', 17)
+        self.set_parameter('EK3_SRC1_POSZ', 3)
+        self.reboot_sitl(startup_location_dist_max=1000)
+
+        self.wait_statustext('Field Elevation Set')
+        self.set_parameter('SIM_GPS_ALT_OFS', 0)
+
+        # FIXME: change to mode shipops before ready to arm (code
+        # needs to be fixed....)
+        self.change_mode("GUIDED")
+
+        self.wait_ready_to_arm()
+
+        self.progress("Change to ShipOps mode")
+        self.change_mode(29)  # 29 is ship ops
+
+        ship_speed = self.get_parameter('SIM_SHIP_SPEED')
+
+        self.progress("ensure we are be moving with the ship")
+        self.wait_groundspeed(ship_speed-0.1, ship_speed+0.1)
+
+        self.progress("arm vehicle and make sure we continue to move with ship")
+        self.arm_vehicle()
+        self.wait_groundspeed(ship_speed-0.1, ship_speed+0.1, minimum_duration=2)
+
+        perch_alt = self.get_parameter('SHIP_PCH_ALT')
+
+        abs_alt = self.get_altitude(relative=False)
+
+        self.progress("trigger launch")
+        self.set_rc(3, 2000)
+
+        self.start_subtest('Ensure we get to perch altitude')
+        self.wait_altitude(perch_alt-2.5, perch_alt+2.5, minimum_duration=5, relative=True, timeout=30)
+
+        self.start_subtest('Ensure we are matching ship speed')
+        self.wait_groundspeed(ship_speed-0.1, ship_speed+0.1, minimum_duration=10)
+
+#        self.set_parameter("SIM_SPEEDUP", 1)
+
+        self.start_subtest('Check various perch distances')
+        self.context_push()
+        for perch_distance in 20, 25, 15, 0:
+            self.set_parameter('SHIP_PCH_RAD', perch_distance)
+            self.ShipOps_wait_perch_distance(perch_distance)
+        self.context_pop()
+
+        self.start_subtest('Check various perch angles')
+        self.context_push()
+        for perch_angle in 180, 90, 270, 0, 300:
+            self.set_parameter('SHIP_PCH_ANG', perch_angle)
+            self.ShipOps_wait_perch_angle(perch_angle)
+        self.context_pop()
+
+        self.progress("trigger recovery")
+        self.set_rc(3, 1000)
+
+        self.wait_altitude(abs_alt-5, abs_alt+5, minimum_duration=5, timeout=60)
+        self.wait_disarmed()
+
+        self.reboot_sitl(startup_location_dist_max=1000)
+
     def ShipOps_PayloadPlace(self):
         '''Fly Simulated Ship Operations'''
         self.context_push()
-        grip_rc_channel = 8
+        # grip_rc_channel = 8
         self.set_rc(8, 2000)  # grab
         self.load_params_file("ShipLanding.param")
         self.reboot_sitl(startup_location_dist_max=1000)  # for gripper
@@ -9990,6 +10062,7 @@ class AutoTestCopter(AutoTest):
             self.AHRSTrimLand,
             self.ShipOps,
             self.ShipOps_PayloadPlace,
+            self.ShipOps_WeirdOrigin,
         ])
         return ret
 
