@@ -1509,9 +1509,9 @@ private:
     uint32_t last_log_ms;   // system time of last time desired velocity was logging
     float target_climb_rate;   // system time of last time desired velocity was logging
     Vector3f offset;
-    Vector3p ship_pos;
-    Vector3f ship_vel;
-    Vector3f ship_accel;
+    Vector3p ship_pos_ned;
+    Vector3f ship_vel_ned;
+    Vector3f ship_accel_ned;
     float ship_heading;
     float ship_heading_rate;
     float ship_heading_accel;
