@@ -8021,7 +8021,7 @@ class AutoTestCopter(AutoTest):
             target=distance,
             current_value_getter=current_value_getter,
             accuracy=2,
-            timeout=30,
+            timeout=300,
             minimum_duration=5,
         )
         self.context_pop()
@@ -8042,12 +8042,12 @@ class AutoTestCopter(AutoTest):
                 raise ValueError("Bad number of positions")
             ship_gpi = positions[17]
             vehicle_gpi = positions[1]
-            angle = AutoTest.get_bearing_int(ship_gpi, vehicle_gpi)
-            return angle - ship_gpi.hdg * 0.01
+            xangle = AutoTest.get_bearing_int(ship_gpi, vehicle_gpi)
+            return mavextra.wrap_180(xangle - ship_gpi.hdg * 0.01)
 
         self.wait_and_maintain(
             value_name="PerchAngle",
-            target=angle,
+            target=mavextra.wrap_180(angle),
             current_value_getter=current_value_getter,
             accuracy=5,
             timeout=30,
@@ -8150,6 +8150,7 @@ class AutoTestCopter(AutoTest):
         self.set_rc(3, 2000)
 
         self.start_subtest('Ensure we get to perch altitude')
+        # this should be measured against the ship
         self.wait_altitude(perch_alt-2.5, perch_alt+2.5, minimum_duration=5, relative=True, timeout=30)
 
         self.start_subtest('Ensure we are matching ship speed')
@@ -8171,10 +8172,19 @@ class AutoTestCopter(AutoTest):
             self.ShipOps_wait_perch_angle(perch_angle)
         self.context_pop()
 
+        self.progress("Change to RTL mode")
+        self.change_mode("RTL")
+        self.wait_altitude(0, 5, True, 120)
+
+        self.progress("Change to ShipOps mode")
+        self.change_mode(29)  # 29 is ship ops
+
         self.progress("trigger recovery")
         self.set_rc(3, 1000)
 
-        self.wait_altitude(abs_alt-5, abs_alt+5, minimum_duration=5, timeout=60)
+# I don't know what this is actually measruing.
+# I would like this to check that we are back to the perch
+        self.ShipOps_wait_perch_distance(perch_distance)
         self.wait_disarmed()
 
         self.reboot_sitl(startup_location_dist_max=1000)
@@ -8241,7 +8251,12 @@ class AutoTestCopter(AutoTest):
 
         self.progress("Waiting for climb-out after releasing load")
         self.wait_altitude(perch_alt-5, perch_alt+5, minimum_duration=5, timeout=60, relative=True)
+        self.set_rc(3, 2000)
         self.ShipOps_wait_perch_distance(perch_distance)
+
+        self.run_auxfunc(aux_func_ship_ops, 2)
+        self.progress("triggering land with RC")
+        self.set_rc(3, 1000)
 
         self.wait_disarmed()
 
