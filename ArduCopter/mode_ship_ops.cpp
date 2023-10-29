@@ -228,6 +228,10 @@ void ModeShipOperation::run()
     
     const Vector3f &curr_pos = inertial_nav.get_position_neu_cm();
     int32_t alt_home_above_origin_cm;
+
+    if (!AP::ahrs().get_home().get_alt_cm(Location::AltFrame::ABOVE_ORIGIN, alt_home_above_origin_cm)) {
+        alt_home_above_origin_cm = 0;
+    }
     
     // define target location
     if (g2.follow.get_target_dist_and_vel_ned(pos_delta_ned, pos_delta_with_ofs_ned, vel_ned)) {
@@ -238,10 +242,6 @@ void ModeShipOperation::run()
 
         float target_heading_deg = 0.0f;
         g2.follow.get_target_heading_deg(target_heading_deg);
-
-        if (!AP::ahrs().get_home().get_alt_cm(Location::AltFrame::ABOVE_ORIGIN, alt_home_above_origin_cm)) {
-            alt_home_above_origin_cm = 0;
-        }
 
         if (!ship_available) {
             // reset ship pos, vel, accel to current value when detected.
