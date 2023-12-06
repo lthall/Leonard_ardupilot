@@ -228,6 +228,7 @@ AP_HW_YJUAV_A6Nano                   1114
 AP_HW_ACNS_CM4PILOT                  1115
 AP_HW_ACNS_F405AIO                   1116
 AP_HW_BLITZF7                        1117
+AP_HW_FSO_POWER_STACK                1142
 
 AP_HW_ESP32_PERIPH                   1205
 AP_HW_ESP32S3_PERIPH                 1206
@@ -236,7 +237,6 @@ AP_HW_CUBEORANGE_PERIPH              1400
 AP_HW_CUBEBLACK_PERIPH               1401
 AP_HW_PIXRACER_PERIPH                1402
 AP_HW_SWBOOMBOARD_PERIPH             1403
-AP_HW_FSO_POWER_STACK                1404
 
 # OpenDroneID enabled boards. Use 10000 + the base board ID
 AP_HW_CubeOrange_ODID               10140
