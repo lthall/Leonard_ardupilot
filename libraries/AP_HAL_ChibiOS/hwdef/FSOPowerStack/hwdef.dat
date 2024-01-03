@@ -37,8 +37,8 @@ PA14 USART2_TX USART2
 PA15 USART2_RX USART2
 
 # SWD debugging
-# PA13 JTMS-SWDIO SWD
-# PA14 JTCK-SWCLK SWD
+PA13 JTMS-SWDIO SWD
+PA14 JTCK-SWCLK SWD
 
 define HAL_NO_GPIO_IRQ
 
@@ -99,7 +99,6 @@ PC2 SPARE12_ADC1 ADC1 SCALE(1) # ADC Bat 2 Voltage
 PC3 SPARE13_ADC1 ADC1 SCALE(1) # ADC Bat 2 Current
 # VBat channel should be here somewhere too
 
-# PWM - BIDIR config pending
 PA6     TIM3_CH1    TIM3    GPIO(50) # Payload 1 Enable
 PA7     TIM3_CH2    TIM3    GPIO(51) # Payload 2 Enable
 PA9     TIM1_CH2    TIM1    GPIO(52) # Output Payload FET
