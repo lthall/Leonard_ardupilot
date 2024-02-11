@@ -197,6 +197,7 @@ public:
     Quaternion attitude_from_thrust_vector(Vector3f thrust_vector, float heading_angle) const;
 
     // Run angular velocity controller and send outputs to the motors
+    virtual void rate_controller_run_dt(float dt) = 0;
     virtual void rate_controller_run() = 0;
 
     // optional variant to allow running with different dt
