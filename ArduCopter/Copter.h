@@ -1067,6 +1067,7 @@ private:
     void exit_mode(Mode *&old_flightmode, Mode *&new_flightmode);
 
     bool using_rate_thread;
+    bool started_rate_thread;
 
 public:
     void failsafe_check();      // failsafe.cpp
