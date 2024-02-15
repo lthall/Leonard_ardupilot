@@ -68,23 +68,22 @@ void ModeRTL::run(bool disarm_on_land)
     if (_state_complete) {
         switch (_state) {
         case SubMode::STARTING:
-            break;
+            FALLTHROUGH;
         case SubMode::INITIAL_CLIMB:
-            if (g2.gripper.enabled() && g2.gripper.grabbed()){
-                g2.gripper.release();
+            FALLTHROUGH;
+        case SubMode::RETURN_HOME:
+            if (copter.g2.gripper.enabled() && copter.g2.gripper.grabbed()){
+                copter.g2.gripper.release();
                 gcs().send_text(MAV_SEVERITY_INFO, "Gripper Released");
             }
             break;
-        case SubMode::RETURN_HOME:
-            break;
         case SubMode::LOITER_AT_HOME:
-            break;
+            FALLTHROUGH;
         case SubMode::FINAL_DESCENT:
-            // do nothing
-            break;
+            FALLTHROUGH;
         case SubMode::LAND:
-            if (g2.gripper.enabled() && g2.gripper.released()){
-                g2.gripper.grab();
+            if (copter.g2.gripper.enabled() && copter.g2.gripper.released()){
+                copter.g2.gripper.grab();
                 gcs().send_text(MAV_SEVERITY_INFO, "Gripper Grabbed");
             }
             break;
