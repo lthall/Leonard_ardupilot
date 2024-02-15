@@ -458,7 +458,9 @@ private:
     void update_dynamic_notch(AP_InertialSensor::HarmonicNotch &notch);
 
     // run notch update at either loop rate or 200Hz
+protected:
     void update_dynamic_notch_at_specified_rate();
+private:
 
     // decimation for 1Hz update
     uint8_t one_Hz_counter;
