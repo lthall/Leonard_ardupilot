@@ -461,6 +461,8 @@ private:
 protected:
     void update_dynamic_notch_at_specified_rate();
 private:
+    // scheduler task
+    void update_dynamic_notches(void);
 
     // decimation for 1Hz update
     uint8_t one_Hz_counter;
@@ -489,6 +491,14 @@ private:
 
     // Bitmask of modes to disable from gcs
     AP_Int32 flight_mode_GCS_block;
+
+protected:
+    /*
+      run notch update at either loop rate or 200Hz. Called by
+      AP_Vehicle scheduler if using_rate_thread is not true
+    */
+    void update_dynamic_notch_at_specified_rate();
+    bool using_rate_thread;
 };
 
 namespace AP {
