@@ -336,17 +336,17 @@ void FSOPowerStack::debug_msg(void)
                   batt.voltage(0), batt.voltage(1), batt.voltage(2), batt.voltage(3),
                   batt.voltage(4), batt.voltage(5), batt.voltage(6), batt.voltage(7), batt.voltage(8));
 
-    float B1_C;
-    float B2_C;
-    float PHV_C;
-    float P1_C;
-    float P2_C;
-    float IHC_C;
-    float I1_C;
-    float I2_C;
-    if (batt.current_amps(B1_C, 0) && batt.current_amps(B2_C, 1) && batt.current_amps(PHV_C, 2) && batt.current_amps(P1_C, 3) && batt.current_amps(P2_C, 4) && batt.current_amps(IHC_C, 5) && batt.current_amps(I1_C, 6) && batt.current_amps(I2_C, 7)) {
-        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Current - B1:%.4f, B2:%.4f, PHV:%.2f, P1:%.2f, P2:%.2f, IHC:%.2f, I1:%.2f, I2:%.2f",
-            B1_C, B2_C, PHV_C, P1_C, P2_C, IHC_C, I1_C, I2_C);
+    float B1_C = nanf("");
+    float B2_C = nanf("");
+    float PHV_C = nanf("");
+    float P1_C = nanf("");
+    float P2_C = nanf("");
+    float IHC_C = nanf("");
+    float I1_C = nanf("");
+    float I2_C = nanf("");
+    if (batt.current_amps(B1_C, 0) || batt.current_amps(B2_C, 1) || batt.current_amps(PHV_C, 2) || batt.current_amps(P1_C, 3) || batt.current_amps(P2_C, 4) || batt.current_amps(IHC_C, 5) || batt.current_amps(I1_C, 6) || batt.current_amps(I2_C, 7)) {
+    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Current - B1:%.4f, B2:%.4f, PHV:%.2f, P1:%.2f, P2:%.2f, IHC:%.2f, I1:%.2f, I2:%.2f",
+                  B1_C, B2_C, PHV_C, P1_C, P2_C, IHC_C, I1_C, I2_C);
     }
     GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Current Limit - PHV:%.2f, P1:%.2f, P2:%.2f,  IHC:%.2f, I1:%.2f, I2:%.2f",
                   payload_HV_current_filter.get(), payload_1_current_filter.get(), payload_2_current_filter.get(),
