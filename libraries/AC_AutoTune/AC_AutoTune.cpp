@@ -389,7 +389,7 @@ void AC_AutoTune::control_attitude()
         test_run(axis, direction_sign);
 
         // Check for failure causing reverse response
-        if (lean_angle <= -attitude_control->lean_angle_max_cd() * AUTOTUNE_TARGET_MIN_ANGLE_RLLPIT_SCALE) {
+        if (lean_angle <= -target_min_angle_rllpit_cd()) {
             step = WAITING_FOR_LEVEL;
             positive_direction = twitch_reverse_direction();
             step_start_time_ms = now;

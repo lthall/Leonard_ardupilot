@@ -1068,6 +1068,11 @@ void AC_AutoTune_Multi::Log_AutoTuneDetails()
     Log_Write_AutoTuneDetails(lean_angle, rotation_rate);
 }
 
+float AC_AutoTune_Multi::target_min_angle_rllpit_cd() const
+{
+    return attitude_control->lean_angle_max_cd() * AUTOTUNE_TARGET_MIN_ANGLE_RLLPIT_SCALE;
+}
+
 // @LoggerMessage: ATUN
 // @Description: Copter/QuadPlane AutoTune
 // @Vehicles: Copter, Plane

@@ -60,6 +60,11 @@
 #define AUTOTUNE_SEQ_BITMASK_MAX_GAIN        8
 #define AUTOTUNE_SEQ_BITMASK_TUNE_CHECK      16
 
+// angle limits preserved from previous behaviour as Multi changed:
+#define AUTOTUNE_TARGET_MIN_ANGLE_RLLPIT_CD 1000    // minimum target angle during TESTING_RATE step that will cause us to move to next step
+#define AUTOTUNE_TARGET_ANGLE_RLLPIT_CD     2000    // target angle during TESTING_RATE step that will cause us to move to next step
+#define AUTOTUNE_TARGET_ANGLE_YAW_CD        3000    // target angle during TESTING_RATE step that will cause us to move to next step
+
 const AP_Param::GroupInfo AC_AutoTune_Heli::var_info[] = {
 
     // @Param: AXES
@@ -1722,6 +1727,11 @@ void AC_AutoTune_Heli::updating_max_gains(float *freq, float *gain, float *phase
         gcs().send_text(MAV_SEVERITY_INFO, "AutoTune: ph=%f rate_d=%f", (double)(max_rate_d.phase), (double)(max_rate_d.max_allowed));
     }
 
+}
+
+float AC_AutoTune_Heli::target_min_angle_rllpit_cd() const
+{
+    return AUTOTUNE_TARGET_MIN_ANGLE_RLLPIT_CD;
 }
 
 #if HAL_LOGGING_ENABLED

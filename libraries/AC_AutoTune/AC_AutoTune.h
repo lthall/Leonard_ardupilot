@@ -314,6 +314,9 @@ private:
     // return true if we have a good position estimate
     virtual bool position_ok();
 
+    // methods subclasses must implement to specify max/min test angles:
+    virtual float target_min_angle_rllpit_cd() const = 0;
+
     // initialise position controller
     bool init_position_controller();
 

@@ -63,6 +63,8 @@ protected:
     // reset the update gain variables for multi
     void reset_update_gain_variables() override {};
 
+    float target_min_angle_rllpit_cd() const override;
+
     void test_init() override;
     void test_run(AxisType test_axis, const float dir_sign) override;
 
