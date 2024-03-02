@@ -1487,6 +1487,30 @@ void PayloadPlace::run_vertical_control()
 
     switch (state) {
     case State::Descent_Start:
+        break;
+    case State::Descent_Measure:
+    case State::Descent_Test:
+        AP::logger().Write("PLP",
+                    "TimeUS,T,TR,TA",
+                    "s---",
+                    "F000",
+                    "Qfff",
+                    AP_HAL::micros64(),
+                    double(thrust_level),
+                    double(thrust_ref),
+                    double(descent_thrust_sum / descent_thrust_sum_count));
+        break;
+    case State::Release:
+    case State::Releasing:
+    case State::Delay:
+    case State::Ascent_Start:
+    case State::Ascent:
+    case State::Done:
+        break;
+    }
+
+    switch (state) {
+    case State::Descent_Start:
     case State::Descent_Measure:
     case State::Descent_Test:
         // update altitude target and call position controller
