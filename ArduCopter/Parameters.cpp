@@ -1214,6 +1214,14 @@ const AP_Param::GroupInfo ParametersG2::var_info2[] = {
     // @User: Advanced
     AP_GROUPINFO("SURFTRAK_TC", 5, ParametersG2, surftrak_tc, 1.0),
 
+    // @Param: PLDP_RNG_DRP
+    // @DisplayName: Payload Place range finder altitude in m that will trigger a drop, after 1 second, without touchdown detection.
+    // @Description: Payload Place range finder altitude in m that will trigger a drop, after 1 second, without touchdown detection.
+    // @Units: m
+    // @Range: 0 100
+    // @User: Standard
+    AP_GROUPINFO("PLDP_RNG_DRP", 6, ParametersG2, pldp_range_finder_drop_m, 0.0),
+
     // ID 62 is reserved for the AP_SUBGROUPEXTENSION
 
     AP_GROUPEND
