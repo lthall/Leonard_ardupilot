@@ -1249,6 +1249,14 @@ const AP_Param::GroupInfo ParametersG2::var_info2[] = {
     // @User: Advanced
     AP_GROUPINFO("FS_EKF_FILT", 8, ParametersG2, fs_ekf_filt_hz, FS_EKF_FILT_DEFAULT),
 
+    // @Param: PLDP_RNG_DRP
+    // @DisplayName: Payload Place range finder altitude in m that will trigger a drop, after 1 second, without touchdown detection.
+    // @Description: Payload Place range finder altitude in m that will trigger a drop, after 1 second, without touchdown detection.
+    // @Units: m
+    // @Range: 0 100
+    // @User: Standard
+    AP_GROUPINFO("PLDP_RNG_DRP", 9, ParametersG2, pldp_range_finder_drop_m, 0.0),
+
     // ID 62 is reserved for the AP_SUBGROUPEXTENSION
 
     AP_GROUPEND
