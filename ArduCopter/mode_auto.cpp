@@ -1269,6 +1269,7 @@ void PayloadPlace::run_vertical_control()
 {
     const uint32_t descent_thrust_cal_duration_ms = 2000; // milliseconds
     const uint32_t placed_check_duration_ms = 500; // how long we have to be below a throttle threshold before considering placed
+    const uint32_t rangefinder_drop_check_duration_ms = 1000; // how long we have to be below a range finder drop altitude before considering placed
     float thrust_ref = 0.0;
 
     // Vertical thrust is taken from the attitude controller before angle boost is added
@@ -1327,6 +1328,31 @@ void PayloadPlace::run_vertical_control()
     const auto &g = copter.g;
     const auto &wp_nav = copter.wp_nav;
     const auto &pos_control = copter.pos_control;
+
+    if (copter.rangefinder_state.enabled && is_positive(g2.pldp_range_finder_drop_m)) {
+        if (!(copter.rangefinder_alt_ok() && (copter.rangefinder_state.glitch_count == 0) && 
+        (copter.rangefinder_state.alt_cm > g2.pldp_range_finder_drop_m * 100.0 || copter.rangefinder_state.alt_cm < 0.5 * g2.pldp_range_finder_drop_m * 100.0)) ) {
+            rangefinder_drop_alt_time_ms = now_ms;
+        } else if (now_ms - rangefinder_drop_alt_time_ms < rangefinder_drop_check_duration_ms) {
+            switch (state) {
+            case State::Descent_Start:
+            case State::Descent_Measure:
+                // do nothing on this loop
+                break;
+            case State::Descent_Test:
+                gcs().send_text(MAV_SEVERITY_INFO, "%s landed", prefix_str);
+                state = State::Release;
+                break;
+            case State::Release:
+            case State::Releasing:
+            case State::Delay:
+            case State::Ascent_Start:
+            case State::Ascent:
+            case State::Done:
+                break;
+            }
+        }
+    }
 
     switch (state) {
     case State::Descent_Start:

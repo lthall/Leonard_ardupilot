@@ -68,6 +68,7 @@ private:
     LowPassFilterFloat  thrust_filt;
     uint32_t descent_thrust_sum_count;
     float descent_start_altitude_cm;
+    float rangefinder_drop_alt_time_ms;
     float descent_speed_cms;
 };
 #endif
