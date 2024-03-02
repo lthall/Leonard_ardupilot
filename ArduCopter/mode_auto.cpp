@@ -1357,7 +1357,7 @@ void PayloadPlace::run_vertical_control()
             // thrust is above minimum threshold
             place_start_time_ms = now_ms;
             break;
-        } else if (is_positive(g2.pldp_range_finder_minimum_m)) {
+        } else if (is_positive(g2.pldp_range_finder_maximum_m)) {
             if (!copter.rangefinder_state.enabled) {
                 // abort payload place because rangefinder is not enabled
                 state = State::Ascent_Start;
