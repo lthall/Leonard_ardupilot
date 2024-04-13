@@ -457,10 +457,6 @@ private:
     // update the harmonic notch
     void update_dynamic_notch(AP_InertialSensor::HarmonicNotch &notch);
 
-    // run notch update at either loop rate or 200Hz
-protected:
-    void update_dynamic_notch_at_specified_rate();
-private:
     // scheduler task
     void update_dynamic_notches(void);
 
