@@ -1240,7 +1240,7 @@ void PayloadPlace::run_vertical_control()
     const uint32_t descent_thrust_cal_duration_ms = 2000; // milliseconds
     const uint32_t placed_check_duration_ms = 500; // how long we have to be below a throttle threshold before considering placed
     const uint32_t rangefinder_drop_check_duration_ms = 1000; // how long we have to be below a range finder drop altitude before considering placed
-    float thrust_ref;
+    float thrust_ref = 0.0;
 
     // Vertical thrust is taken from the attitude controller before angle boost is added
     auto *attitude_control = copter.attitude_control;
