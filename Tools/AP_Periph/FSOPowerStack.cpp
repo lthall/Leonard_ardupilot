@@ -209,6 +209,8 @@ void FSOPowerStack::init()
     payload_HV_current_filter.set_cutoff_frequency(sample_freq, 1.0/over_current_tc);
     payload_1_current_filter.set_cutoff_frequency(sample_freq, 1.0/over_current_tc);
     payload_2_current_filter.set_cutoff_frequency(sample_freq, 1.0/over_current_tc);
+    set_h16pro_on();
+    set_internal_HC_on();
 }
 
 /*
@@ -301,10 +303,8 @@ void FSOPowerStack::report(void)
 void FSOPowerStack::update_switches()
 {
     uint32_t now_ms = AP_HAL::millis();
-    bool switch_1_pressed = hal.gpio->read(FSO_SWITCH_MAIN_PIN);
-    bool switch_2_pressed = hal.gpio->read(FSO_SWITCH_PAYLOAD_PIN);
 
-    if (!switch_1_pressed) {
+    if (!switch_1_pressed()) {
         switch_1_press_time_ms = now_ms;
         switch_1_switch_released = true;
     }
@@ -321,7 +321,7 @@ void FSOPowerStack::update_switches()
         }
     }
 
-    if (!switch_2_pressed) {
+    if (!switch_2_pressed()) {
         switch_2_press_time_ms = now_ms;
         switch_2_switch_released = true;
     }

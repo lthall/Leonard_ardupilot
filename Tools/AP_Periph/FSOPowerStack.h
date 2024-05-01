@@ -170,6 +170,16 @@ private:
     void set_payload_HV_SW_on(){hal.gpio->write(FSO_PAYLOAD_HV_EN_PIN, 1);}
     void set_payload_HV_SW_off(){hal.gpio->write(FSO_PAYLOAD_HV_EN_PIN, 0);}
 
+    void set_h16pro_on(){hal.gpio->write(FSO_H16_EN_PIN, 1);}
+    void set_h16pro_off(){hal.gpio->write(FSO_H16_EN_PIN, 0);}
+
+    void set_internal_HC_on(){hal.gpio->write(FSO_INTERNAL_HC_EN_PIN, 1);}
+    void set_internal_HC_off(){hal.gpio->write(FSO_INTERNAL_HC_EN_PIN, 0);}
+
+    bool switch_1_pressed(){return hal.gpio->read(FSO_SWITCH_MAIN_PIN);}
+    bool switch_2_pressed(){return hal.gpio->read(FSO_SWITCH_PAYLOAD_PIN);}
+    bool h16pro_fault(){return hal.gpio->read(FSO_H16_FAULT_PIN);}
+
     uint32_t last_report_ms;
     void report();
 
