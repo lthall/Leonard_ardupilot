@@ -184,6 +184,8 @@ void AC_PID::set_notch_sample_rate(float sample_rate)
         }
     }
 #endif
+    // reset logging of max dt
+    _pid_info.max_dt = _pid_info.dt;
 }
 
 //  update_all - set target and measured inputs to PID controller and calculate outputs
@@ -275,6 +277,8 @@ float AC_PID::update_all(float target, float measurement, float dt, bool limit, 
     _pid_info.D = D_out;
     _pid_info.FF = _target * _kff;
     _pid_info.DFF = _target_derivative * _kdff;
+    _pid_info.dt = dt;
+    _pid_info.max_dt = MAX(dt, _pid_info.dt);
 
     return P_out + D_out + _integrator;
 }
