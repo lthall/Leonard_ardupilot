@@ -13,9 +13,12 @@ void Copter::rate_controller_thread()
     ins.set_rate_loop_sem(&rate_sem);
 
     uint32_t last_run_us = AP_HAL::micros();
+    float max_dt = 0.0;
+    float min_dt = 1.0;
     float dt_avg = 0.0;
     uint32_t now_ms = AP_HAL::millis();
     uint32_t last_report_ms = now_ms;
+    uint32_t last_rtdt_log_us = last_run_us;
     uint32_t last_notch_sample_ms = now_ms;
     bool was_using_rate_thread = false;
 
@@ -27,7 +30,9 @@ void Copter::rate_controller_thread()
             if (was_using_rate_thread) {
                 // if we were using the rate thread, we need to
                 // setup the notch filter sample rate
-                attitude_control->set_notch_sample_rate(AP::scheduler().get_filtered_loop_rate_hz());
+                const float loop_rate_hz = AP::scheduler().get_filtered_loop_rate_hz();
+                attitude_control->set_notch_sample_rate(loop_rate_hz);
+                motors->set_dt(1.0/loop_rate_hz);
                 was_using_rate_thread = false;
             }
             hal.scheduler->delay_microseconds(500);
@@ -53,6 +58,27 @@ void Copter::rate_controller_thread()
         } else {
             dt_avg = 0.99f * dt_avg + 0.01f * dt;
         }
+
+        max_dt = MAX(dt, max_dt);
+        min_dt = MIN(dt, min_dt);
+
+#if HAL_LOGGING_ENABLED
+// @LoggerMessage: RTDT
+// @Description: Attitude controller time deltas
+// @Field: TimeUS: Time since system startup
+// @Field: dt: current time delta
+// @Field: dtAvg: current time delta average
+// @Field: dtMax: Max time delta since last log output
+// @Field: dtMin: Min time delta since last log output
+
+        if (now_us - last_rtdt_log_us >= 2500) {    // 400 Hz
+            AP::logger().WriteStreaming("RTDT", "TimeUS,dt,dtAvg,dtMax,dtMin", "Qffff",
+                                                AP_HAL::micros64(),
+                                                dt, dt_avg, max_dt, min_dt);
+            max_dt = dt_avg;
+            min_dt = dt_avg;
+        }
+#endif
 
         /*
           run the rate controller. We pass in the long term average dt
@@ -85,6 +111,7 @@ void Copter::rate_controller_thread()
             // enabled at runtime
             last_notch_sample_ms = now_ms;
             attitude_control->set_notch_sample_rate(1.0 / dt_avg);
+            motors->set_dt(dt_avg);
         }
         
         if (now_ms - last_report_ms >= 200) {
