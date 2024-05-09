@@ -86,7 +86,9 @@ void Copter::rate_controller_thread()
           the timing of the FIFO reads on the SPI bus, which does not
           reflect the actual time between IMU samples, which is steady
         */
-        attitude_control->rate_controller_run_dt(dt_avg);
+        motors->set_dt(dt_avg);
+        attitude_control->set_dt(dt_avg);
+        attitude_control->rate_controller_run();
 
         /*
           immediately output the new motor values
@@ -111,7 +113,6 @@ void Copter::rate_controller_thread()
             // enabled at runtime
             last_notch_sample_ms = now_ms;
             attitude_control->set_notch_sample_rate(1.0 / dt_avg);
-            motors->set_dt(dt_avg);
         }
         
         if (now_ms - last_report_ms >= 200) {
@@ -130,11 +131,11 @@ void Copter::run_rate_controller_main()
 {
     // set attitude and position controller loop time
     const float last_loop_time_s = AP::scheduler().get_last_loop_time_s();
-    motors->set_dt(last_loop_time_s);
-    attitude_control->set_dt(last_loop_time_s);
     pos_control->set_dt(last_loop_time_s);
 
     if (!using_rate_thread) {
+        motors->set_dt(last_loop_time_s);
+        attitude_control->set_dt(last_loop_time_s);
         // only run the rate controller if we are not using the rate thread
         attitude_control->rate_controller_run();
     }
