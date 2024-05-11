@@ -20,6 +20,7 @@ void Copter::rate_controller_thread()
     uint32_t last_report_ms = now_ms;
     uint32_t last_rtdt_log_us = last_run_us;
     uint32_t last_notch_sample_ms = now_ms;
+    uint32_t loop_delay_ns = 125000;
     bool was_using_rate_thread = false;
 
     while (true) {
@@ -53,6 +54,7 @@ void Copter::rate_controller_thread()
         const float dt = dt_us * 1.0e-6;
         last_run_us = now_us;
 
+
         if (is_zero(dt_avg)) {
             dt_avg = dt;
         } else {
@@ -77,6 +79,7 @@ void Copter::rate_controller_thread()
                                                 dt, dt_avg, max_dt, min_dt);
             max_dt = dt_avg;
             min_dt = dt_avg;
+            last_rtdt_log_us = now_us;
         }
 #endif
 
@@ -101,9 +104,15 @@ void Copter::rate_controller_thread()
         update_dynamic_notch_at_specified_rate();
 
 #if CONFIG_HAL_BOARD != HAL_BOARD_SITL
+        if (AP::scheduler().get_extra_loop_us() > 0) {
+            // if the main loop is slow, slowly lower the attitude rate
+            loop_delay_ns = MIN(loop_delay_ns + 100, 500000);    // min rate 2Khz
+        } else {
+            loop_delay_ns = MAX(loop_delay_ns - 100, 125000);    // max rate 8Khz
+        }
         // ensure we give at least some CPU to other threads
         // don't sleep on SITL where small sleeps are not possible
-        hal.scheduler->delay_microseconds(100);
+        hal.scheduler->delay_microseconds(loop_delay_ns * 1e-3);
 #endif
 
         now_ms = AP_HAL::millis();
