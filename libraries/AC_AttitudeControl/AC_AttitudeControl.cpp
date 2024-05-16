@@ -534,6 +534,7 @@ void AC_AttitudeControl::input_rate_bf_roll_pitch_yaw_2(float roll_rate_bf_cds, 
     _attitude_target.to_euler(_euler_angle_target);
     // Convert body-frame angular velocity into euler angle derivative of desired attitude
     ang_vel_to_euler_rate(_attitude_target, _ang_vel_target, _euler_rate_target);
+
     // finally update the attitude target
     _ang_vel_body = _ang_vel_target;
 }
@@ -617,6 +618,26 @@ void AC_AttitudeControl::input_angle_step_bf_roll_pitch_yaw(float roll_angle_ste
 
     // Call quaternion attitude controller
     attitude_controller_run_quat();
+}
+
+// Command an rate step (i.e change) in body frame rate
+// Used to command a step in rate without exciting the orthogonal axis during autotune
+// Done as a single thread-safe function to avoid intermediate zero values being seen by the attitude controller
+void AC_AttitudeControl::input_rate_step_bf_roll_pitch_yaw(float roll_rate_step_bf_cd, float pitch_rate_step_bf_cd, float yaw_rate_step_bf_cd)
+{
+    // Set x-axis angular velocity in centidegrees/s
+    _ang_vel_target.x = radians(roll_rate_step_bf_cd * 0.01f);
+    _ang_vel_target.y = radians(pitch_rate_step_bf_cd * 0.01f);
+    _ang_vel_target.z = radians(yaw_rate_step_bf_cd * 0.01f);
+
+    // Update the unused targets attitude based on current attitude to condition mode change
+    _ahrs.get_quat_body_to_ned(_attitude_target);
+    _attitude_target.to_euler(_euler_angle_target);
+    // Convert body-frame angular velocity into euler angle derivative of desired attitude
+    ang_vel_to_euler_rate(_attitude_target, _ang_vel_target, _euler_rate_target);
+    
+    // finally update the attitude target
+    _ang_vel_body = _ang_vel_target;
 }
 
 // Command a thrust vector and heading rate
