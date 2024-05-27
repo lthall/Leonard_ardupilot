@@ -20,6 +20,9 @@
 #define REG_TIx3204_CHAN_SKIP 6 // 6 registers per channel
 #define REG_TIx3204_CHAN_CONFIG(chan) (REG_TIx3204_CHAN_BASE + (chan)*REG_TIx3204_CHAN_SKIP)
 
+#define CONFIG_REF_VREF 0 // Use external reference pin
+#define CONFIG_REF_VDD 1<<10 // Use VDD as reference pin
+
 // per channel config registers
 #define REG_TIx3204_OFS_MARGIN_HIGH      0x00
 #define REG_TIx3204_OFS_MARGIN_LOW       0x01
@@ -83,7 +86,7 @@ bool AP_DAC_TIx3204::set_voltage(uint8_t chan, float v)
 
     if (!configured[chan]) {
             // setup as VDD reference
-        const uint16_t vout_config = 1<<10;
+        const uint16_t vout_config = CONFIG_REF_VREF;
         if (!register_write(REG_TIx3204_CHAN_CONFIG(chan) + REG_TIx3204_OFS_VOUT_CMP_CONFIG, vout_config)) {
             GCS_SEND_TEXT(MAV_SEVERITY_INFO, "TIx3204 vout config write %u fail", unsigned(chan));
             return false;
