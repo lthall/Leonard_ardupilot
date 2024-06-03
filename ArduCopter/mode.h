@@ -39,7 +39,8 @@ public:
 
     enum class State : uint8_t {
         Descent_Start,
-        Descent,
+        Descent_Measure,
+        Descent_Test,
         Release,
         Releasing,
         Delay,
@@ -63,7 +64,9 @@ private:
     float descent_max_cm;
     uint32_t descent_established_time_ms; // milliseconds
     uint32_t place_start_time_ms; // milliseconds
-    float descent_thrust_level;
+    float descent_thrust_sum;
+    LowPassFilterFloat  thrust_filt;
+    uint32_t descent_thrust_sum_count;
     float descent_start_altitude_cm;
     float descent_speed_cms;
 };
