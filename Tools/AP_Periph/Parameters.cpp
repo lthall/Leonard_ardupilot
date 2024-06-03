@@ -664,7 +664,7 @@ const AP_Param::Info AP_Periph_FW::var_info[] = {
 #ifdef HAL_PERIPH_ENABLE_FSO_POWER_STACK
     // @Group: FSO
     // @Path: FSOPowerStack.cpp
-    GOBJECT(FSO_power_stack, "FSO",  FSOPowerStack),
+    GOBJECT(FSO_power_stack, "AAA",  FSOPowerStack),
 #endif
     
     AP_VAREND

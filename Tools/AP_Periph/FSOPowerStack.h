@@ -19,8 +19,8 @@ public:
 private:
 
     enum class Option : uint32_t {
-        DEBUG = 0,
-        CAL = 1
+        CAL = 0,
+        DEBUG = 1
     };
 
     bool option_is_set(Option option) {
