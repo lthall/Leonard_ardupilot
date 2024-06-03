@@ -1269,6 +1269,7 @@ void PayloadPlace::run_vertical_control()
 {
     const uint32_t descent_thrust_cal_duration_ms = 2000; // milliseconds
     const uint32_t placed_check_duration_ms = 500; // how long we have to be below a throttle threshold before considering placed
+    float thrust_ref = 0.0;
 
     // Vertical thrust is taken from the attitude controller before angle boost is added
     auto *attitude_control = copter.attitude_control;
@@ -1281,7 +1282,8 @@ void PayloadPlace::run_vertical_control()
         case State::Descent_Start:
             // do nothing on this loop
             break;
-        case State::Descent:
+        case State::Descent_Measure:
+        case State::Descent_Test:
             gcs().send_text(MAV_SEVERITY_INFO, "%s landed", prefix_str);
             state = State::Release;
             break;
@@ -1304,7 +1306,8 @@ void PayloadPlace::run_vertical_control()
             gcs().send_text(MAV_SEVERITY_INFO, "%s Manual release", prefix_str);
             state = State::Done;
             break;
-        case State::Descent:
+        case State::Descent_Measure:
+        case State::Descent_Test:
             gcs().send_text(MAV_SEVERITY_INFO, "%s Manual release", prefix_str);
             state = State::Release;
             break;
@@ -1331,11 +1334,12 @@ void PayloadPlace::run_vertical_control()
         descent_start_altitude_cm = inertial_nav.get_position_z_up_cm();
         // limiting the decent rate to the limit set in wp_nav is not necessary but done for safety
         descent_speed_cms = MIN((is_positive(g2.pldp_descent_speed_ms)) ? g2.pldp_descent_speed_ms * 100.0 : abs(g.land_speed), wp_nav->get_default_speed_down());
-        descent_thrust_level = 1.0;
-        state = State::Descent;
+        descent_thrust_sum = thrust_level;
+        descent_thrust_sum_count = 1;
+        state = State::Descent_Measure;
         FALLTHROUGH;
 
-    case State::Descent:
+    case State::Descent_Measure:
         // check maximum decent distance
         if (!is_zero(descent_max_cm) &&
             descent_start_altitude_cm - inertial_nav.get_position_z_up_cm() > descent_max_cm) {
@@ -1347,13 +1351,27 @@ void PayloadPlace::run_vertical_control()
         if (pos_control->get_vel_desired_cms().z > -0.95 * descent_speed_cms) {
             // decent rate has not reached descent_speed_cms
             descent_established_time_ms = now_ms;
+            descent_thrust_sum = thrust_level;
+            descent_thrust_sum_count = 1;
             break;
         } else if (now_ms - descent_established_time_ms < descent_thrust_cal_duration_ms) {
-            // record minimum thrust for descent_thrust_cal_duration_ms
-            descent_thrust_level = MIN(descent_thrust_level, thrust_level);
-            place_start_time_ms = now_ms;
+            // record average thrust for descent_thrust_cal_duration_ms
+            descent_thrust_sum += thrust_level;
+            descent_thrust_sum_count += 1;
             break;
-        } else if (thrust_level > g2.pldp_thrust_placed_fraction * descent_thrust_level) {
+        }
+        // descent_thrust_sum = descent_thrust_sum / descent_thrust_sum_count;
+        // set filter frequency to 1 / sample period
+        thrust_filt.set_cutoff_frequency(500.0 / placed_check_duration_ms);
+        thrust_filt.reset(descent_thrust_sum / descent_thrust_sum_count);
+        place_start_time_ms = now_ms;
+        state = State::Descent_Test;
+        FALLTHROUGH;
+
+    case State::Descent_Test:
+    
+        thrust_ref = thrust_filt.apply(thrust_level, AP::scheduler().get_loop_period_s());
+        if (thrust_ref > g2.pldp_thrust_placed_fraction * descent_thrust_sum / descent_thrust_sum_count) {
             // thrust is above minimum threshold
             place_start_time_ms = now_ms;
             break;
@@ -1381,7 +1399,7 @@ void PayloadPlace::run_vertical_control()
 
         if (now_ms - place_start_time_ms > placed_check_duration_ms) {
             state = State::Release;
-            gcs().send_text(MAV_SEVERITY_INFO, "%s payload release thrust threshold: %f", prefix_str, static_cast<double>(g2.pldp_thrust_placed_fraction * descent_thrust_level));
+            gcs().send_text(MAV_SEVERITY_INFO, "%s payload release thrust threshold: %f", prefix_str, static_cast<double>(g2.pldp_thrust_placed_fraction * descent_thrust_sum / descent_thrust_sum_count));
         }
         break;
 
@@ -1443,7 +1461,8 @@ void PayloadPlace::run_vertical_control()
 
     switch (state) {
     case State::Descent_Start:
-    case State::Descent:
+    case State::Descent_Measure:
+    case State::Descent_Test:
         // update altitude target and call position controller
         pos_control->land_at_climb_rate_cm(-descent_speed_cms, true);
         break;
@@ -2120,7 +2139,8 @@ bool PayloadPlace::verify()
 {
     switch (state) {
     case State::Descent_Start:
-    case State::Descent:
+    case State::Descent_Measure:
+    case State::Descent_Test:
     case State::Release:
     case State::Releasing:
     case State::Delay:
