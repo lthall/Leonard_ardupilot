@@ -1485,6 +1485,16 @@ public:
     void set_state(SubMode mode);
 
     // SHIP_OPS states
+    enum class KeepOutZoneMode : uint8_t {
+        NO_ACTION,
+        AVOID_KOZ,
+        EXIT_KOZ
+    };
+
+    void set_keep_out_zone_mode(KeepOutZoneMode keep_out_zone_mode);
+    KeepOutZoneMode keep_out_zone_mode() { return _keep_out_zone_mode; }
+
+    // SHIP_OPS states
     enum class ApproachMode : uint8_t {
         LAUNCH_RECOVERY,
         PAYLOAD_PLACE
@@ -1506,6 +1516,7 @@ protected:
 private:
 
     SubMode _state = SubMode::CLIMB_TO_RTL;  // records state of rtl (initial climb, returning home, etc)
+    KeepOutZoneMode _keep_out_zone_mode = KeepOutZoneMode::NO_ACTION;  // records state of rtl (initial climb, returning home, etc)
     ApproachMode _approach_mode = ApproachMode::LAUNCH_RECOVERY;  // records state of rtl (initial climb, returning home, etc)
     uint32_t wp_distance() const override;
     int32_t wp_bearing() const override;
@@ -1533,6 +1544,9 @@ private:
     AP_Float ship_jerk_z;
     AP_Float ship_accel_h;
     AP_Float ship_jerk_h;
+    AP_Float keep_out_CW;
+    AP_Float keep_out_CCW;
+    AP_Float keep_out_radius;
 };
 #endif // MODE_SHIP_OPS_ENABLED
 

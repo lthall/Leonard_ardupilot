@@ -77,6 +77,30 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("JERKH", 9, ModeShipOperation, ship_jerk_h, 360.0f),
 
+    // @Param: KOZ_CW
+    // @DisplayName: CW angular offset in degrees from ship heading for keep out zone
+    // @Description: CW angular offset in degrees from ship heading for keep out zone
+    // @Range: 0 360
+    // @Units: deg
+    // @User: Advanced
+    AP_GROUPINFO("KOZ_CW", 10, ModeShipOperation, keep_out_CW, 90.0f),
+
+    // @Param: KOZ_CCW
+    // @DisplayName: CCW angular offset in degrees from ship heading for keep out zone
+    // @Description: CCW angular offset in degrees from ship heading for keep out zone
+    // @Range: 0 360
+    // @Units: deg
+    // @User: Advanced
+    AP_GROUPINFO("KOZ_CCW", 11, ModeShipOperation, keep_out_CCW, -90.0f),
+
+    // @Param: KOZ_RAD
+    // @DisplayName: Radius in meters of the keep out zone
+    // @Description: Radius in meters of the keep out zone
+    // @Range: 0 1000
+    // @Units: m
+    // @User: Advanced
+    AP_GROUPINFO("KOZ_RAD", 12, ModeShipOperation, keep_out_radius, 250.0f),
+
     AP_GROUPEND
 };
 
@@ -111,25 +135,28 @@ bool ModeShipOperation::init(const bool ignore_checks)
     //     return false;
     // }
 
-    Vector3f pos_delta;  // vector to lead vehicle + offset
-    Vector3f pos_delta_with_ofs;  // vector to lead vehicle + offset
-    Vector3f pos_with_ofs;  // vector to lead vehicle + offset
-    Vector3f vel_ned;  // velocity of lead vehicle
-    const Vector3f &curr_pos = inertial_nav.get_position_neu_cm();
+    Vector3f pos_delta_ned_m;  // vector to lead vehicle + offset
+    Vector3f pos_delta_with_ofs_ned_m;  // vector to lead vehicle + offset
+    Vector3f pos_with_ofs_ned;  // vector to lead vehicle + offset
+    Vector3f vel_ned_ms;  // velocity of lead vehicle
+    Vector3f accel_ned;  // accel of lead vehicle
+    const Vector3f &curr_pos_neu_cm = inertial_nav.get_position_neu_cm();
     
-    if (!g2.follow.get_target_dist_and_vel_ned(pos_delta, pos_delta_with_ofs, vel_ned)) {
+    if (!g2.follow.get_target_dist_and_vel_ned(pos_delta_ned_m, pos_delta_with_ofs_ned_m, vel_ned_ms)) {
         // follow does not have a target
         gcs().send_text(MAV_SEVERITY_WARNING, "Beacon distance larger than FOLL_DIST_MAX");
         return false;
     }
-    // change NED to NEU
-    pos_with_ofs.z = -curr_pos.z + pos_delta_with_ofs.z * 100.0;
+
+    pos_with_ofs_ned.xy() = curr_pos_neu_cm.xy() + pos_delta_with_ofs_ned_m.xy() * 100.0;
+    pos_with_ofs_ned.z = -curr_pos_neu_cm.z + pos_delta_with_ofs_ned_m.z * 100.0;
+    vel_ned_ms *= 100.0f;
     
     float target_heading_deg = 0.0f;
     g2.follow.get_target_heading_deg(target_heading_deg);
 
-    ship_pos_ned = pos_with_ofs.topostype();
-    ship_vel_ned = vel_ned;
+    ship_pos_ned = pos_with_ofs_ned.topostype();
+    ship_vel_ned = vel_ned_ms;
     ship_accel_ned.zero();
     ship_heading = radians(target_heading_deg);
     ship_heading_rate = 0.0;
@@ -137,7 +164,7 @@ bool ModeShipOperation::init(const bool ignore_checks)
     ship_available = true;
 
     offset.zero();
-    offset.xy() = curr_pos.xy() - ship_pos_ned.xy().tofloat();
+    offset.xy() = curr_pos_neu_cm.xy() - ship_pos_ned.xy().tofloat();
 
     // initialise horizontal speed, acceleration
     pos_control->set_max_speed_accel_xy(wp_nav->get_default_speed_xy(), wp_nav->get_wp_acceleration());
@@ -189,9 +216,41 @@ const char *ModeShipOperation::state_name(SubMode mode) const
 
 void ModeShipOperation::set_state(SubMode mode)
 {
-    gcs().send_text(MAV_SEVERITY_INFO, "ShipOps: moving to (%s) from (%s)",
-                    state_name(mode), state_name(_state));
+    gcs().send_text(MAV_SEVERITY_WARNING, "ShipOps: %s",
+                    state_name(mode));
     _state = mode;
+}
+
+void ModeShipOperation::set_keep_out_zone_mode(KeepOutZoneMode keep_out_zone_mode)
+{
+    if (_keep_out_zone_mode != keep_out_zone_mode) {
+        _keep_out_zone_mode = keep_out_zone_mode;
+        switch (_keep_out_zone_mode) {
+        case KeepOutZoneMode::NO_ACTION:
+            break;
+        case KeepOutZoneMode::AVOID_KOZ:
+            gcs().send_text(MAV_SEVERITY_WARNING, "ShipOps: Avoiding KOZ");
+            break;
+        case KeepOutZoneMode::EXIT_KOZ:
+            gcs().send_text(MAV_SEVERITY_WARNING, "ShipOps: Exiting KOZ");
+            break;
+        }
+    }
+
+}
+
+void ModeShipOperation::set_approach_mode(ApproachMode approach_mode)
+{
+    _approach_mode = approach_mode;
+    switch (_approach_mode) {
+    case ApproachMode::LAUNCH_RECOVERY:
+        gcs().send_text(MAV_SEVERITY_WARNING, "ShipOps: Mode Launch/Recovery");
+        break;
+    case ApproachMode::PAYLOAD_PLACE:
+        gcs().send_text(MAV_SEVERITY_WARNING, "ShipOps: Mode Payload Place");
+        break;
+    }
+
 }
 
 void ModeShipOperation::run()
@@ -220,13 +279,13 @@ void ModeShipOperation::run()
         }
     }
 
-    Vector3f pos_delta_ned;  // vector to lead vehicle + offset
-    Vector3f pos_delta_with_ofs_ned;  // vector to lead vehicle + offset
+    Vector3f pos_delta_ned_m;  // vector to lead vehicle + offset
+    Vector3f pos_delta_with_ofs_ned_m;  // vector to lead vehicle + offset
     Vector3f pos_with_ofs_ned;  // vector to lead vehicle + offset
-    Vector3f vel_ned;  // velocity of lead vehicle
+    Vector3f vel_ned_ms;  // velocity of lead vehicle
     Vector3f accel_ned;  // accel of lead vehicle
     
-    const Vector3f &curr_pos = inertial_nav.get_position_neu_cm();
+    const Vector3f &curr_pos_neu_cm = inertial_nav.get_position_neu_cm();
     int32_t alt_home_above_origin_cm;
 
     if (!AP::ahrs().get_home().get_alt_cm(Location::AltFrame::ABOVE_ORIGIN, alt_home_above_origin_cm)) {
@@ -234,11 +293,11 @@ void ModeShipOperation::run()
     }
     
     // define target location
-    if (g2.follow.get_target_dist_and_vel_ned(pos_delta_ned, pos_delta_with_ofs_ned, vel_ned)) {
-        // vel_ned does not include the change in heading + offset radius
-        pos_with_ofs_ned.xy() = curr_pos.xy() + pos_delta_with_ofs_ned.xy() * 100.0;
-        pos_with_ofs_ned.z = -curr_pos.z + pos_delta_with_ofs_ned.z * 100.0;
-        vel_ned *= 100.0f;
+    if (g2.follow.get_target_dist_and_vel_ned(pos_delta_ned_m, pos_delta_with_ofs_ned_m, vel_ned_ms)) {
+        // vel_ned_ms does not include the change in heading + offset radius
+        pos_with_ofs_ned.xy() = curr_pos_neu_cm.xy() + pos_delta_with_ofs_ned_m.xy() * 100.0;
+        pos_with_ofs_ned.z = -curr_pos_neu_cm.z + pos_delta_with_ofs_ned_m.z * 100.0;
+        vel_ned_ms *= 100.0f;
 
         float target_heading_deg = 0.0f;
         g2.follow.get_target_heading_deg(target_heading_deg);
@@ -246,7 +305,7 @@ void ModeShipOperation::run()
         if (!ship_available) {
             // reset ship pos, vel, accel to current value when detected.
             ship_pos_ned = pos_with_ofs_ned.topostype();
-            ship_vel_ned = vel_ned;
+            ship_vel_ned = vel_ned_ms;
             ship_accel_ned.zero();
             ship_heading = radians(target_heading_deg);
             ship_heading_rate = 0.0;
@@ -254,11 +313,11 @@ void ModeShipOperation::run()
             ship_available = true;
         }
 
-        shape_pos_vel_accel_xy(pos_with_ofs_ned.xy().topostype(), vel_ned.xy(), accel_ned.xy(),
+        shape_pos_vel_accel_xy(pos_with_ofs_ned.xy().topostype(), vel_ned_ms.xy(), accel_ned.xy(),
                             ship_pos_ned.xy(), ship_vel_ned.xy(), ship_accel_ned.xy(),
                             0.0, ship_accel_xy * 100.0,
                             ship_jerk_xy * 100.0, G_Dt, false);
-        shape_pos_vel_accel(pos_with_ofs_ned.z, vel_ned.z, accel_ned.z,
+        shape_pos_vel_accel(pos_with_ofs_ned.z, vel_ned_ms.z, accel_ned.z,
                             ship_pos_ned.z, ship_vel_ned.z, ship_accel_ned.z,
                             0.0, 0.0, 
                             -ship_accel_z * 100.0, ship_accel_z * 100.0,
@@ -294,7 +353,7 @@ void ModeShipOperation::run()
         pos_control->init_xy_controller();   // forces attitude target to decay to zero
         pos_control->relax_z_controller(0.0f);   // forces throttle output to decay to zero
         offset.zero();
-        offset.xy() = curr_pos.xy() - ship_pos_ned.xy().tofloat();
+        offset.xy() = curr_pos_neu_cm.xy() - ship_pos_ned.xy().tofloat();
         break;
 
     case AltHold_Landed_Ground_Idle:
@@ -310,6 +369,8 @@ void ModeShipOperation::run()
         attitude_control->reset_rate_controller_I_terms_smoothly();
         pos_control->relax_velocity_controller_xy();   // forces attitude target to decay to zero
         pos_control->relax_z_controller(0.0f);   // forces throttle output to decay to zero
+        offset.zero();
+        offset.xy() = curr_pos_neu_cm.xy() - ship_pos_ned.xy().tofloat();
         break;
 
     case AltHold_Takeoff:
@@ -324,7 +385,7 @@ void ModeShipOperation::run()
             // initialise takeoff variables
             takeoff.start(constrain_float(g.pilot_takeoff_alt, 0.0f, 1000.0f));
             offset.zero();
-            offset.xy() = curr_pos.xy() - ship_pos_ned.xy().tofloat();
+            offset.xy() = curr_pos_neu_cm.xy() - ship_pos_ned.xy().tofloat();
         }
 
         // set position controller targets adjusted for pilot input
@@ -351,13 +412,73 @@ void ModeShipOperation::run()
             // climb to RTL altitude
             offset.z = MIN(-pos_control->get_pos_target_z_cm(),  -(float)(alt_home_above_origin_cm + g.rtl_altitude)) - ship_pos_ned.tofloat().z;
             break;
-        case SubMode::RETURN_TO_PERCH:
-            // move to Perch location at RTL altitude
-            offset.x = perch_offset.x;
-            offset.y = perch_offset.y;
+        case SubMode::RETURN_TO_PERCH: {
+            // move to Perch location at RTL altitude while avoiding ship   
+            offset.zero();
             offset.z = MIN(-pos_control->get_pos_target_z_cm(),  -(float)(alt_home_above_origin_cm + g.rtl_altitude)) - ship_pos_ned.tofloat().z;
+
+            Vector2f aircraft_bearing_cm = curr_pos_neu_cm.xy() - ship_pos_ned.xy().tofloat();
+            float aircraft_bearing_rad = aircraft_bearing_cm.angle();
+            float extension_distance_cm = ship_perch_radius * 10.0 + stopping_distance(wp_nav->get_default_speed_xy() + vel_ned_ms.xy().length(), 0.5 * pos_control->get_shaping_jerk_xy_cmsss() / wp_nav->get_wp_acceleration(), 0.5 * wp_nav->get_wp_acceleration());
+            Vector2f extension_cm = Vector2f(extension_distance_cm, 0.0);
+
+            float keep_out_CW_rad = radians(keep_out_CW);
+            float keep_out_CCW_rad = radians(keep_out_CCW);
+            float keep_out_angle_rad = wrap_2PI(keep_out_CW_rad - keep_out_CCW_rad);
+            float koz_center_heading_rad = ship_heading + (keep_out_CW_rad + keep_out_CCW_rad) / 2.0;
+
+            if (fabsf(wrap_PI(aircraft_bearing_rad - koz_center_heading_rad)) > keep_out_angle_rad / 2.0) {
+                set_keep_out_zone_mode(KeepOutZoneMode::NO_ACTION);
+            } else if (aircraft_bearing_cm.length() < keep_out_radius * 100.0) {
+                set_keep_out_zone_mode(KeepOutZoneMode::EXIT_KOZ);
+            } else {
+                set_keep_out_zone_mode(KeepOutZoneMode::AVOID_KOZ);
+            }
+
+            switch (_keep_out_zone_mode) {
+            case KeepOutZoneMode::NO_ACTION:
+                // direct line of sight to the perch point
+                offset.xy() = perch_offset;
+                break;
+            case KeepOutZoneMode::AVOID_KOZ: {
+                // avoiding keep out zone
+                float aircraft_tangent_angle = acosf(keep_out_radius * 100.0 / aircraft_bearing_cm.length());
+                float intercept_point_angle = 0.0;
+                if (aircraft_bearing_rad > ship_heading) {
+                    intercept_point_angle = constrain_float(wrap_PI(aircraft_bearing_rad + aircraft_tangent_angle - koz_center_heading_rad), -keep_out_angle_rad / 2.0, keep_out_angle_rad / 2.0) + koz_center_heading_rad; 
+                    extension_cm.rotate(intercept_point_angle + M_PI / 2);
+                } else {
+                    intercept_point_angle = constrain_float(wrap_PI(aircraft_bearing_rad - aircraft_tangent_angle - koz_center_heading_rad), -keep_out_angle_rad / 2.0, keep_out_angle_rad / 2.0) + koz_center_heading_rad;
+                    extension_cm.rotate(intercept_point_angle - M_PI / 2);
+                }
+                offset.xy().zero();
+                offset.xy().x = keep_out_radius * 100.0;
+                offset.xy().rotate(intercept_point_angle);
+                offset.xy() += extension_cm;
+                break;
+            }
+            case KeepOutZoneMode::EXIT_KOZ: {
+                // exiting keep out zone
+                Vector2f ship_heading_unit = Vector2f(1.0, 0.0);
+                ship_heading_unit.rotate(ship_heading);
+                float intercept_point_angle = acosf(aircraft_bearing_cm * ship_heading_unit / (keep_out_radius * 100.0));
+                float turn_ratio = constrain_float((aircraft_bearing_cm.length() - keep_out_radius * 90.0) / (keep_out_radius * 10.0), 0.0, 1.0);
+                if (aircraft_bearing_rad > ship_heading) {
+                    intercept_point_angle = ship_heading + intercept_point_angle;
+                    extension_cm.rotate(ship_heading + (1.0 + turn_ratio) * M_PI / 2);
+                } else {
+                    intercept_point_angle = ship_heading - intercept_point_angle;
+                    extension_cm.rotate(ship_heading - (1.0 + turn_ratio) * M_PI / 2);
+                }
+                offset.xy().zero();
+                offset.xy().x = keep_out_radius * 100.0;
+                offset.xy().rotate(intercept_point_angle);
+                offset.xy() += extension_cm;
+                break;
+            }
+            }
             break;
-            // FALLTHROUGH
+        }
         case SubMode::PERCH:
             // move to Perch location and altitude
             offset.x = perch_offset.x;
@@ -394,9 +515,9 @@ void ModeShipOperation::run()
         switch (_state) {
         case SubMode::CLIMB_TO_RTL:
             // slow to zero velocity and climb to RTL altitude using velocity control
-            vel_ned.zero();
+            vel_ned_ms.zero();
             accel_ned.zero();
-            pos_control->input_vel_accel_xy(vel_ned.xy(), accel_ned.xy());
+            pos_control->input_vel_accel_xy(vel_ned_ms.xy(), accel_ned.xy());
             break;
         case SubMode::RETURN_TO_PERCH:
             // FALLTHROUGH
@@ -484,7 +605,7 @@ void ModeShipOperation::run()
             switch (g2.follow.get_yaw_behave()) {
                 case AP_Follow::YAW_BEHAVE_FACE_LEAD_VEHICLE: {
                     if (ship_pos_ned.xy().length() > 1.0f) {
-                        yaw_cd = get_bearing_cd(curr_pos.xy(), ship_pos_ned.xy().tofloat());
+                        yaw_cd = get_bearing_cd(curr_pos_neu_cm.xy(), ship_pos_ned.xy().tofloat());
                     }
                     break;
                 }
@@ -628,20 +749,6 @@ bool ModeShipOperation::get_wp(Location &loc) const
     loc = copter.current_loc;
     loc.offset_bearing(bearing, dist);
     return true;
-}
-
-void ModeShipOperation::set_approach_mode(ApproachMode approach_mode)
-{
-    _approach_mode = approach_mode;
-    switch (_approach_mode) {
-    case ApproachMode::LAUNCH_RECOVERY:
-        gcs().send_text(MAV_SEVERITY_INFO, "ShipOps: Mode Launch/Recovery");
-        break;
-    case ApproachMode::PAYLOAD_PLACE:
-        gcs().send_text(MAV_SEVERITY_INFO, "ShipOps: Mode Payload Place");
-        break;
-    }
-
 }
 
 #endif // MODE_SHIP_OPS_ENABLED == ENABLED
