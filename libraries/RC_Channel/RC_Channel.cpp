@@ -670,6 +670,9 @@ void RC_Channel::init_aux_function(const aux_func_t ch_option, const AuxSwitchPo
     case AUX_FUNC::MAG_CAL:
     case AUX_FUNC::CAMERA_IMAGE_TRACKING:
     case AUX_FUNC::MOUNT_LRF_ENABLE:
+#if AP_TIE_DOWN_CLAMPS_ENABLED
+    case AUX_FUNC::TIE_DOWN_RELEASE:
+#endif
         break;
 
     // not really aux functions:
@@ -845,7 +848,6 @@ bool RC_Channel::read_aux()
     run_aux_function(_option, new_position, AuxFuncTriggerSource::RC);
     return true;
 }
-
 
 void RC_Channel::do_aux_function_armdisarm(const AuxSwitchPos ch_flag)
 {
@@ -1252,6 +1254,26 @@ bool RC_Channel::run_aux_function(aux_func_t ch_option, AuxSwitchPos pos, AuxFun
     return ret;
 }
 
+#if AP_TIE_DOWN_CLAMPS_ENABLED
+void RC_Channel::do_aux_function_TIE_DOWN_RELEASE(const AuxSwitchPos ch_flag)
+{
+    AP_LandingGear *lg = AP_LandingGear::get_singleton();
+    if (lg == nullptr) {
+        return;
+    }
+    switch (ch_flag) {
+    case AuxSwitchPos::LOW:
+        lg->tie_down_release();
+        break;
+    case AuxSwitchPos::MIDDLE:
+        break;
+    case AuxSwitchPos::HIGH:
+        lg->tie_down_secure();
+        break;
+    }
+}
+#endif
+
 bool RC_Channel::do_aux_function(const aux_func_t ch_option, const AuxSwitchPos ch_flag)
 {
     switch (ch_option) {
@@ -1378,7 +1400,13 @@ bool RC_Channel::do_aux_function(const aux_func_t ch_option, const AuxSwitchPos 
         }
         break;
     }
+
+#if AP_TIE_DOWN_CLAMPS_ENABLED
+    case AUX_FUNC::TIE_DOWN_RELEASE:
+        do_aux_function_TIE_DOWN_RELEASE(ch_flag);
+        break;
 #endif
+#endif  // AP_LANDINGGEAR_ENABLED
 
     case AUX_FUNC::GPS_DISABLE:
         AP::gps().force_disable(ch_flag == AuxSwitchPos::HIGH);
