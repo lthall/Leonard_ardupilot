@@ -35,6 +35,7 @@ public:
     void run_horizontal_control();
     void init_vertical_control();
     void run_vertical_control();
+    bool within_rangefinder_release_range() const;
 
 private:
 
@@ -1484,7 +1485,7 @@ public:
     const char *state_name(SubMode mode) const;
     void set_state(SubMode mode);
 
-    // SHIP_OPS states
+    // Keep-Out-Zone states
     enum class KeepOutZoneMode : uint8_t {
         NO_ACTION,
         AVOID_KOZ,
@@ -1492,7 +1493,7 @@ public:
     };
 
     void set_keep_out_zone_mode(KeepOutZoneMode keep_out_zone_mode);
-    KeepOutZoneMode keep_out_zone_mode() { return _keep_out_zone_mode; }
+    //KeepOutZoneMode keep_out_zone_mode() const { return new_keep_out_zone_mode; }
 
     // SHIP_OPS states
     enum class ApproachMode : uint8_t {
@@ -1501,7 +1502,7 @@ public:
     };
 
     void set_approach_mode(ApproachMode approach_mode);
-    ApproachMode approach_mode() { return _approach_mode; }
+    //ApproachMode approach_mode() const { return new_approach_mode; }
 
     virtual bool is_landing() const override;
 
@@ -1516,23 +1517,25 @@ protected:
 private:
 
     SubMode _state = SubMode::CLIMB_TO_RTL;  // records state of rtl (initial climb, returning home, etc)
-    KeepOutZoneMode _keep_out_zone_mode = KeepOutZoneMode::NO_ACTION;  // records state of rtl (initial climb, returning home, etc)
-    ApproachMode _approach_mode = ApproachMode::LAUNCH_RECOVERY;  // records state of rtl (initial climb, returning home, etc)
+    KeepOutZoneMode keep_out_zone_mode = KeepOutZoneMode::NO_ACTION;  // records state of rtl (initial climb, returning home, etc)
+    ApproachMode approach_mode = ApproachMode::LAUNCH_RECOVERY;  // records state of rtl (initial climb, returning home, etc)
     uint32_t wp_distance() const override;
     int32_t wp_bearing() const override;
 
     uint32_t last_log_ms;   // system time of last time desired velocity was logging
     float target_climb_rate;   // system time of last time desired velocity was logging
     Vector3f offset;
-    Vector3p ship_pos_ned;
-    Vector3f ship_vel_ned;
-    Vector3f ship_accel_ned;
-    float ship_heading;
-    float ship_heading_rate;
-    float ship_heading_accel;
     bool ship_takeoff;
     bool pilot_correction_active;
-    bool ship_available;
+    struct {
+        Vector3p pos_ned;
+        Vector3f vel_ned;
+        Vector3f accel_ned;
+        float heading;
+        float heading_rate;
+        float heading_accel;
+        bool available;
+    } ship;
 
     // Ship Operations parameters
     AP_Float ship_perch_angle;

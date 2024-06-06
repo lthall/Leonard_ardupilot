@@ -492,8 +492,8 @@ bool RC_Channel_Copter::do_aux_function(const aux_func_t ch_option, const AuxSwi
 #endif
             break;
 
-        case AUX_FUNC::SHIP_OPS_MODE:
 #if MODE_SHIP_OPS_ENABLED == ENABLED
+        case AUX_FUNC::SHIP_OPS_MODE:
             switch (ch_flag) {
                 case AuxSwitchPos::LOW:
                     copter.mode_ship_ops.set_approach_mode(ModeShipOperation::ApproachMode::PAYLOAD_PLACE);
@@ -505,8 +505,8 @@ bool RC_Channel_Copter::do_aux_function(const aux_func_t ch_option, const AuxSwi
                     copter.mode_ship_ops.set_approach_mode(ModeShipOperation::ApproachMode::LAUNCH_RECOVERY);
                     break;
             }
-#endif
             break;
+#endif
 
         case AUX_FUNC::STABILIZE:
             do_aux_function_change_mode(Mode::Number::STABILIZE, ch_flag);
@@ -633,14 +633,14 @@ bool RC_Channel_Copter::do_aux_function(const aux_func_t ch_option, const AuxSwi
             switch (ch_flag) {
             case AuxSwitchPos::LOW:
                 // release tie down
-                gcs().send_text(MAV_SEVERITY_INFO, "Release tie down");
+                GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Release tie down");
                 SRV_Channels::set_output_scaled(SRV_Channel::k_tie_down_release, 1000);
                 break;
             case AuxSwitchPos::MIDDLE:
                 break;
             case AuxSwitchPos::HIGH:
                 // secure tie down
-                gcs().send_text(MAV_SEVERITY_INFO, "Secure tie down");
+                GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Secure tie down");
                 SRV_Channels::set_output_scaled(SRV_Channel::k_tie_down_release, 0);
                 break;
             }

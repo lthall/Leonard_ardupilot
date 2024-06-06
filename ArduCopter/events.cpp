@@ -425,14 +425,16 @@ void Copter::set_mode_SmartRTL_or_RTL(ModeReason reason)
 // this is always called from a failsafe so we trigger notification to pilot
 void Copter::set_mode_Ship_Op_or_RTL_or_land_with_pause(ModeReason reason)
 {
-    // attempt to switch to SmartRTL, if this failed then attempt to RTL
+    // attempt to switch to ShipLanding, if this fails then attempt to RTL
     // if that fails, then land
-    if (!set_mode(Mode::Number::SHIP_OPS, reason)) {
-        gcs().send_text(MAV_SEVERITY_WARNING, "Ship Operations Unavailable, Trying RTL Mode");
-        set_mode_RTL_or_land_with_pause(reason);
-    } else {
+#if MODE_SHIP_OPS_ENABLED
+    if (set_mode(Mode::Number::SHIP_OPS, reason)) {
         AP_Notify::events.failsafe_mode_change = 1;
+        return;
     }
+#endif
+    GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Ship Operations Unavailable, Trying RTL Mode");
+    set_mode_RTL_or_land_with_pause(reason);
 }
 
 // Sets mode to Auto and jumps to DO_LAND_START, as set with AUTO_RTL param

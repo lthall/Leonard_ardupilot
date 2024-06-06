@@ -1182,9 +1182,9 @@ const AP_Param::GroupInfo ParametersG2::var_info2[] = {
     // @User: Standard
     AP_GROUPINFO("PLDP_THRESH", 1, ParametersG2, pldp_thrust_placed_fraction, 0.9),
 
-    // @Param: PLDP_RNG_MIN
-    // @DisplayName: Payload Place minimum range finder altitude
-    // @Description: Minimum range finder altitude in m to trigger payload touchdown, set to zero to disable.
+    // @Param: PLDP_RNG_MAX
+    // @DisplayName: Payload Place maximum range finder altitude
+    // @Description: Maximum range finder altitude in m to trigger payload touchdown, set to zero to disable.
     // @Units: m
     // @Range: 0 100
     // @User: Standard
@@ -1215,8 +1215,8 @@ const AP_Param::GroupInfo ParametersG2::var_info2[] = {
     AP_GROUPINFO("SURFTRAK_TC", 5, ParametersG2, surftrak_tc, 1.0),
 
     // @Param: PLDP_RNG_DRP
-    // @DisplayName: Payload Place range finder altitude in m that will trigger a drop, after 1 second, without touchdown detection.
-    // @Description: Payload Place range finder altitude in m that will trigger a drop, after 1 second, without touchdown detection.
+    // @DisplayName: Payload Place range finder altitude that will trigger a drop
+    // @Description: If the rangefinder returns a value less than this value a 1 second counter is started.  A drop will be performed once that timer has elapsed.  A value of zero disables this behaviour.
     // @Units: m
     // @Range: 0 100
     // @User: Standard
