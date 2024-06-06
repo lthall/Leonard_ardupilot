@@ -1538,15 +1538,15 @@ private:
     } ship;
 
     // Ship Operations parameters
-    AP_Float ship_perch_angle;
-    AP_Float ship_perch_radius;
-    AP_Float ship_perch_altitude;
-    AP_Float ship_accel_xy;
-    AP_Float ship_jerk_xy;
-    AP_Float ship_accel_z;
-    AP_Float ship_jerk_z;
-    AP_Float ship_accel_h;
-    AP_Float ship_jerk_h;
+    AP_Float perch_angle;
+    AP_Float perch_radius;
+    AP_Float perch_altitude;
+    AP_Float ship_max_accel_xy;
+    AP_Float ship_max_jerk_xy;
+    AP_Float ship_max_accel_z;
+    AP_Float ship_max_jerk_z;
+    AP_Float ship_max_accel_h;
+    AP_Float ship_max_jerk_h;
     AP_Float keep_out_CW;
     AP_Float keep_out_CCW;
     AP_Float keep_out_radius;

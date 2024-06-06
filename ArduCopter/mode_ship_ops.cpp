@@ -11,7 +11,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @Range: 0 1
     // @Units: deg
     // @User: Advanced
-    AP_GROUPINFO("PCH_ANG", 1, ModeShipOperation, ship_perch_angle, 180.0f),
+    AP_GROUPINFO("PCH_ANG", 1, ModeShipOperation, perch_angle, 180.0f),
 
     // @Param: PCH_RAD
     // @DisplayName: Distance of the perch position from the ship
@@ -19,7 +19,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @Range: 0 1
     // @Units: m
     // @User: Advanced
-    AP_GROUPINFO("PCH_RAD", 2, ModeShipOperation, ship_perch_radius, 25.0f),
+    AP_GROUPINFO("PCH_RAD", 2, ModeShipOperation, perch_radius, 25.0f),
 
     // @Param: PCH_ALT
     // @DisplayName: Altitude of the perch position from the ship
@@ -27,7 +27,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @Range: 0 1
     // @Units: m
     // @User: Advanced
-    AP_GROUPINFO("PCH_ALT", 3, ModeShipOperation, ship_perch_altitude, 25.0f),
+    AP_GROUPINFO("PCH_ALT", 3, ModeShipOperation, perch_altitude, 25.0f),
 
     // @Param: ACCELXY
     // @DisplayName: Acceleration limit for the horizontal kinematic input shaping
@@ -35,7 +35,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @Range: 0 1
     // @Units: m/s/s
     // @User: Advanced
-    AP_GROUPINFO("ACCELXY", 4, ModeShipOperation, ship_accel_xy, 2.5f),
+    AP_GROUPINFO("ACCELXY", 4, ModeShipOperation, ship_max_accel_xy, 2.5f),
 
     // @Param: JERKXY
     // @DisplayName: Jerk limit for the horizontal kinematic input shaping
@@ -43,7 +43,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @Range: 0 1
     // @Units: m/s/s/s
     // @User: Advanced
-    AP_GROUPINFO("JERKXY", 5, ModeShipOperation, ship_jerk_xy, 5.0f),
+    AP_GROUPINFO("JERKXY", 5, ModeShipOperation, ship_max_jerk_xy, 5.0f),
 
     // @Param: ACCELZ
     // @DisplayName: Acceleration limit for the vertical kinematic input shaping
@@ -51,7 +51,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @Range: 0 1
     // @Units: m/s/s
     // @User: Advanced
-    AP_GROUPINFO("ACCELZ", 6, ModeShipOperation, ship_accel_z, 2.5f),
+    AP_GROUPINFO("ACCELZ", 6, ModeShipOperation, ship_max_accel_z, 2.5f),
 
     // @Param: JERKZ
     // @DisplayName: Jerk limit for the vertical kinematic input shaping
@@ -59,7 +59,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @Range: 0 1
     // @Units: m/s/s/s
     // @User: Advanced
-    AP_GROUPINFO("JERKZ", 7, ModeShipOperation, ship_jerk_z, 5.0f),
+    AP_GROUPINFO("JERKZ", 7, ModeShipOperation, ship_max_jerk_z, 5.0f),
 
     // @Param: ACCELH
     // @DisplayName: Angular acceleration limit for the heading kinematic input shaping
@@ -67,7 +67,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @Range: 0 1
     // @Units: deg/s/s
     // @User: Advanced
-    AP_GROUPINFO("ACCELH", 8, ModeShipOperation, ship_accel_h, 90.0f),
+    AP_GROUPINFO("ACCELH", 8, ModeShipOperation, ship_max_accel_h, 90.0f),
 
     // @Param: JERKH
     // @DisplayName: Angular jerk limit for the heading kinematic input shaping
@@ -75,7 +75,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @Range: 0 1
     // @Units: deg/s/s/s
     // @User: Advanced
-    AP_GROUPINFO("JERKH", 9, ModeShipOperation, ship_jerk_h, 360.0f),
+    AP_GROUPINFO("JERKH", 9, ModeShipOperation, ship_max_jerk_h, 360.0f),
 
     // @Param: KOZ_CW
     // @DisplayName: CW angular offset in degrees from ship heading for keep out zone
@@ -259,9 +259,9 @@ void ModeShipOperation::run()
     float yaw_cd = attitude_control->get_att_target_euler_cd().z;
     float yaw_rate_cds = 0.0f;
 
-    Vector2f perch_offset = { ship_perch_radius * 100.0f, 0.0f };
-    perch_offset.rotate(radians(ship_perch_angle));
-    const float perch_height = ship_perch_altitude * 100.0;
+    Vector2f perch_offset = { perch_radius * 100.0f, 0.0f };
+    perch_offset.rotate(radians(perch_angle));
+    const float perch_height = perch_altitude * 100.0;
 
     // get pilot desired climb rate if enabled
     bool valid_pilot_input = rc().has_valid_input() && g.land_repositioning;
@@ -315,20 +315,20 @@ void ModeShipOperation::run()
 
         shape_pos_vel_accel_xy(pos_with_ofs_ned.xy().topostype(), vel_ned_ms.xy(), accel_ned.xy(),
                             ship.pos_ned.xy(), ship.vel_ned.xy(), ship.accel_ned.xy(),
-                            0.0, ship_accel_xy * 100.0,
-                            ship_jerk_xy * 100.0, G_Dt, false);
+                            0.0, ship_max_accel_xy * 100.0,
+                            ship_max_jerk_xy * 100.0, G_Dt, false);
         shape_pos_vel_accel(pos_with_ofs_ned.z, vel_ned_ms.z, accel_ned.z,
                             ship.pos_ned.z, ship.vel_ned.z, ship.accel_ned.z,
                             0.0, 0.0, 
-                            -ship_accel_z * 100.0, ship_accel_z * 100.0,
-                            ship_jerk_z * 100.0, G_Dt, false);
+                            -ship_max_accel_z * 100.0, ship_max_accel_z * 100.0,
+                            ship_max_jerk_z * 100.0, G_Dt, false);
         update_pos_vel_accel_xy(ship.pos_ned.xy(), ship.vel_ned.xy(), ship.accel_ned.xy(), G_Dt, Vector2f(), Vector2f(), Vector2f());
         update_pos_vel_accel(ship.pos_ned.z, ship.vel_ned.z, ship.accel_ned.z, G_Dt, 0.0, 0.0, 0.0);
 
         shape_angle_vel_accel(radians(target_heading_deg), 0.0, 0.0,
                             ship.heading, ship.heading_rate, ship.heading_accel,
-                            0.0, radians(ship_accel_h),
-                            radians(ship_jerk_h), G_Dt, false);
+                            0.0, radians(ship_max_accel_h),
+                            radians(ship_max_jerk_h), G_Dt, false);
         postype_t ship_heading_p = ship.heading;
         update_pos_vel_accel(ship_heading_p, ship.heading_rate, ship.heading_accel, G_Dt, 0.0, 0.0, 0.0);
         ship.heading = wrap_PI(ship_heading_p);
@@ -425,9 +425,9 @@ void ModeShipOperation::run()
             float keep_out_angle_rad = wrap_2PI(keep_out_CW_rad - keep_out_CCW_rad);
             float koz_center_heading_rad = ship.heading + (keep_out_CW_rad + keep_out_CCW_rad) / 2.0;
 
-            float extension_distance_cm = ship_perch_radius * 10.0 + stopping_distance(wp_nav->get_default_speed_xy() + vel_ned_ms.xy().length(), 0.5 * pos_control->get_shaping_jerk_xy_cmsss() / wp_nav->get_wp_acceleration(), 0.5 * wp_nav->get_wp_acceleration());
-            extension_distance_cm = MIN(extension_distance_cm, ship_perch_radius * 100.0);
-            extension_distance_cm = MIN(extension_distance_cm, ship_perch_radius * 100.0 * sinf(0.5 * (2 * M_PI - keep_out_angle_rad * 100.0)));
+            float extension_distance_cm = perch_radius * 10.0 + stopping_distance(wp_nav->get_default_speed_xy() + vel_ned_ms.xy().length(), 0.5 * pos_control->get_shaping_jerk_xy_cmsss() / wp_nav->get_wp_acceleration(), 0.5 * wp_nav->get_wp_acceleration());
+            extension_distance_cm = MIN(extension_distance_cm, perch_radius * 100.0);
+            extension_distance_cm = MIN(extension_distance_cm, perch_radius * 100.0 * sinf(0.5 * (2 * M_PI - keep_out_angle_rad * 100.0)));
             Vector2f extension_cm = { extension_distance_cm, 0.0 };
 
             if (fabsf(wrap_PI(aircraft_bearing_rad - koz_center_heading_rad)) > keep_out_angle_rad / 2.0) {
@@ -658,7 +658,7 @@ void ModeShipOperation::run()
         case SubMode::RETURN_TO_PERCH:
             // check that position is within 10% of the Perch radius in x and y
             // if throttle is low then reduce altitude to Perch altitude
-            pos_check = pos_error.xy().length() < ship_perch_radius * 10.0f;
+            pos_check = pos_error.xy().length() < perch_radius * 10.0f;
             if (pos_check) {
                 set_state(SubMode::PERCH);
             }
