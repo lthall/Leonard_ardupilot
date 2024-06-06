@@ -155,13 +155,7 @@ bool ModeShipOperation::init(const bool ignore_checks)
     float target_heading_deg = 0.0f;
     g2.follow.get_target_heading_deg(target_heading_deg);
 
-    ship.pos_ned = pos_with_ofs_ned.topostype();
-    ship.vel_ned = vel_ned_ms;
-    ship.accel_ned.zero();
-    ship.heading = radians(target_heading_deg);
-    ship.heading_rate = 0.0;
-    ship.heading_accel = 0.0;
-    ship.available = true;
+    ship.reset(pos_with_ofs_ned, vel_ned_ms, target_heading_deg);
 
     offset.zero();
     offset.xy() = curr_pos_neu_cm.xy() - ship.pos_ned.xy().tofloat();
@@ -254,6 +248,17 @@ void ModeShipOperation::set_approach_mode(ApproachMode new_approach_mode)
 
 }
 
+void ModeShipOperation::Ship::reset(const Vector3f &pos_with_ofs_ned, const Vector3f &vel_ned_ms, float target_heading_deg)
+{
+    pos_ned = pos_with_ofs_ned.topostype();
+    vel_ned = vel_ned_ms;
+    accel_ned.zero();
+    heading = radians(target_heading_deg);
+    heading_rate = 0.0;
+    heading_accel = 0.0;
+    available = true;
+}
+
 void ModeShipOperation::run()
 {
     float yaw_cd = attitude_control->get_att_target_euler_cd().z;
@@ -304,13 +309,7 @@ void ModeShipOperation::run()
 
         if (!ship.available) {
             // reset ship pos, vel, accel to current value when detected.
-            ship.pos_ned = pos_with_ofs_ned.topostype();
-            ship.vel_ned = vel_ned_ms;
-            ship.accel_ned.zero();
-            ship.heading = radians(target_heading_deg);
-            ship.heading_rate = 0.0;
-            ship.heading_accel = 0.0;
-            ship.available = true;
+            ship.reset(pos_with_ofs_ned, vel_ned_ms, target_heading_deg);
         }
 
         shape_pos_vel_accel_xy(pos_with_ofs_ned.xy().topostype(), vel_ned_ms.xy(), accel_ned.xy(),
