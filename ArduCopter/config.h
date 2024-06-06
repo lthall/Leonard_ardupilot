@@ -304,7 +304,7 @@
 //////////////////////////////////////////////////////////////////////////////
 // Ship Operations Supoort - support for landing relative to a beacon
 #ifndef MODE_SHIP_OPS_ENABLED
-# define MODE_SHIP_OPS_ENABLED !HAL_MINIMIZE_FEATURES && MODE_FOLLOW_ENABLED
+# define MODE_SHIP_OPS_ENABLED MODE_FOLLOW_ENABLED
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
