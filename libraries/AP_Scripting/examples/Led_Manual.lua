@@ -11,11 +11,13 @@ local color = 1
 function update()
   color = 1
   if ahrs:healthy()  then
-    gcs:send_text(0, "healthy")
-    color = 4
-    if arming:pre_arm_checks() then
-      gcs:send_text(0, "pre_arm_checks")
-      color = 5
+    --gcs:send_text(0, "healthy")
+    if gps:num_sensors() == 2 and gps:status(0) >= gps.GPS_OK_FIX_3D and gps:status(1) >= gps.GPS_OK_FIX_3D_RTK_FLOAT then
+      --gcs:send_text(0, "GPS Lock")
+      color = 2
+    else
+      --gcs:send_text(0, "Waiting for GPS Lock")
+      color = 3
     end
   end
   if color == 0 then
