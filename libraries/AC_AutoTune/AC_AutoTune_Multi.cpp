@@ -109,7 +109,7 @@ const AP_Param::GroupInfo AC_AutoTune_Multi::var_info[] = {
     // @Description: Defines the minimum D gain
     // @Range: 0.0001 0.005
     // @User: Standard
-    AP_GROUPINFO("MIN_D", 3, AC_AutoTune_Multi, min_d,  0.0005f),
+    AP_GROUPINFO("MIN_D", 3, AC_AutoTune_Multi, min_d,  0.0001f),
 
     AP_GROUPEND
 };
@@ -527,7 +527,7 @@ void AC_AutoTune_Multi::report_axis_gains(const char* axis_string, float rate_P,
 
 // twitching_test_rate - twitching tests
 // update min and max and test for end conditions
-void AC_AutoTune_Multi::twitching_test_rate(float angle, float rate, float rate_target_max, float &meas_rate_min, float &meas_rate_max, float &meas_angle_min)
+void AC_AutoTune_Multi::twitching_test_rate(float angle, float rate, float angle_max, float rate_target_max, float &meas_rate_min, float &meas_rate_max, float &meas_angle_min)
 {
     const uint32_t now = AP_HAL::millis();
 
@@ -555,17 +555,38 @@ void AC_AutoTune_Multi::twitching_test_rate(float angle, float rate, float rate_
 
     if (meas_rate_max > rate_target_max) {
         // the measured rate has passed the maximum target rate
-        step = UPDATE_GAINS;
+        test_finished = true;
     }
 
     if (meas_rate_max-meas_rate_min > meas_rate_max*aggressiveness) {
-        // the measurement has passed 50% of the maximum rate and bounce back is larger than the threshold
-        step = UPDATE_GAINS;
+        // the measurement has passed 25% of the maximum rate and bounce back is larger than the threshold
+        test_finished = true;
     }
 
     if (now - step_start_time_ms >= step_time_limit_ms) {
         // we have passed the maximum stop time
-        step = UPDATE_GAINS;
+        test_finished = true;
+    }
+
+    if (angle >= angle_max) {
+        if (meas_rate_min < rate || (meas_angle_min > 0.95 * angle_max)) {
+            // we have measured the peek and following minimum rate
+            test_finished = true;
+        }
+        if (is_equal(rate, meas_rate_min)) {
+            step_scaler *= 0.9 * rate / rate_target_max;
+        }
+        if (step_scaler < 0.2f) {
+            LOGGER_WRITE_EVENT(LogEvent::AUTOTUNE_REACHED_LIMIT);
+            gcs().send_text(MAV_SEVERITY_CRITICAL, "AutoTune: Twitch Size Determination Failed 1");
+            mode = FAILED;
+            LOGGER_WRITE_EVENT(LogEvent::AUTOTUNE_FAILED);
+        }
+        // ignore result and start test again
+        step = WAITING_FOR_LEVEL;
+        positive_direction = twitch_reverse_direction();
+        step_start_time_ms = now;
+        level_start_time_ms = now;
     }
 }
 
@@ -582,7 +603,7 @@ void AC_AutoTune_Multi::twitching_abort_rate(float angle, float rate, float angl
                 step_scaler *= 0.9f;
             } else {
                 LOGGER_WRITE_EVENT(LogEvent::AUTOTUNE_REACHED_LIMIT);
-                gcs().send_text(MAV_SEVERITY_CRITICAL, "AutoTune: Twitch Size Determination Failed");
+                gcs().send_text(MAV_SEVERITY_CRITICAL, "AutoTune: Twitch Size Determination Failed 1");
                 mode = FAILED;
                 LOGGER_WRITE_EVENT(LogEvent::AUTOTUNE_FAILED);
             }
@@ -959,7 +980,7 @@ void AC_AutoTune_Multi::updating_rate_p_up_d_down(float &tune_d, float tune_d_mi
             tune_d = tune_d_min;
             LOGGER_WRITE_EVENT(LogEvent::AUTOTUNE_REACHED_LIMIT);
             if (fail_min_d) {
-                gcs().send_text(MAV_SEVERITY_CRITICAL, "AutoTune: Rate D Gain Determination Failed");
+                gcs().send_text(MAV_SEVERITY_CRITICAL, "AutoTune: Rate D Gain Determination Failed 2");
                 mode = FAILED;
                 LOGGER_WRITE_EVENT(LogEvent::AUTOTUNE_FAILED);
             }
@@ -969,7 +990,7 @@ void AC_AutoTune_Multi::updating_rate_p_up_d_down(float &tune_d, float tune_d_mi
         // do not decrease the P term past the minimum
         if (tune_p <= tune_p_min) {
             tune_p = tune_p_min;
-            gcs().send_text(MAV_SEVERITY_CRITICAL, "AutoTune: Rate P Gain Determination Failed");
+            gcs().send_text(MAV_SEVERITY_CRITICAL, "AutoTune: Rate P Gain Determination Failed 3");
             mode = FAILED;
             LOGGER_WRITE_EVENT(LogEvent::AUTOTUNE_FAILED);
         }
@@ -1018,7 +1039,7 @@ void AC_AutoTune_Multi::updating_angle_p_down(float &tune_p, float tune_p_min, f
             tune_p = tune_p_min;
             counter = AUTOTUNE_SUCCESS_COUNT;
             LOGGER_WRITE_EVENT(LogEvent::AUTOTUNE_REACHED_LIMIT);
-            gcs().send_text(MAV_SEVERITY_CRITICAL, "AutoTune: Angle P Gain Determination Failed");
+            gcs().send_text(MAV_SEVERITY_CRITICAL, "AutoTune: Angle P Gain Determination Failed 4");
             mode = FAILED;
             LOGGER_WRITE_EVENT(LogEvent::AUTOTUNE_FAILED);
        }
@@ -1221,7 +1242,7 @@ void AC_AutoTune_Multi::twitch_test_init()
     } else {
         rotation_rate_filt.reset(0);
     }
-
+    test_finished = false;
 }
 
 //run twitch test
@@ -1308,31 +1329,36 @@ void AC_AutoTune_Multi::twitch_test_run(AxisType test_axis, const float dir_sign
     rotation_rate = rotation_rate_filt.apply(filter_value,
                     AP::scheduler().get_loop_period_s());
 
-    switch (tune_type) {
-    case RD_UP:
-    case RD_DOWN:
-        twitching_test_rate(lean_angle, rotation_rate, target_rate, test_rate_min, test_rate_max, test_angle_min);
-        twitching_measure_acceleration(test_accel_max, rotation_rate, rate_max);
-        twitching_abort_rate(lean_angle, rotation_rate, angle_finish, test_rate_min, test_angle_min);
-        break;
-    case RP_UP:
-        twitching_test_rate(lean_angle, rotation_rate, target_rate*(1+0.5f*aggressiveness), test_rate_min, test_rate_max, test_angle_min);
-        twitching_measure_acceleration(test_accel_max, rotation_rate, rate_max);
-        twitching_abort_rate(lean_angle, rotation_rate, angle_finish, test_rate_min, test_angle_min);
-        break;
-    case SP_DOWN:
-    case SP_UP:
-        twitching_test_angle(lean_angle, rotation_rate, target_angle*(1+0.5f*aggressiveness), test_angle_min, test_angle_max, test_rate_min, test_rate_max);
-        twitching_measure_acceleration(test_accel_max, rotation_rate - dir_sign * start_rate, rate_max);
-        break;
-    case RFF_UP:
-    case MAX_GAINS:
-    case TUNE_CHECK:
-        // this should never happen
-        INTERNAL_ERROR(AP_InternalError::error_t::flow_of_control);
-        break;
-    default:
-        break;
+    if (!test_finished) {
+        switch (tune_type) {
+        case RD_UP:
+        case RD_DOWN:
+            twitching_test_rate(lean_angle, rotation_rate, angle_finish, target_rate, test_rate_min, test_rate_max, test_angle_min);
+            twitching_abort_rate(lean_angle, rotation_rate, angle_finish, test_rate_min, test_angle_min);
+            break;
+        case RP_UP:
+            twitching_test_rate(lean_angle, rotation_rate, angle_finish, target_rate*(1+0.5f*aggressiveness), test_rate_min, test_rate_max, test_angle_min);
+            twitching_abort_rate(lean_angle, rotation_rate, angle_finish, test_rate_min, test_angle_min);
+            break;
+        case SP_DOWN:
+        case SP_UP:
+            twitching_test_angle(lean_angle, rotation_rate, target_angle*(1+0.5f*aggressiveness), test_angle_min, test_angle_max, test_rate_min, test_rate_max);
+            twitching_measure_acceleration(test_accel_max, rotation_rate - dir_sign * start_rate, rate_max);
+            break;
+        case RFF_UP:
+        case MAX_GAINS:
+        case TUNE_CHECK:
+            // this should never happen
+            INTERNAL_ERROR(AP_InternalError::error_t::flow_of_control);
+            break;
+        default:
+            break;
+        }
+        if (test_finished) {
+            angle_stop = constrain_float(lean_angle * 1.05, angle_stop * 0.95, 0.9 * angle_finish);
+        }
+    } else if (lean_angle > angle_stop) {
+        step = UPDATE_GAINS;
     }
 }
 

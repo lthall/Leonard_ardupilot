@@ -277,7 +277,7 @@ protected:
     float    rate_max;                              // maximum rate variable - parent and multi
     float    test_accel_max;                        // maximum acceleration variable
     float    step_scaler;                           // scaler to reduce maximum target step - parent and multi
-    float    angle_finish;                           // Angle that test is aborted- parent and multi
+    float    angle_finish;                          // Angle that test is aborted- parent and multi
     float    desired_yaw_cd;                        // yaw heading during tune - parent and Tradheli
 
     LowPassFilterFloat  rotation_rate_filt;         // filtered rotation rate in radians/second

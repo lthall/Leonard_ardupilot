@@ -151,7 +151,7 @@ private:
     void twitch_test_init();
     void twitch_test_run(AxisType test_axis, const float dir_sign);
 
-    void twitching_test_rate(float angle, float rate, float rate_target, float &meas_rate_min, float &meas_rate_max, float &meas_angle_min);
+    void twitching_test_rate(float angle, float rate, float angle_max, float rate_target, float &meas_rate_min, float &meas_rate_max, float &meas_angle_min);
     void twitching_abort_rate(float angle, float rate, float angle_max, float meas_rate_min, float angle_min);
     void twitching_test_angle(float angle, float rate, float angle_target, float &meas_angle_min, float &meas_angle_max, float &meas_rate_min, float &meas_rate_max);
 
@@ -185,6 +185,8 @@ private:
     AP_Int8  axis_bitmask;        // axes to be tuned
     AP_Float aggressiveness;      // aircraft response aggressiveness to be tuned
     AP_Float min_d;               // minimum rate d gain allowed during tuning
+    bool test_finished;
+    float angle_stop;
 };
 
 #endif  // AC_AUTOTUNE_ENABLED
