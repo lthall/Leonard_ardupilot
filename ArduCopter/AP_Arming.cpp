@@ -807,6 +807,7 @@ bool AP_Arming_Copter::disarm(const AP_Arming::Method method, bool do_disarm_che
 #if AUTOTUNE_ENABLED == ENABLED
     // save auto tuned parameters
     if (copter.flightmode == &copter.mode_autotune) {
+        // it may be difficult to remove this without loosing the current capability
         copter.mode_autotune.save_tuning_gains();
     } else {
         copter.mode_autotune.reset();

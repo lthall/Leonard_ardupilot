@@ -34,6 +34,14 @@ public:
     // save gained, called on disarm
     void save_tuning_gains() override;
 
+    // switch to use original gains
+    void load_orig_gains() override;
+
+    // switch to gains found by last successful autotune
+    // this is more different to save_tuning_gains than I would expect
+    // maybe this is a sign it can be made more efficient.
+    void load_tuned_gains() override;
+
     // var_info for holding Parameter information
     static const struct AP_Param::GroupInfo var_info[];
 
@@ -44,12 +52,6 @@ protected:
 
     // backup original gains and prepare for start of tuning
     void backup_gains_and_initialise() override;
-
-    // switch to use original gains
-    void load_orig_gains() override;
-
-    // switch to gains found by last successful autotune
-    void load_tuned_gains() override;
 
     // load gains used between tests. called during testing mode's update-gains step to set gains ahead of return-to-level step
     void load_intra_test_gains() override;

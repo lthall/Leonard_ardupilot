@@ -381,6 +381,7 @@ void AC_PID::load_gains()
 // save original gains to eeprom, used by autotune to save gains before tuning
 void AC_PID::save_gains()
 {
+    // should be be using set_and_save_ifchanged?
     _kp.save();
     _ki.save();
     _kd.save();

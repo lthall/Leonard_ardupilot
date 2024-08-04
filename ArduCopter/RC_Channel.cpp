@@ -76,7 +76,8 @@ void RC_Channel_Copter::init_aux_function(const AUX_FUNC ch_option, const AuxSwi
     // the following functions do not need to be initialised:
     case AUX_FUNC::ALTHOLD:
     case AUX_FUNC::AUTO:
-    case AUX_FUNC::AUTOTUNE:
+    case AUX_FUNC::AUTOTUNE_MODE:
+    case AUX_FUNC::AUTOTUNE_SWITCH:
     case AUX_FUNC::BRAKE:
     case AUX_FUNC::CIRCLE:
     case AUX_FUNC::DRIFT:
@@ -290,8 +291,36 @@ bool RC_Channel_Copter::do_aux_function(const AUX_FUNC ch_option, const AuxSwitc
 #endif
 
 #if AUTOTUNE_ENABLED == ENABLED
-        case AUX_FUNC::AUTOTUNE:
+        case AUX_FUNC::AUTOTUNE_MODE:
             do_aux_function_change_mode(Mode::Number::AUTOTUNE, ch_flag);
+            break;
+        case AUX_FUNC::AUTOTUNE_SWITCH:
+            switch(ch_flag) {
+                // this could also work as a two position switch by switching into Autotune using the mode switch.
+                // The switch wouldn't do anything if autotune had not completed.
+                // some challenges there to get that stretch goal
+                case AuxSwitchPos::LOW:
+                    // load and save if required original gains
+                    // we could leave the current save on disarm and only switch
+                    copter.mode_autotune.autotune.load_orig_gains(); // this currently doesn't save the gains
+                    // what we do with the mode is an open question
+                    // can we switch back to the previous mode
+                    break;
+                case AuxSwitchPos::MIDDLE:
+                    // change to mode autotune or do nothing if tune is complete
+                    if (copter.mode_autotune.autotune.) {
+                        do_aux_function_change_mode(Mode::Number::AUTOTUNE, ch_flag);
+                    }
+                    break;
+                case AuxSwitchPos::HIGH:
+                    // load and save if required tuned gains if tuning is complete
+                    // we could leave the current save on disarm and only switch
+                    // we would need to change the save on disarm anyway to save the current settings not the tuned settings, but we need to maintain the ability to run autotune without the switch.
+                    copter.mode_autotune.autotune.load_tuned_gains(); // this currently doesn't save the gains
+                    // what we do with the mode is an open question
+                    // can we switch back to the previous mode
+                    break;
+            }
             break;
 #endif
 

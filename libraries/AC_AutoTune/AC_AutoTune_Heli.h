@@ -40,6 +40,12 @@ public:
     // var_info for holding Parameter information
     static const struct AP_Param::GroupInfo var_info[];
 
+    // switch to use original gains
+    void load_orig_gains() override;
+
+    // switch to gains found by last successful autotune
+    void load_tuned_gains() override;
+
 protected:
 
     //
@@ -51,12 +57,6 @@ protected:
 
     // load gains
     void load_gain_set(AxisType s_axis, float rate_p, float rate_i, float rate_d, float rate_ff, float angle_p, float max_accel, float rate_fltt, float rate_flte, float smax, float max_rate);
-
-    // switch to use original gains
-    void load_orig_gains() override;
-
-    // switch to gains found by last successful autotune
-    void load_tuned_gains() override;
 
     // load gains used between tests. called during testing mode's update-gains step to set gains ahead of return-to-level step
     void load_intra_test_gains() override;

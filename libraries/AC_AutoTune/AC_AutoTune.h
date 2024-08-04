@@ -65,6 +65,12 @@ public:
         axes_completed = 0;
     }
 
+    // switch to use original gains
+    virtual void load_orig_gains() = 0;
+
+    // switch to gains found by last successful autotune
+    virtual void load_tuned_gains() = 0;
+
 protected:
     // axis that can be tuned
     enum AxisType {
@@ -99,12 +105,6 @@ protected:
 
     // backup original gains and prepare for start of tuning
     virtual void backup_gains_and_initialise();
-
-    // switch to use original gains
-    virtual void load_orig_gains() = 0;
-
-    // switch to gains found by last successful autotune
-    virtual void load_tuned_gains() = 0;
 
     // load gains used between tests. called during testing mode's update-gains step to set gains ahead of return-to-level step
     virtual void load_intra_test_gains() = 0;

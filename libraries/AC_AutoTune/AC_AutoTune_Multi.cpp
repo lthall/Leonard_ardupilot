@@ -395,6 +395,7 @@ void AC_AutoTune_Multi::save_tuning_gains()
 
     if (!attitude_control->get_bf_feedforward()) {
         attitude_control->bf_feedforward_save(true);
+        // following two lines may be able to be removed, need to check
         attitude_control->save_accel_roll_max_cdss(0.0);
         attitude_control->save_accel_pitch_max_cdss(0.0);
     }
