@@ -1,9 +1,21 @@
--- add new param SHP1_
-local ship_selected = 0
-local PARAM_TABLE_KEY1 = 20
-local PARAM_TABLE_PREFIX1 = "SHP1_"
-local PARAM_TABLE_KEY2 = 21
-local PARAM_TABLE_PREFIX2 = "SHP2_"
+-- A Lua script for switching between parameter banks with checking and runtime updates
+-- Select bank with RCx_OPTION 300
+
+local bank_target = {
+   { name = "PCH_ANG", value = Parameter('SHIP_PCH_ANG'), bank_defualt = 180 },
+   { name = "PCH_RAD", value = Parameter('SHIP_PCH_RAD'), bank_defualt = 25 },
+   { name = "PCH_ALT", value = Parameter('SHIP_PCH_ALT'), bank_defualt = 25 },
+   { name = "KOZ_CW", value = Parameter('SHIP_KOZ_CW'), bank_defualt = 90 },
+   { name = "KOZ_CCW", value = Parameter('SHIP_KOZ_CCW'), bank_defualt = -90 },
+   { name = "KOZ_RAD", value = Parameter('SHIP_KOZ_RAD'), bank_defualt = 250 },
+   { name = "KOZ_DKR", value = Parameter('SHIP_KOZ_DKR'), bank_defualt = 10 },
+
+   { name = "OFS_X", value = Parameter('FOLL_OFS_X'), bank_defualt = 0 },
+   { name = "OFS_Y", value = Parameter('FOLL_OFS_Y'), bank_defualt = 0 },
+   { name = "OFS_Z", value = Parameter('FOLL_OFS_Z'), bank_defualt = 0 },
+
+   { name = "SYSID", value = Parameter('FOLL_SYSID'), bank_defualt = 200 }
+}
 
 -- add a parameter and bind it to a variable
 local function bind_add_param(name, idx, default_value, key, prefix)
@@ -11,46 +23,97 @@ local function bind_add_param(name, idx, default_value, key, prefix)
    return Parameter(prefix .. name)
 end
 
-assert(param:add_table(PARAM_TABLE_KEY1, PARAM_TABLE_PREFIX1, 11), 'could not add param table')
-assert(param:add_table(PARAM_TABLE_KEY2, PARAM_TABLE_PREFIX2, 11), 'could not add param table')
+local function add_param_bank(target_params, table_key, prefix, bank_name, extra_msg, defualt_override)
 
-local shp1_pch_ang = bind_add_param('PCH_ANG', 1, 180, PARAM_TABLE_KEY1, PARAM_TABLE_PREFIX1)
-local shp1_pch_rad = bind_add_param('PCH_RAD', 2, 25, PARAM_TABLE_KEY1, PARAM_TABLE_PREFIX1)
-local shp1_pch_alt = bind_add_param('PCH_ALT', 3, 25, PARAM_TABLE_KEY1, PARAM_TABLE_PREFIX1)
-local shp1_koz_cw = bind_add_param('KOZ_CW', 4, 90, PARAM_TABLE_KEY1, PARAM_TABLE_PREFIX1)
-local shp1_koz_ccw = bind_add_param('KOZ_CCW', 5, -90, PARAM_TABLE_KEY1, PARAM_TABLE_PREFIX1)
-local shp1_koz_rad = bind_add_param('KOZ_RAD', 6, 250, PARAM_TABLE_KEY1, PARAM_TABLE_PREFIX1)
-local shp1_koz_dkr = bind_add_param('KOZ_DKR', 7, 10, PARAM_TABLE_KEY1, PARAM_TABLE_PREFIX1)
-local shp1_ofs_x = bind_add_param('OFS_X', 8, 0, PARAM_TABLE_KEY1, PARAM_TABLE_PREFIX1)
-local shp1_ofs_y = bind_add_param('OFS_Y', 9, 0, PARAM_TABLE_KEY1, PARAM_TABLE_PREFIX1)
-local shp1_ofs_z = bind_add_param('OFS_Z', 10, 0, PARAM_TABLE_KEY1, PARAM_TABLE_PREFIX1)
-local shp1_sysid = bind_add_param('SYSID', 11, 200, PARAM_TABLE_KEY1, PARAM_TABLE_PREFIX1)
+   if extra_msg == nil then
+      extra_msg = ""
+   end
 
-local shp2_pch_ang = bind_add_param('PCH_ANG', 1, 180, PARAM_TABLE_KEY2, PARAM_TABLE_PREFIX2)
-local shp2_pch_rad = bind_add_param('PCH_RAD', 2, 25, PARAM_TABLE_KEY2, PARAM_TABLE_PREFIX2)
-local shp2_pch_alt = bind_add_param('PCH_ALT', 3, 25, PARAM_TABLE_KEY2, PARAM_TABLE_PREFIX2)
-local shp2_koz_cw = bind_add_param('KOZ_CW', 4, 90, PARAM_TABLE_KEY2, PARAM_TABLE_PREFIX2)
-local shp2_koz_ccw = bind_add_param('KOZ_CCW', 5, -90, PARAM_TABLE_KEY2, PARAM_TABLE_PREFIX2)
-local shp2_koz_rad = bind_add_param('KOZ_RAD', 6, 250, PARAM_TABLE_KEY2, PARAM_TABLE_PREFIX2)
-local shp2_koz_dkr = bind_add_param('KOZ_DKR', 7, 10, PARAM_TABLE_KEY2, PARAM_TABLE_PREFIX2)
-local shp2_ofs_x = bind_add_param('OFS_X', 8, 0, PARAM_TABLE_KEY2, PARAM_TABLE_PREFIX2)
-local shp2_ofs_y = bind_add_param('OFS_Y', 9, 0, PARAM_TABLE_KEY2, PARAM_TABLE_PREFIX2)
-local shp2_ofs_z = bind_add_param('OFS_Z', 10, 0, PARAM_TABLE_KEY2, PARAM_TABLE_PREFIX2)
-local shp2_sysid = bind_add_param('SYSID', 11, 201, PARAM_TABLE_KEY2, PARAM_TABLE_PREFIX2)
+   local self = {
+      params = {},
+      active = false,
+      checked = false,
+   }
 
-local SHIP_PCH_ANG = Parameter('SHIP_PCH_ANG')
-local SHIP_PCH_RAD = Parameter('SHIP_PCH_RAD')
-local SHIP_PCH_ALT = Parameter('SHIP_PCH_ALT')
-local SHIP_KOZ_CW = Parameter('SHIP_KOZ_CW')
-local SHIP_KOZ_CCW = Parameter('SHIP_KOZ_CCW')
-local SHIP_KOZ_RAD = Parameter('SHIP_KOZ_RAD')
-local SHIP_KOZ_DKR = Parameter('SHIP_KOZ_DKR')
+   -- Add params table with the given key and prefix
+   assert(param:add_table(table_key, prefix, #target_params), 'could not add param \"' .. prefix .. '\" table for ' .. bank_name .. 'param bank')
 
-local FOLL_OFS_X = Parameter('FOLL_OFS_X')
-local FOLL_OFS_Y = Parameter('FOLL_OFS_Y')
-local FOLL_OFS_Z = Parameter('FOLL_OFS_Z')
+   -- Add copy of each param
+   for i, param in pairs(target_params) do
+      local default_value = param.bank_defualt
+      if (defualt_override ~= nil) and (defualt_override[param.name] ~= nil) then
+         default_value = defualt_override[param.name]
+      end
 
-local FOLL_SYSID = Parameter('FOLL_SYSID')
+      self.params[i] = {}
+      self.params[i].value = bind_add_param(param.name, i, default_value, table_key, prefix)
+      self.params[i].name = prefix .. param.name
+      self.params[i].last_set_value = self.params[i].value:get()
+   end
+
+   -- Set target param to bank value for given index
+   local function set(i)
+      local new_value = self.params[i].value:get()
+      target_params[i].value:set(new_value)
+      self.params[i].last_set_value = new_value
+   end
+
+   -- Bank update function, pass true if selected
+   function self.update(b)
+      if not b then
+         -- De-select
+         self.active = false
+         self.checked = false
+         return
+      end
+
+      if not self.active then
+         -- Initial set
+         for i = 1,#target_params do
+            set(i)
+         end
+         gcs:send_text(0, bank_name .. " parameters selected" .. extra_msg)
+
+         self.active = true
+         self.checked = false
+         return
+      end
+
+      if not self.checked then
+         local all_checked = true
+         -- Check each param value is correct
+         for i = 1,#target_params do
+            if target_params[i].value:get() ~= self.params[i].value:get() then
+               -- Value not set, try again
+               all_checked = false
+               set(i)
+            end
+         end
+         if all_checked then
+            -- Everything set correctly
+            gcs:send_text(0, bank_name .. " parameters checked")
+            self.checked = true
+         end
+         return
+      end
+
+      -- Update target param for runtime changes of bank
+      for i = 1,#target_params do
+         if self.params[i].last_set_value ~= self.params[i].value:get() then
+            set(i)
+            gcs:send_text(0, bank_name .. " parameters " .. self.params[i].name .. " updated")
+         end
+      end
+
+   end
+
+   return self
+end
+
+local banks = {
+   add_param_bank(bank_target, 20, "SHP1_", "Ship 1", " for payload place"),
+   add_param_bank(bank_target, 21, "SHP2_", "Ship 2", " for approach", { SYSID = 201 })
+}
 
 -- Use RCx_OPTION 300: Scripting1
 local AuxFunScripting1 = 300
@@ -58,42 +121,17 @@ local AuxSwitchPos = { LOW = 0, MIDDLE = 1, HIGH = 2 }
 
 local interval_ms = 1000     -- update at 1hz
 gcs:send_text(0, "Starting SHIP OPS LUA")
-function update() -- this is the loop which periodically runs
+local function update() -- this is the loop which periodically runs
+   local bank_selected = 1
 
    local aux = rc:get_aux_cached(AuxFunScripting1)
    if (aux == nil) or (aux == AuxSwitchPos.LOW) then
-      -- If aux has never been set, or aux is low then use ship 2
-      if ship_selected ~= 2 then
-         gcs:send_text(0, "Ship 2 for payload place")
-         ship_selected = 2
-         SHIP_PCH_ANG:set(shp2_pch_ang:get())
-         SHIP_PCH_RAD:set(shp2_pch_rad:get())
-         SHIP_PCH_ALT:set(shp2_pch_alt:get())
-         SHIP_KOZ_CW:set(shp2_koz_cw:get())
-         SHIP_KOZ_CCW:set(shp2_koz_ccw:get())
-         SHIP_KOZ_RAD:set(shp2_koz_rad:get())
-         SHIP_KOZ_DKR:set(shp2_koz_dkr:get())
-         FOLL_OFS_X:set(shp2_ofs_x:get())
-         FOLL_OFS_Y:set(shp2_ofs_y:get())
-         FOLL_OFS_Z:set(shp2_ofs_z:get())
-         FOLL_SYSID:set(shp2_sysid:get())
-      end
-   else
-      if ship_selected ~= 1 then
-         gcs:send_text(0, "Ship 1 for approach")
-         ship_selected = 1
-         SHIP_PCH_ANG:set(shp1_pch_ang:get())
-         SHIP_PCH_RAD:set(shp1_pch_rad:get())
-         SHIP_PCH_ALT:set(shp1_pch_alt:get())
-         SHIP_KOZ_CW:set(shp1_koz_cw:get())
-         SHIP_KOZ_CCW:set(shp1_koz_ccw:get())
-         SHIP_KOZ_RAD:set(shp1_koz_rad:get())
-         SHIP_KOZ_DKR:set(shp1_koz_dkr:get())
-         FOLL_OFS_X:set(shp1_ofs_x:get())
-         FOLL_OFS_Y:set(shp1_ofs_y:get())
-         FOLL_OFS_Z:set(shp1_ofs_z:get())
-         FOLL_SYSID:set(shp1_sysid:get())
-      end
+      -- If aux has never been set, or aux is low then use bank 2
+      bank_selected = 2
+   end
+
+   for i = 1,#banks do
+      banks[i].update(i == bank_selected)
    end
 
    return update, interval_ms
