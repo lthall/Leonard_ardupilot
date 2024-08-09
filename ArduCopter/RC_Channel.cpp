@@ -497,6 +497,22 @@ bool RC_Channel_Copter::do_aux_function(const aux_func_t ch_option, const AuxSwi
 #endif
             break;
 
+#if MODE_SHIP_OPS_ENABLED == ENABLED
+        case AUX_FUNC::SHIP_OPS_MODE:
+            switch (ch_flag) {
+                case AuxSwitchPos::LOW:
+                    copter.mode_ship_ops.set_approach_mode(ModeShipOperation::ApproachMode::PAYLOAD_PLACE);
+                    break;
+                case AuxSwitchPos::MIDDLE:
+                    copter.mode_ship_ops.set_approach_mode(ModeShipOperation::ApproachMode::LAUNCH_RECOVERY);
+                    break;
+                case AuxSwitchPos::HIGH:
+                    copter.mode_ship_ops.set_approach_mode(ModeShipOperation::ApproachMode::LAUNCH_RECOVERY);
+                    break;
+            }
+            break;
+#endif
+
         case AUX_FUNC::STABILIZE:
             do_aux_function_change_mode(Mode::Number::STABILIZE, ch_flag);
             break;

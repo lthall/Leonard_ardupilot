@@ -590,6 +590,11 @@ public:
     void *mode_flowhold_ptr;
 #endif
 
+#if MODE_SHIP_OPS_ENABLED == ENABLED
+    // we need a pointer to the mode for the G2 table
+    void *mode_shipops_ptr;
+#endif
+    
 #if MODE_FOLLOW_ENABLED == ENABLED
     // follow
     AP_Follow follow;

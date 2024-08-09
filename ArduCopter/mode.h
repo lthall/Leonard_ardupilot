@@ -58,6 +58,7 @@ public:
     void run_horizontal_control();
     void init_vertical_control();
     void run_vertical_control();
+    bool within_rangefinder_release_range() const;
 
 private:
 
@@ -106,6 +107,7 @@ public:
         AUTOROTATE =   26,  // Autonomous autorotation
         AUTO_RTL =     27,  // Auto RTL, this is not a true mode, AUTO will report as this mode if entered to perform a DO_LAND_START Landing sequence
         TURTLE =       28,  // Flip over after crash
+        SHIP_OPS =     29,  // Provides semi-autonomous landing on a moving platform
 
         // Mode number 127 reserved for the "drone show mode" in the Skybrush
         // fork at https://github.com/skybrush-io/ardupilot
@@ -278,9 +280,9 @@ protected:
         bool triggered(float target_climb_rate) const;
 
         bool running() const { return _running; }
+        float take_off_start_alt;
     private:
         bool _running;
-        float take_off_start_alt;
         float take_off_complete_alt;
     };
 
@@ -1471,6 +1473,117 @@ private:
     };
 
 };
+
+
+#if MODE_SHIP_OPS_ENABLED == ENABLED
+class ModeShipOperation : public Mode {
+
+public:
+    // inherit constructor
+    using Mode::Mode;
+    ModeShipOperation(void);
+    Number mode_number() const override { return Number::SHIP_OPS; }
+
+    bool init(bool ignore_checks) override;
+    void run() override;
+
+    bool requires_GPS() const override { return true; }
+    bool has_manual_throttle() const override { return false; }
+    bool allows_arming(AP_Arming::Method method) const override { return true; };
+    bool is_autopilot() const override { return true; }
+    bool has_user_takeoff(bool must_navigate) const override { return true; }
+
+    bool requires_terrain_failsafe() const override { return false; }
+
+    // for reporting to GCS
+    bool get_wp(Location &loc) const override;
+
+    // SHIP_OPS states
+    enum class SubMode : uint8_t {
+        CLIMB_TO_RTL,
+        RETURN_TO_PERCH,
+        PERCH,
+        OVER_SPOT,
+        LAUNCH_RECOVERY,
+        PAYLOAD_PLACE
+    };
+    SubMode state() { return _state; }
+    const char *state_name(SubMode mode) const;
+    void set_state(SubMode mode);
+
+    // Keep-Out-Zone states
+    enum class KeepOutZoneMode : uint8_t {
+        NO_ACTION,
+        AVOID_KOZ,
+        EXIT_KOZ
+    };
+
+    void set_keep_out_zone_mode(KeepOutZoneMode keep_out_zone_mode);
+    //KeepOutZoneMode keep_out_zone_mode() const { return new_keep_out_zone_mode; }
+
+    // SHIP_OPS states
+    enum class ApproachMode : uint8_t {
+        LAUNCH_RECOVERY,
+        PAYLOAD_PLACE
+    };
+
+    void set_approach_mode(ApproachMode approach_mode);
+    //ApproachMode approach_mode() const { return new_approach_mode; }
+
+    virtual bool is_landing() const override;
+
+    // var_info for holding Parameter information
+    static const struct AP_Param::GroupInfo var_info[];
+    
+protected:
+
+    const char *name() const override { return "SHIP_OPS"; }
+    const char *name4() const override { return "SHIP"; }
+
+private:
+
+    SubMode _state = SubMode::CLIMB_TO_RTL;  // records state of rtl (initial climb, returning home, etc)
+    KeepOutZoneMode keep_out_zone_mode = KeepOutZoneMode::NO_ACTION;  // records state of rtl (initial climb, returning home, etc)
+    ApproachMode approach_mode = ApproachMode::LAUNCH_RECOVERY;  // records state of rtl (initial climb, returning home, etc)
+    uint32_t wp_distance() const override;
+    int32_t wp_bearing() const override;
+
+    uint32_t last_msg_ms;   // system time of last time error message was sent
+    float target_climb_rate;   // climb rate in cm/s
+    Vector3f offset; // position relative to the ship in cm
+    class Ship {
+    public:
+        void reset(uint8_t sys_id, const Vector3f &pos_with_ofs_ned, const Vector3f &vel_ned_ms, float target_heading_deg);
+        uint8_t sysid;
+        Vector3p pos_ned;
+        Vector3f vel_ned;
+        Vector3f accel_ned;
+        float heading;
+        float heading_rate;
+        float heading_accel;
+        bool available;
+    } ship;
+
+    // Ship Operations parameters
+    AP_Float perch_angle;
+    AP_Float perch_radius;
+    AP_Float perch_altitude;
+    AP_Float perch_max_vel_xy;
+    AP_Float perch_max_accel_xy;
+    AP_Float ship_max_accel_xy;
+    AP_Float ship_max_jerk_xy;
+    AP_Float ship_max_accel_z;
+    AP_Float ship_max_jerk_z;
+    AP_Float ship_max_accel_h;
+    AP_Float ship_max_jerk_h;
+    AP_Float keep_out_CW;
+    AP_Float keep_out_CCW;
+    AP_Float keep_out_radius;
+    AP_Float deck_radius;
+
+    bool xy_position_control_permitted;
+};
+#endif // MODE_SHIP_OPS_ENABLED
 
 
 class ModeSmartRTL : public ModeRTL {

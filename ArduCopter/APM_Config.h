@@ -22,6 +22,7 @@
 //#define MODE_LOITER_ENABLED   DISABLED            // disable loiter mode support
 //#define MODE_POSHOLD_ENABLED  DISABLED            // disable poshold mode support
 //#define MODE_RTL_ENABLED      DISABLED            // disable rtl mode support
+//#define MODE_SHIP_OPS_ENABLED DISABLED            // disable ship operation mode support
 //#define MODE_SMARTRTL_ENABLED DISABLED            // disable smartrtl mode support
 //#define MODE_SPORT_ENABLED    DISABLED            // disable sport mode support
 //#define MODE_SYSTEMID_ENABLED DISABLED            // disable system ID mode support

@@ -252,6 +252,7 @@ public:
         MOUNT_LRF_ENABLE =   177,  // mount LRF enable/disable
 
         TIE_DOWN_RELEASE =   179, // Operate tie down release low=open, middle=auto, high=close
+        SHIP_OPS_MODE =      180, // Set Ship Ops Mode low=Payload_Place, middle=Approach, high=Approach
 
         // inputs from 200 will eventually used to replace RCMAP
         ROLL =               201, // roll input
