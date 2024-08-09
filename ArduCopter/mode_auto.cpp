@@ -1272,13 +1272,21 @@ void PayloadPlace::run_vertical_control()
     const uint32_t rangefinder_drop_check_duration_ms = 1000; // how long we have to be below a range finder drop altitude before considering placed
     float thrust_ref = 0.0;
 
-    // Vertical thrust is taken from the attitude controller before angle boost is added
+    auto &g2 = copter.g2;
+    const auto &g = copter.g;
+    auto &inertial_nav = copter.inertial_nav;
     auto *attitude_control = copter.attitude_control;
+    const auto &pos_control = copter.pos_control;
+    const auto &wp_nav = copter.wp_nav;
+
+    // Vertical thrust is taken from the attitude controller before angle boost is added
     const float thrust_level = attitude_control->get_throttle_in();
     const uint32_t now_ms = AP_HAL::millis();
 
+    // relax position target if we might be landed
     // if we discover we've landed then immediately release the load:
     if (copter.ap.land_complete || copter.ap.land_complete_maybe) {
+        pos_control->soften_for_landing_xy();
         switch (state) {
         case State::Descent_Start:
             // do nothing on this loop
@@ -1304,7 +1312,9 @@ void PayloadPlace::run_vertical_control()
         AP::gripper()->valid() && AP::gripper()->released()) {
         switch (state) {
         case State::Descent_Start:
-            gcs().send_text(MAV_SEVERITY_INFO, "%s Manual release", prefix_str);
+            gcs().send_text(MAV_SEVERITY_INFO, "%s Abort: Gripper Open", prefix_str);
+            // Descent_Start has not run so we must also initalise descent_start_altitude_cm
+            descent_start_altitude_cm = inertial_nav.get_position_z_up_cm();
             state = State::Done;
             break;
         case State::Descent_Measure:
@@ -1323,35 +1333,27 @@ void PayloadPlace::run_vertical_control()
     }
 #endif
 
-    auto &inertial_nav = copter.inertial_nav;
-    auto &g2 = copter.g2;
-    const auto &g = copter.g;
-    const auto &wp_nav = copter.wp_nav;
-    const auto &pos_control = copter.pos_control;
-
-    if (copter.rangefinder_state.enabled && is_positive(g2.pldp_range_finder_drop_m)) {
-        if (!(copter.rangefinder_alt_ok() && (copter.rangefinder_state.glitch_count == 0) && 
-        (copter.rangefinder_state.alt_cm > g2.pldp_range_finder_drop_m * 100.0 || copter.rangefinder_state.alt_cm < 0.5 * g2.pldp_range_finder_drop_m * 100.0)) ) {
+    switch (state) {
+    case State::Descent_Start:
+    case State::Descent_Measure:
+        rangefinder_drop_alt_time_ms = now_ms;
+        break;
+    case State::Descent_Test:
+        if (!within_rangefinder_release_range()) {
+            // reset timer
             rangefinder_drop_alt_time_ms = now_ms;
-        } else if (now_ms - rangefinder_drop_alt_time_ms < rangefinder_drop_check_duration_ms) {
-            switch (state) {
-            case State::Descent_Start:
-            case State::Descent_Measure:
-                // do nothing on this loop
-                break;
-            case State::Descent_Test:
-                gcs().send_text(MAV_SEVERITY_INFO, "%s landed", prefix_str);
-                state = State::Release;
-                break;
-            case State::Release:
-            case State::Releasing:
-            case State::Delay:
-            case State::Ascent_Start:
-            case State::Ascent:
-            case State::Done:
-                break;
-            }
+        } else if (now_ms - rangefinder_drop_alt_time_ms > rangefinder_drop_check_duration_ms) {
+            gcs().send_text(MAV_SEVERITY_INFO, "%s rangefinder trigger", prefix_str);
+            state = State::Release;
         }
+        break;
+    case State::Release:
+    case State::Releasing:
+    case State::Delay:
+    case State::Ascent_Start:
+    case State::Ascent:
+    case State::Done:
+        break;
     }
 
     switch (state) {
@@ -1536,7 +1538,42 @@ void PayloadPlace::run_horizontal_control()
 {
     copter.flightmode->land_run_horizontal_control();
 }
-#endif
+
+// returns true if rangefinder returns valid range to trigger drop
+bool PayloadPlace::within_rangefinder_release_range() const
+{
+    auto &g2 = copter.g2;
+    if (!is_positive(g2.pldp_range_finder_drop_m)) {
+        // feature disabled
+        return false;
+    }
+    if (!copter.rangefinder_state.enabled) {
+        // no rangefinder!
+        return false;
+    }
+    if (!copter.rangefinder_alt_ok()) {
+        // no valid range from rangefinder
+        return false;
+    }
+    if (copter.rangefinder_state.glitch_count != 0) {
+        // do not accept reading when glitching is happening
+        return false;
+    }
+
+    const float rangefinder_range_m = copter.rangefinder_state.alt_cm * 0.01;
+    if (rangefinder_range_m > g2.pldp_range_finder_drop_m) {
+        // too high
+        return false;
+    }
+
+    if (rangefinder_range_m < 0.5 * g2.pldp_range_finder_drop_m) {
+        // too low
+        return false;
+    }
+
+    return true;
+}
+#endif  // #if AC_PAYLOAD_PLACE_ENABLED
 
 // sets the target_loc's alt to the vehicle's current alt but does not change target_loc's frame
 // in the case of terrain altitudes either the terrain database or the rangefinder may be used

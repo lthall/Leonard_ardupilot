@@ -32,3 +32,9 @@ define HAL_MSP_ENABLED 0
 #  directory, but are seen across the entire codebase:
 define MODE_FLOWHOLD_ENABLED 0
 define MODE_TURTLE_ENABLED 0
+
+# no SLCAN on these boards (use can-over-mavlink if required)
+define AP_CAN_SLCAN_ENABLED 0
+
+# no ship-ops on small boards:
+define MODE_SHIP_OPS_ENABLED 0
