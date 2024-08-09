@@ -5,17 +5,10 @@ local PARAM_TABLE_PREFIX1 = "SHP1_"
 local PARAM_TABLE_KEY2 = 21
 local PARAM_TABLE_PREFIX2 = "SHP2_"
 
--- bind a parameter to a variable
-function bind_param(name)
-   local p = Parameter()
-   assert(p:init(name), string.format('could not find %s parameter', name))
-   return p
-end
-
 -- add a parameter and bind it to a variable
-function bind_add_param(name, idx, default_value, key, prefix)
+local function bind_add_param(name, idx, default_value, key, prefix)
    assert(param:add_param(key, idx, name, default_value), string.format('could not add param %s', name))
-   return bind_param(prefix .. name)
+   return Parameter(prefix .. name)
 end
 
 assert(param:add_table(PARAM_TABLE_KEY1, PARAM_TABLE_PREFIX1, 11), 'could not add param table')
@@ -45,69 +38,31 @@ local shp2_ofs_y = bind_add_param('OFS_Y', 9, 0, PARAM_TABLE_KEY2, PARAM_TABLE_P
 local shp2_ofs_z = bind_add_param('OFS_Z', 10, 0, PARAM_TABLE_KEY2, PARAM_TABLE_PREFIX2)
 local shp2_sysid = bind_add_param('SYSID', 11, 201, PARAM_TABLE_KEY2, PARAM_TABLE_PREFIX2)
 
-local SHIP_PCH_ANG = Parameter()
-if not SHIP_PCH_ANG:init('SHIP_PCH_ANG') then
-   gcs:send_text(6, 'init SHIP_PCH_ANG failed')
-end
+local SHIP_PCH_ANG = Parameter('SHIP_PCH_ANG')
+local SHIP_PCH_RAD = Parameter('SHIP_PCH_RAD')
+local SHIP_PCH_ALT = Parameter('SHIP_PCH_ALT')
+local SHIP_KOZ_CW = Parameter('SHIP_KOZ_CW')
+local SHIP_KOZ_CCW = Parameter('SHIP_KOZ_CCW')
+local SHIP_KOZ_RAD = Parameter('SHIP_KOZ_RAD')
+local SHIP_KOZ_DKR = Parameter('SHIP_KOZ_DKR')
 
-local SHIP_PCH_RAD = Parameter()
-if not SHIP_PCH_RAD:init('SHIP_PCH_RAD') then
-   gcs:send_text(6, 'init SHIP_PCH_RAD failed')
-end
+local FOLL_OFS_X = Parameter('FOLL_OFS_X')
+local FOLL_OFS_Y = Parameter('FOLL_OFS_Y')
+local FOLL_OFS_Z = Parameter('FOLL_OFS_Z')
 
-local SHIP_PCH_ALT = Parameter()
-if not SHIP_PCH_ALT:init('SHIP_PCH_ALT') then
-   gcs:send_text(6, 'init SHIP_PCH_ALT failed')
-end
+local FOLL_SYSID = Parameter('FOLL_SYSID')
 
-local SHIP_KOZ_CW = Parameter()
-if not SHIP_KOZ_CW:init('SHIP_KOZ_CW') then
-   gcs:send_text(6, 'init SHIP_KOZ_CW failed')
-end
-
-local SHIP_KOZ_CCW = Parameter()
-if not SHIP_KOZ_CCW:init('SHIP_KOZ_CCW') then
-   gcs:send_text(6, 'init SHIP_KOZ_CCW failed')
-end
-
-local SHIP_KOZ_RAD = Parameter()
-if not SHIP_KOZ_RAD:init('SHIP_KOZ_RAD') then
-   gcs:send_text(6, 'init SHIP_KOZ_RAD failed')
-end
-
-local SHIP_KOZ_DKR = Parameter()
-if not SHIP_KOZ_DKR:init('SHIP_KOZ_DKR') then
-   gcs:send_text(6, 'init SHIP_KOZ_DKR failed')
-end
-
-local FOLL_OFS_X = Parameter()
-if not FOLL_OFS_X:init('FOLL_OFS_X') then
-   gcs:send_text(6, 'init FOLL_OFS_X failed')
-end
-
-local FOLL_OFS_Y = Parameter()
-if not FOLL_OFS_Y:init('FOLL_OFS_Y') then
-   gcs:send_text(6, 'init FOLL_OFS_Y failed')
-end
-
-local FOLL_OFS_Z = Parameter()
-if not FOLL_OFS_Z:init('FOLL_OFS_Z') then
-   gcs:send_text(6, 'init FOLL_OFS_Z failed')
-end
-
-local FOLL_SYSID = Parameter()
-if not FOLL_SYSID:init('FOLL_SYSID') then
-   gcs:send_text(6, 'init FOLL_SYSID failed')
-end
+local switch_chanel = assert(rc:get_channel(6), "Could not get RC channel")
+local AuxSwitchPos = { LOW = 0, MIDDLE = 1, HIGH = 2 }
 
 local interval_ms = 1000     -- update at 1hz
 
 
 gcs:send_text(0, "Starting SHIP OPS LUA")
 function update() -- this is the loop which periodically runs
-    
-    pwm6 = rc:get_pwm(6)
-    if pwm6 and pwm6 < 1250 then    -- check if RC6 input has moved low
+
+   -- Check if aux switch is low
+   if switch_chanel:get_aux_switch_pos() == AuxSwitchPos.LOW then
       if ship_selected ~= 2 then
          gcs:send_text(0, "Ship 2 for payload place")
          ship_selected = 2
@@ -123,7 +78,7 @@ function update() -- this is the loop which periodically runs
          FOLL_OFS_Z:set(shp2_ofs_z:get())
          FOLL_SYSID:set(shp2_sysid:get())
       end
-    else
+   else
       if ship_selected ~= 1 then
          gcs:send_text(0, "Ship 1 for approach")
          ship_selected = 1
@@ -139,8 +94,9 @@ function update() -- this is the loop which periodically runs
          FOLL_OFS_Z:set(shp1_ofs_z:get())
          FOLL_SYSID:set(shp1_sysid:get())
       end
-    end
-    return update, interval_ms
+   end
+
+   return update, interval_ms
 end
 
 return update() -- run immediately before starting to reschedule
