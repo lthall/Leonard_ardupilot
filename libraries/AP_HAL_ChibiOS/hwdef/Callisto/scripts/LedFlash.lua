@@ -1,4 +1,4 @@
--- add new param MOT_STOP_BITMASK
+-- add new param Lights_ON
 local PARAM_TABLE_KEY = 1
 assert(param:add_table(PARAM_TABLE_KEY, "LIGHTS_", 1), "could not add param table")
 assert(param:add_param(PARAM_TABLE_KEY, 1, "ON", 1), "could not add param")
