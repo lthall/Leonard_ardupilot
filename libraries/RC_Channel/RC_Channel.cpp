@@ -560,6 +560,7 @@ void RC_Channel::init_aux_function(const aux_func_t ch_option, const AuxSwitchPo
     case AUX_FUNC::CAMERA_MANUAL_FOCUS:
     case AUX_FUNC::CAMERA_AUTO_FOCUS:
     case AUX_FUNC::TIE_DOWN_RELEASE:
+    case AUX_FUNC::SHIP_OPS_MODE:
 
         run_aux_function(ch_option, ch_flag, AuxFuncTriggerSource::INIT);
         break;
