@@ -52,17 +52,17 @@ local FOLL_OFS_Z = Parameter('FOLL_OFS_Z')
 
 local FOLL_SYSID = Parameter('FOLL_SYSID')
 
-local switch_chanel = assert(rc:get_channel(6), "Could not get RC channel")
+-- Use RCx_OPTION 300: Scripting1
+local AuxFunScripting1 = 300
 local AuxSwitchPos = { LOW = 0, MIDDLE = 1, HIGH = 2 }
 
 local interval_ms = 1000     -- update at 1hz
-
-
 gcs:send_text(0, "Starting SHIP OPS LUA")
 function update() -- this is the loop which periodically runs
 
-   -- Check if aux switch is low
-   if switch_chanel:get_aux_switch_pos() == AuxSwitchPos.LOW then
+   local aux = rc:get_aux_cached(AuxFunScripting1)
+   if (aux == nil) or (aux == AuxSwitchPos.LOW) then
+      -- If aux has never been set, or aux is low then use ship 2
       if ship_selected ~= 2 then
          gcs:send_text(0, "Ship 2 for payload place")
          ship_selected = 2
