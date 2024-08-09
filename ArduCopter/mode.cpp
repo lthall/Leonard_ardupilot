@@ -137,6 +137,12 @@ Mode *Copter::mode_from_mode_num(const Mode::Number mode)
             break;
 #endif
 
+#if MODE_SHIP_OPS_ENABLED == ENABLED
+        case Mode::Number::SHIP_OPS:
+            ret = (Mode *)g2.mode_shipops_ptr;
+            break;
+#endif
+
 #if MODE_SMARTRTL_ENABLED == ENABLED
         case Mode::Number::SMART_RTL:
             ret = &mode_smartrtl;

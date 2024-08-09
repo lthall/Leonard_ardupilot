@@ -277,7 +277,7 @@ void Copter::get_scheduler_tasks(const AP_Scheduler::Task *&tasks,
     log_bit = MASK_LOG_PM;
 }
 
-constexpr int8_t Copter::_failsafe_priorities[7];
+constexpr int8_t Copter::_failsafe_priorities[8];
 
 #if AP_SCRIPTING_ENABLED
 #if MODE_GUIDED_ENABLED == ENABLED
