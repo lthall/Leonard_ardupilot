@@ -39,6 +39,11 @@ void Copter::failsafe_radio_on_event()
         case FS_THR_ENABLED_BRAKE_OR_LAND:
             desired_action = FailsafeAction::BRAKE_LAND;
             break;
+#if MODE_SHIP_OPS_ENABLED == ENABLED
+        case FS_THR_ENABLED_ALWAYS_SHIP_OP:
+            desired_action = FailsafeAction::SHIP_OPERATION;
+            break;
+#endif          
         default:
             desired_action = FailsafeAction::LAND;
     }
@@ -189,6 +194,9 @@ void Copter::failsafe_gcs_on_event(void)
             break;
         case FS_GCS_ENABLED_BRAKE_OR_LAND:
             desired_action = FailsafeAction::BRAKE_LAND;
+            break;
+        case FS_THR_ENABLED_ALWAYS_SHIP_OP:
+            desired_action = FailsafeAction::SHIP_OPERATION;
             break;
         default: // if an invalid parameter value is set, the fallback is RTL
             desired_action = FailsafeAction::RTL;
@@ -416,6 +424,23 @@ void Copter::set_mode_SmartRTL_or_RTL(ModeReason reason)
     }
 }
 
+// set_mode_Ship_Op_or_RTL_or_land_with_pause - sets mode to SHIP_LAND if possible or RTL if possible or LAND with 4 second delay before descent starts
+// this is always called from a failsafe so we trigger notification to pilot
+void Copter::set_mode_Ship_Op_or_RTL_or_land_with_pause(ModeReason reason)
+{
+    // attempt to switch to ShipLanding, if this fails then attempt to RTL
+    // if that fails, then land
+#if MODE_SHIP_OPS_ENABLED
+    rc().run_aux_function(RC_Channel::AUX_FUNC::SHIP_OPS_MODE, RC_Channel::AuxSwitchPos::HIGH, RC_Channel::AuxFuncTriggerSource::INIT);
+    if (set_mode(Mode::Number::SHIP_OPS, reason)) {
+        AP_Notify::events.failsafe_mode_change = 1;
+        return;
+    }
+#endif
+    GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Ship Operations Unavailable, Trying RTL Mode");
+    set_mode_RTL_or_land_with_pause(reason);
+}
+
 // Sets mode to Auto and jumps to DO_LAND_START, as set with AUTO_RTL param
 // This can come from failsafe or RC option
 void Copter::set_mode_auto_do_land_start_or_RTL(ModeReason reason)
@@ -482,6 +507,9 @@ void Copter::do_failsafe_action(FailsafeAction action, ModeReason reason){
             break;
         case FailsafeAction::SMARTRTL:
             set_mode_SmartRTL_or_RTL(reason);
+            break;
+        case FailsafeAction::SHIP_OPERATION:
+            set_mode_Ship_Op_or_RTL_or_land_with_pause(reason);
             break;
         case FailsafeAction::SMARTRTL_LAND:
             set_mode_SmartRTL_or_land_with_pause(reason);
