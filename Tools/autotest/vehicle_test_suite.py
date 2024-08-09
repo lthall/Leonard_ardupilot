@@ -6310,6 +6310,23 @@ class TestSuite(ABC):
                       (dist, min_distance, max_distance))
 
     @staticmethod
+    def get_bearing_int(loc1, loc2):
+        """Get ground distance between two locations."""
+        try:
+            lon1 = loc1.lng
+            lon2 = loc2.lng
+        except AttributeError:
+            lon1 = loc1.lon
+            lon2 = loc2.lon
+
+        lat1 = loc1.lat * 1e-7
+        lon1 *= 1e-7
+        lat2 = loc2.lat * 1e-7
+        lon2 *= 1e-7
+
+        return util.gps_bearing(lat1, lon1, lat2, lon2)
+
+    @staticmethod
     def get_latlon_attr(loc, attrs):
         '''return any found latitude attribute from loc'''
         ret = None
