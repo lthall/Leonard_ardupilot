@@ -1522,11 +1522,10 @@ private:
     uint32_t wp_distance() const override;
     int32_t wp_bearing() const override;
 
-    uint32_t last_log_ms;   // system time of last time desired velocity was logging
+    uint32_t last_msg_ms;   // system time of last time error message was sent
     float target_climb_rate;   // climb rate in cm/s
     Vector3f offset; // position relative to the ship in cm
     bool ship_takeoff; // true if we have initialised ShipOps while landed.
-    bool keep_out_zone_valid = true; // true if the KOZ is valid
     class Ship {
     public:
         void reset(const Vector3f &pos_with_ofs_ned, const Vector3f &vel_ned_ms, float target_heading_deg);

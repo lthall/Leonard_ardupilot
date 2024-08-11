@@ -2,6 +2,8 @@
 
 #if MODE_SHIP_OPS_ENABLED == ENABLED
 
+#define MESSAGE_PERIOD 2500
+
 // parameters for ship operation
 const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
 
@@ -125,6 +127,8 @@ ModeShipOperation::ModeShipOperation(void) : Mode()
 // initialise ship operations mode
 bool ModeShipOperation::init(const bool ignore_checks)
 {
+    last_msg_ms = AP_HAL::millis();
+
     if (!g2.follow.enabled()) {
         // follow not enabled
         GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Set FOLL_ENABLE = 1");
@@ -140,13 +144,15 @@ bool ModeShipOperation::init(const bool ignore_checks)
     float keep_out_CCW_rad = wrap_2PI(radians(keep_out_CCW));
     float keep_out_angle_rad = wrap_2PI(radians(keep_out_CW) - keep_out_CCW_rad);
     float keep_out_CW_rad = keep_out_angle_rad + keep_out_CCW_rad;
-    float koz_center_heading_rad = wrap_2PI(ship.heading + (keep_out_CW_rad + keep_out_CCW_rad) / 2.0);
+    float keep_out_center_rad = (keep_out_CW_rad + keep_out_CCW_rad) / 2.0;
+    bool deck_radius_valid = is_positive(deck_radius);
+    bool approach_arc_valid = wrap_PI(radians(perch_angle) - keep_out_center_rad) >=  keep_out_angle_rad / 2.0;
     if (is_positive(keep_out_radius)) {
-        if (!is_positive(deck_radius)) {
+        if (!deck_radius_valid) {
             GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "KOZ_DKR must be positive");
             return false;
         }
-        if ((wrap_PI(radians(perch_angle) - koz_center_heading_rad)) <  keep_out_angle_rad / 2.0) {
+        if (!approach_arc_valid) {
             GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Perch in KOZ");
             return false;
         }
@@ -289,6 +295,8 @@ void ModeShipOperation::Ship::reset(const Vector3f &pos_with_ofs_ned, const Vect
 
 void ModeShipOperation::run()
 {
+    const uint32_t now_ms = AP_HAL::millis();
+
     float yaw_cd = attitude_control->get_att_target_euler_cd().z;
     float yaw_rate_cds = 0.0f;
 
@@ -318,21 +326,35 @@ void ModeShipOperation::run()
         alt_home_above_origin_cm = 0;
     }
 
+    // check that keep out zone is valid
+    // if not then don't take-off or approach ship
     float keep_out_CCW_rad = wrap_2PI(radians(keep_out_CCW));
     float keep_out_angle_rad = wrap_2PI(radians(keep_out_CW) - keep_out_CCW_rad);
     float keep_out_CW_rad = keep_out_angle_rad + keep_out_CCW_rad;
-    float koz_center_heading_rad = wrap_2PI(ship.heading + (keep_out_CW_rad + keep_out_CCW_rad) / 2.0);
+    float keep_out_center_rad = (keep_out_CW_rad + keep_out_CCW_rad) / 2.0;
+    float koz_center_heading_rad = wrap_2PI(ship.heading + keep_out_center_rad);
+    bool keep_out_zone_valid = true; // true if the KOZ is valid
+    bool deck_radius_valid = is_positive(deck_radius);
     if (is_positive(keep_out_radius)) {
-        bool deck_radius_valid = is_positive(deck_radius);
-        bool approach_arc_valid = wrap_PI(radians(perch_angle) - koz_center_heading_rad) >=  keep_out_angle_rad / 2.0;
+        bool approach_arc_valid = wrap_PI(radians(perch_angle) - keep_out_center_rad) >=  keep_out_angle_rad / 2.0;
         if (keep_out_zone_valid != deck_radius_valid && approach_arc_valid) {
-            if (!deck_radius_valid) {
-                GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Invalid KOZ: KOZ_DKR must be positive");
+            if (now_ms - last_msg_ms > MESSAGE_PERIOD) {
+                last_msg_ms = now_ms;
+                if (!deck_radius_valid) {
+                    GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Invalid KOZ: KOZ_DKR must be positive");
+                }
+                if (!approach_arc_valid) {
+                    GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Invalid KOZ: Perch in KOZ");
+                }
             }
-            if (!approach_arc_valid) {
-                GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Invalid KOZ: Perch in KOZ");
+            if (copter.ap.land_complete) {
+                // prevent takeoff being triggered
+                target_climb_rate = -get_pilot_speed_dn();
+                set_state(SubMode::LAUNCH_RECOVERY);
+            } else {
+                target_climb_rate = 0.0;
+                set_state(SubMode::CLIMB_TO_RTL);
             }
-            set_state(SubMode::CLIMB_TO_RTL);
         }
         keep_out_zone_valid = deck_radius_valid && approach_arc_valid;
     }
@@ -357,6 +379,7 @@ void ModeShipOperation::run()
         if (!ship.available) {
             // reset ship pos, vel, accel to current value when detected.
             ship.reset(pos_with_ofs_ned, vel_ned_ms, target_heading_deg);
+            GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Beacon %i detected", g2.follow.get_target_sysid() );
         }
 
         shape_pos_vel_accel_xy(pos_with_ofs_ned.xy().topostype(), vel_ned_ms.xy(), accel_ned.xy(),
@@ -383,10 +406,30 @@ void ModeShipOperation::run()
         perch_offset.rotate(ship.heading);
     } else {
         if (ship.available) {
-            GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "No Valid Beacon");
+            GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Beacon %i not detected", g2.follow.get_target_sysid() );
             ship.available = false;
         }
-        set_state(SubMode::CLIMB_TO_RTL);
+        if (copter.ap.land_complete) {
+            // prevent takeoff being triggered
+            target_climb_rate = -get_pilot_speed_dn();
+            set_state(SubMode::LAUNCH_RECOVERY);
+        } else {
+            target_climb_rate = 0.0;
+            set_state(SubMode::CLIMB_TO_RTL);
+        }
+    }
+
+    // Don't allow take-off if outside of deck radius
+    if (ship.available && copter.ap.land_complete && deck_radius_valid && is_positive(target_climb_rate)) {
+        Vector2f offset_xy = curr_pos_neu_cm.xy() - ship.pos_ned.xy().tofloat();
+        if (offset_xy.length() > deck_radius * 100.0) {
+            if (now_ms - last_msg_ms > MESSAGE_PERIOD) {
+                last_msg_ms = now_ms;
+                GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Take-off restricted off deck");
+            }
+            // prevent takeoff being triggered
+            target_climb_rate = -get_pilot_speed_dn();
+        }
     }
 
     // Alt Hold State Machine Determination
@@ -745,8 +788,15 @@ void ModeShipOperation::run()
 #endif
                     break;
                 case ApproachMode::PAYLOAD_PLACE:
-                    payload_place.init(0.0);
-                    set_state(SubMode::PAYLOAD_PLACE);
+                    if (AP::gripper() != nullptr && AP::gripper()->valid() && AP::gripper()->grabbed()) {
+                        payload_place.init(0.0);
+                        set_state(SubMode::PAYLOAD_PLACE);
+                    } else {
+                        if (now_ms - last_msg_ms > MESSAGE_PERIOD) {
+                            last_msg_ms = now_ms;
+                            GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Gripper already dropped");
+                        }
+                    }
                     break;
                 }
             } else if (alt_check && is_positive(target_climb_rate)) {
