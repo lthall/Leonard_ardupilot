@@ -6,7 +6,7 @@
 
 #include "ap_version.h"
 
-#define THISFIRMWARE "Callisto 2.5 V4.5.5r1"
+#define THISFIRMWARE "Callisto 2.5 V4.5.5r2"
 
 // the following line is parsed by the autotest scripts
 #define FIRMWARE_VERSION 4,5,5,FIRMWARE_VERSION_TYPE_OFFICIAL
