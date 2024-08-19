@@ -10,7 +10,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @Param: PCH_ANG
     // @DisplayName: Angle from the bow of the ship of the perch position
     // @Description: Angle from the bow of the ship of the perch position where the aircraft will wait until it is commanded to land.
-    // @Range: 0 1
+    // @Range: -180 360
     // @Units: deg
     // @User: Advanced
     AP_GROUPINFO("PCH_ANG", 1, ModeShipOperation, perch_angle, 180.0f),
@@ -18,7 +18,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @Param: PCH_RAD
     // @DisplayName: Distance of the perch position from the ship
     // @Description: Distance in m of the perch position from the ship where the aircraft will wait until it is commanded to land.
-    // @Range: 0 1
+    // @Range: 0 100
     // @Units: m
     // @User: Advanced
     AP_GROUPINFO("PCH_RAD", 2, ModeShipOperation, perch_radius, 25.0f),
@@ -26,7 +26,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @Param: PCH_ALT
     // @DisplayName: Altitude of the perch position from the ship
     // @Description: Altitude in m of the perch position relative to the ship where the aircraft will wait until it is commanded to land.
-    // @Range: 0 1
+    // @Range: 0 100
     // @Units: m
     // @User: Advanced
     AP_GROUPINFO("PCH_ALT", 3, ModeShipOperation, perch_altitude, 25.0f),
@@ -34,7 +34,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @Param: ACCELXY
     // @DisplayName: Acceleration limit for the horizontal kinematic input shaping
     // @Description: Acceleration limit of the horizontal kinematic path generation used to determine how quickly the ship varies in velocity
-    // @Range: 0 1
+    // @Range: 0 5
     // @Units: m/s/s
     // @User: Advanced
     AP_GROUPINFO("ACCELXY", 4, ModeShipOperation, ship_max_accel_xy, 2.5f),
@@ -42,7 +42,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @Param: JERKXY
     // @DisplayName: Jerk limit for the horizontal kinematic input shaping
     // @Description: Jerk limit of the horizontal kinematic path generation used to determine how quickly the ship varies in acceleration
-    // @Range: 0 1
+    // @Range: 0 20
     // @Units: m/s/s/s
     // @User: Advanced
     AP_GROUPINFO("JERKXY", 5, ModeShipOperation, ship_max_jerk_xy, 5.0f),
@@ -50,7 +50,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @Param: ACCELZ
     // @DisplayName: Acceleration limit for the vertical kinematic input shaping
     // @Description: Acceleration limit of the vertical kinematic path generation used to determine how quickly the ship varies in velocity
-    // @Range: 0 1
+    // @Range: 0 2.5
     // @Units: m/s/s
     // @User: Advanced
     AP_GROUPINFO("ACCELZ", 6, ModeShipOperation, ship_max_accel_z, 2.5f),
@@ -58,7 +58,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @Param: JERKZ
     // @DisplayName: Jerk limit for the vertical kinematic input shaping
     // @Description: Jerk limit of the vertical kinematic path generation used to determine how quickly the ship varies in acceleration
-    // @Range: 0 1
+    // @Range: 0 5
     // @Units: m/s/s/s
     // @User: Advanced
     AP_GROUPINFO("JERKZ", 7, ModeShipOperation, ship_max_jerk_z, 5.0f),
@@ -66,7 +66,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @Param: ACCELH
     // @DisplayName: Angular acceleration limit for the heading kinematic input shaping
     // @Description: Angular acceleration limit of the heading kinematic path generation used to determine how quickly the ship varies in angular velocity
-    // @Range: 0 1
+    // @Range: 0 45
     // @Units: deg/s/s
     // @User: Advanced
     AP_GROUPINFO("ACCELH", 8, ModeShipOperation, ship_max_accel_h, 90.0f),
@@ -74,7 +74,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @Param: JERKH
     // @DisplayName: Angular jerk limit for the heading kinematic input shaping
     // @Description: Angular jerk limit of the heading kinematic path generation used to determine how quickly the ship varies in angular acceleration
-    // @Range: 0 1
+    // @Range: 0 180
     // @Units: deg/s/s/s
     // @User: Advanced
     AP_GROUPINFO("JERKH", 9, ModeShipOperation, ship_max_jerk_h, 360.0f),
@@ -82,7 +82,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @Param: KOZ_CW
     // @DisplayName: CW angular offset in degrees from ship heading for keep out zone
     // @Description: CW angular offset in degrees from ship heading for keep out zone
-    // @Range: 0 360
+    // @Range: -180 360
     // @Units: deg
     // @User: Advanced
     AP_GROUPINFO("KOZ_CW", 10, ModeShipOperation, keep_out_CW, 90.0f),
@@ -90,7 +90,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @Param: KOZ_CCW
     // @DisplayName: CCW angular offset in degrees from ship heading for keep out zone
     // @Description: CCW angular offset in degrees from ship heading for keep out zone
-    // @Range: 0 360
+    // @Range: -180 360
     // @Units: deg
     // @User: Advanced
     AP_GROUPINFO("KOZ_CCW", 11, ModeShipOperation, keep_out_CCW, -90.0f),
@@ -98,7 +98,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @Param: KOZ_RAD
     // @DisplayName: Radius in meters of the keep out zone
     // @Description: Radius in meters of the keep out zone
-    // @Range: 0 1000
+    // @Range: 0 5000
     // @Units: m
     // @User: Advanced
     AP_GROUPINFO("KOZ_RAD", 12, ModeShipOperation, keep_out_radius, 250.0f),
@@ -106,7 +106,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @Param: KOZ_DKR
     // @DisplayName: Radius in meters of the deck
     // @Description: Radius in meters of the deck before the keep out zone becomes effective
-    // @Range: 0 1000
+    // @Range: 0 100
     // @Units: m
     // @User: Advanced
     AP_GROUPINFO("KOZ_DKR", 13, ModeShipOperation, deck_radius, 10.0f),
@@ -146,7 +146,7 @@ bool ModeShipOperation::init(const bool ignore_checks)
     float keep_out_CW_rad = keep_out_angle_rad + keep_out_CCW_rad;
     float keep_out_center_rad = (keep_out_CW_rad + keep_out_CCW_rad) / 2.0;
     bool deck_radius_valid = is_positive(deck_radius);
-    bool approach_arc_valid = wrap_PI(radians(perch_angle) - keep_out_center_rad) >=  keep_out_angle_rad / 2.0;
+    bool approach_arc_valid = fabs(wrap_PI(radians(perch_angle) - keep_out_center_rad)) >=  keep_out_angle_rad / 2.0;
     if (is_positive(keep_out_radius)) {
         if (!deck_radius_valid) {
             GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "KOZ_DKR must be positive");
@@ -336,7 +336,7 @@ void ModeShipOperation::run()
     bool keep_out_zone_valid = true; // true if the KOZ is valid
     bool deck_radius_valid = is_positive(deck_radius);
     if (is_positive(keep_out_radius)) {
-        bool approach_arc_valid = wrap_PI(radians(perch_angle) - keep_out_center_rad) >=  keep_out_angle_rad / 2.0;
+        bool approach_arc_valid = fabs(wrap_PI(radians(perch_angle) - keep_out_center_rad)) >=  keep_out_angle_rad / 2.0;
         if (keep_out_zone_valid != deck_radius_valid && approach_arc_valid) {
             if (now_ms - last_msg_ms > MESSAGE_PERIOD) {
                 last_msg_ms = now_ms;
@@ -559,16 +559,16 @@ void ModeShipOperation::run()
                 Vector2f ship_heading_unit = { 1.0, 0.0 };
                 ship_heading_unit.rotate(ship.heading);
                 float exit_angle_avoid = acosf((aircraft_vector_cm * ship_heading_unit) / (keep_out_radius * 100.0));
-                if (is_negative(wrap_PI(aircraft_bearing_rad - koz_center_heading_rad))) {
+                if (is_negative(wrap_PI(aircraft_bearing_rad - ship.heading))) {
                     exit_angle_avoid *= -1.0;
                 }
                 exit_angle_avoid += ship.heading;
                 // keep_out_radius is in meters so 0.9 * 100 = 90.
                 float turn_ratio_1 = constrain_float((aircraft_vector_cm.length() - keep_out_radius * 50.0) / (keep_out_radius * 50.0), 0.0, 1.0);
-                float turn_ratio_2 = constrain_float((aircraft_vector_cm.length() - keep_out_radius * 90.0) / (keep_out_radius * 10.0), 0.0, 1.0);
                 float exit_angle = turn_ratio_1 * aircraft_bearing_rad + (1.0 - turn_ratio_1) * exit_angle_avoid;
-                // this only sends the aircraft to the back of the boat.
+                // this only sends the aircraft away from the boat.
                 // we need this to move the aircraft to the approach vector.
+                float turn_ratio_2 = constrain_float((aircraft_vector_cm.length() - keep_out_radius * 90.0) / (keep_out_radius * 10.0), 0.0, 1.0);
                 float transition_angle;
                 if (is_positive(wrap_PI(aircraft_bearing_rad - koz_center_heading_rad))) {
                     transition_angle = exit_angle + turn_ratio_2 * M_PI / 2;
