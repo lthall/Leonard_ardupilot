@@ -111,27 +111,31 @@ local function add_param_bank(target_params, table_key, prefix, bank_name, extra
 end
 
 local banks = {
-   add_param_bank(bank_target, 20, "SHP1_", "Ship 1", " for payload place"),
-   add_param_bank(bank_target, 21, "SHP2_", "Ship 2", " for approach", { SYSID = 201 })
+   add_param_bank(bank_target, 20, "SHP1_", "Ship 1", ""),
+   add_param_bank(bank_target, 21, "SHP2_", "Ship 2", "", { SYSID = 201 })
 }
 
 -- Use RCx_OPTION 300: Scripting1
-local AuxFunScripting1 = 300
+-- local AuxFunChOption = 300
+-- Use RCx_OPTION 175: SHIP_OPS_MODE
+local AuxFunChOption = 175
 local AuxSwitchPos = { LOW = 0, MIDDLE = 1, HIGH = 2 }
 
 local interval_ms = 1000     -- update at 1hz
 gcs:send_text(0, "Starting SHIP OPS LUA")
+
 local function update() -- this is the loop which periodically runs
    local bank_selected = 1
 
-   local aux = rc:get_aux_cached(AuxFunScripting1)
-   if (aux == nil) or (aux == AuxSwitchPos.LOW) then
-      -- If aux has never been set, or aux is low then use bank 2
-      bank_selected = 2
-   end
-
-   for i = 1,#banks do
-      banks[i].update(i == bank_selected)
+   local aux = rc:get_aux_cached(AuxFunChOption)
+   if (aux ~= nil) and (aux ~= AuxSwitchPos.MIDDLE) then
+      -- If aux has never been set, or aux is middle then do nothing
+      if (aux == AuxSwitchPos.LOW) then
+         bank_selected = 2
+      end
+      for i = 1,#banks do
+         banks[i].update(i == bank_selected)
+      end
    end
 
    return update, interval_ms
