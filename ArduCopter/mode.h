@@ -1525,10 +1525,10 @@ private:
     uint32_t last_msg_ms;   // system time of last time error message was sent
     float target_climb_rate;   // climb rate in cm/s
     Vector3f offset; // position relative to the ship in cm
-    bool ship_takeoff; // true if we have initialised ShipOps while landed.
     class Ship {
     public:
-        void reset(const Vector3f &pos_with_ofs_ned, const Vector3f &vel_ned_ms, float target_heading_deg);
+        void reset(uint8_t sys_id, const Vector3f &pos_with_ofs_ned, const Vector3f &vel_ned_ms, float target_heading_deg);
+        uint8_t sysid;
         Vector3p pos_ned;
         Vector3f vel_ned;
         Vector3f accel_ned;

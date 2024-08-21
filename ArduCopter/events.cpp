@@ -428,6 +428,7 @@ void Copter::set_mode_Ship_Op_or_RTL_or_land_with_pause(ModeReason reason)
     // attempt to switch to ShipLanding, if this fails then attempt to RTL
     // if that fails, then land
 #if MODE_SHIP_OPS_ENABLED
+    rc().run_aux_function(RC_Channel::AUX_FUNC::SHIP_OPS_MODE, RC_Channel::AuxSwitchPos::HIGH, RC_Channel::AuxFuncTriggerSource::INIT);
     if (set_mode(Mode::Number::SHIP_OPS, reason)) {
         AP_Notify::events.failsafe_mode_change = 1;
         return;

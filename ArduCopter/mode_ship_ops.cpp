@@ -186,7 +186,7 @@ bool ModeShipOperation::init(const bool ignore_checks)
     float target_heading_deg = 0.0f;
     g2.follow.get_target_heading_deg(target_heading_deg);
 
-    ship.reset(pos_with_ofs_ned, vel_ned_ms, target_heading_deg);
+    ship.reset(g2.follow.get_target_sysid(), pos_with_ofs_ned, vel_ned_ms, target_heading_deg);
 
     offset.zero();
     offset.xy() = curr_pos_neu_cm.xy() - ship.pos_ned.xy().tofloat();
@@ -209,11 +209,9 @@ bool ModeShipOperation::init(const bool ignore_checks)
     if (get_alt_hold_state(0.0f) == AltHold_Flying) {
         // we are flying so we will initialise at the climb to RTL altitude.
         set_state(SubMode::CLIMB_TO_RTL);
-        ship_takeoff = false;
     } else {
         // we are landed so we will initialise in the Final state.
         set_state(SubMode::LAUNCH_RECOVERY);
-        ship_takeoff = true;
     }
 
     return true;
@@ -270,6 +268,10 @@ void ModeShipOperation::set_keep_out_zone_mode(KeepOutZoneMode new_keep_out_zone
 
 void ModeShipOperation::set_approach_mode(ApproachMode new_approach_mode)
 {
+    if (approach_mode == new_approach_mode) {
+        // nothing to do
+        return;
+    }
     approach_mode = new_approach_mode;
     switch (approach_mode) {
     case ApproachMode::LAUNCH_RECOVERY:
@@ -282,8 +284,9 @@ void ModeShipOperation::set_approach_mode(ApproachMode new_approach_mode)
 
 }
 
-void ModeShipOperation::Ship::reset(const Vector3f &pos_with_ofs_ned, const Vector3f &vel_ned_ms, float target_heading_deg)
+void ModeShipOperation::Ship::reset(uint8_t sys_id, const Vector3f &pos_with_ofs_ned, const Vector3f &vel_ned_ms, float target_heading_deg)
 {
+    sysid = sys_id;
     pos_ned = pos_with_ofs_ned.topostype();
     vel_ned = vel_ned_ms;
     accel_ned.zero();
@@ -311,14 +314,9 @@ void ModeShipOperation::run()
         target_climb_rate = get_pilot_desired_climb_rate(channel_throttle->get_control_in());
         target_climb_rate = constrain_float(target_climb_rate, -get_pilot_speed_dn(), g.pilot_speed_up);
     } else {
-        // take off and landing will be conducted automaticaly  
-        if (ship_takeoff) {
-            // take off and move to perch
-            target_climb_rate = g.pilot_speed_up;
-        } else {
-            // return to perch and continue to landing
-            target_climb_rate = -get_pilot_speed_dn();
-        }
+        // return to perch and continue to landing
+        // set_approach_mode(ApproachMode::LAUNCH_RECOVERY);
+        target_climb_rate = -get_pilot_speed_dn();
     }
     
     int32_t alt_home_above_origin_cm;
@@ -376,10 +374,15 @@ void ModeShipOperation::run()
         float target_heading_deg = 0.0f;
         g2.follow.get_target_heading_deg(target_heading_deg);
 
-        if (!ship.available) {
+        if (!ship.available || ship.sysid != g2.follow.get_target_sysid()) {
             // reset ship pos, vel, accel to current value when detected.
-            ship.reset(pos_with_ofs_ned, vel_ned_ms, target_heading_deg);
+            ship.reset(g2.follow.get_target_sysid(), pos_with_ofs_ned, vel_ned_ms, target_heading_deg);
             GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Beacon %i detected", g2.follow.get_target_sysid() );
+            if (copter.ap.land_complete) {
+                set_state(SubMode::LAUNCH_RECOVERY);
+            } else {
+                set_state(SubMode::CLIMB_TO_RTL);
+            }
         }
 
         shape_pos_vel_accel_xy(pos_with_ofs_ned.xy().topostype(), vel_ned_ms.xy(), accel_ned.xy(),
