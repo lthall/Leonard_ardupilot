@@ -51,7 +51,7 @@ public:
     void set_target_sysid(uint8_t sysid) { _sysid.set(sysid); }
 
     // get which target to follow
-    int get_target_sysid() { return _sysid; }
+    uint8_t get_target_sysid() { return _sysid; }
 
     // restore offsets to zero if necessary, should be called when vehicle exits follow mode
     void clear_offsets_if_required();
