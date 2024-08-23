@@ -13,7 +13,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @Range: -180 360
     // @Units: deg
     // @User: Advanced
-    AP_GROUPINFO("PCH_ANG", 1, ModeShipOperation, perch_angle, 180.0f),
+    AP_GROUPINFO("PCH_ANG", 1, ModeShipOperation, perch_angle, 180.0),
 
     // @Param: PCH_RAD
     // @DisplayName: Distance of the perch position from the ship
@@ -21,7 +21,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @Range: 0 100
     // @Units: m
     // @User: Advanced
-    AP_GROUPINFO("PCH_RAD", 2, ModeShipOperation, perch_radius, 25.0f),
+    AP_GROUPINFO("PCH_RAD", 2, ModeShipOperation, perch_radius, 25.0),
 
     // @Param: PCH_ALT
     // @DisplayName: Altitude of the perch position from the ship
@@ -29,7 +29,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @Range: 0 100
     // @Units: m
     // @User: Advanced
-    AP_GROUPINFO("PCH_ALT", 3, ModeShipOperation, perch_altitude, 25.0f),
+    AP_GROUPINFO("PCH_ALT", 3, ModeShipOperation, perch_altitude, 25.0),
 
     // @Param: ACCELXY
     // @DisplayName: Acceleration limit for the horizontal kinematic input shaping
@@ -37,7 +37,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @Range: 0 5
     // @Units: m/s/s
     // @User: Advanced
-    AP_GROUPINFO("ACCELXY", 4, ModeShipOperation, ship_max_accel_xy, 2.5f),
+    AP_GROUPINFO("ACCELXY", 4, ModeShipOperation, ship_max_accel_xy, 2.5),
 
     // @Param: JERKXY
     // @DisplayName: Jerk limit for the horizontal kinematic input shaping
@@ -45,7 +45,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @Range: 0 20
     // @Units: m/s/s/s
     // @User: Advanced
-    AP_GROUPINFO("JERKXY", 5, ModeShipOperation, ship_max_jerk_xy, 5.0f),
+    AP_GROUPINFO("JERKXY", 5, ModeShipOperation, ship_max_jerk_xy, 5.0),
 
     // @Param: ACCELZ
     // @DisplayName: Acceleration limit for the vertical kinematic input shaping
@@ -53,7 +53,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @Range: 0 2.5
     // @Units: m/s/s
     // @User: Advanced
-    AP_GROUPINFO("ACCELZ", 6, ModeShipOperation, ship_max_accel_z, 2.5f),
+    AP_GROUPINFO("ACCELZ", 6, ModeShipOperation, ship_max_accel_z, 2.5),
 
     // @Param: JERKZ
     // @DisplayName: Jerk limit for the vertical kinematic input shaping
@@ -61,7 +61,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @Range: 0 5
     // @Units: m/s/s/s
     // @User: Advanced
-    AP_GROUPINFO("JERKZ", 7, ModeShipOperation, ship_max_jerk_z, 5.0f),
+    AP_GROUPINFO("JERKZ", 7, ModeShipOperation, ship_max_jerk_z, 5.0),
 
     // @Param: ACCELH
     // @DisplayName: Angular acceleration limit for the heading kinematic input shaping
@@ -69,7 +69,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @Range: 0 45
     // @Units: deg/s/s
     // @User: Advanced
-    AP_GROUPINFO("ACCELH", 8, ModeShipOperation, ship_max_accel_h, 90.0f),
+    AP_GROUPINFO("ACCELH", 8, ModeShipOperation, ship_max_accel_h, 90.0),
 
     // @Param: JERKH
     // @DisplayName: Angular jerk limit for the heading kinematic input shaping
@@ -77,7 +77,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @Range: 0 180
     // @Units: deg/s/s/s
     // @User: Advanced
-    AP_GROUPINFO("JERKH", 9, ModeShipOperation, ship_max_jerk_h, 360.0f),
+    AP_GROUPINFO("JERKH", 9, ModeShipOperation, ship_max_jerk_h, 360.0),
 
     // @Param: KOZ_CW
     // @DisplayName: CW angular offset in degrees from ship heading for keep out zone
@@ -85,7 +85,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @Range: -180 360
     // @Units: deg
     // @User: Advanced
-    AP_GROUPINFO("KOZ_CW", 10, ModeShipOperation, keep_out_CW, 90.0f),
+    AP_GROUPINFO("KOZ_CW", 10, ModeShipOperation, keep_out_CW, 90.0),
 
     // @Param: KOZ_CCW
     // @DisplayName: CCW angular offset in degrees from ship heading for keep out zone
@@ -93,7 +93,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @Range: -180 360
     // @Units: deg
     // @User: Advanced
-    AP_GROUPINFO("KOZ_CCW", 11, ModeShipOperation, keep_out_CCW, -90.0f),
+    AP_GROUPINFO("KOZ_CCW", 11, ModeShipOperation, keep_out_CCW, -90.0),
 
     // @Param: KOZ_RAD
     // @DisplayName: Radius in meters of the keep out zone
@@ -101,7 +101,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @Range: 0 5000
     // @Units: m
     // @User: Advanced
-    AP_GROUPINFO("KOZ_RAD", 12, ModeShipOperation, keep_out_radius, 250.0f),
+    AP_GROUPINFO("KOZ_RAD", 12, ModeShipOperation, keep_out_radius, 250.0),
 
     // @Param: KOZ_DKR
     // @DisplayName: Radius in meters of the deck
@@ -109,7 +109,23 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @Range: 0 100
     // @Units: m
     // @User: Advanced
-    AP_GROUPINFO("KOZ_DKR", 13, ModeShipOperation, deck_radius, 10.0f),
+    AP_GROUPINFO("KOZ_DKR", 13, ModeShipOperation, deck_radius, 10.0),
+
+    // @Param: PCH_VXY
+    // @DisplayName: Velocity limit of the aircraft during movement between perch and spot
+    // @Description: Velocity limit of the aircraft during movement between perch and spot
+    // @Range: 0 5
+    // @Units: m/s/s
+    // @User: Advanced
+    AP_GROUPINFO("PCH_VXY", 14, ModeShipOperation, perch_max_vel_xy, 5.0),
+
+    // @Param: PCH_AXY
+    // @DisplayName: Acceleration limit of the aircraft during movement between perch and spot
+    // @Description: Acceleration limit of the aircraft during movement between perch and spot
+    // @Range: 0 5
+    // @Units: m/s/s
+    // @User: Advanced
+    AP_GROUPINFO("PCH_AXY", 15, ModeShipOperation, perch_max_accel_xy, 2.0),
 
     AP_GROUPEND
 };
@@ -245,6 +261,22 @@ void ModeShipOperation::set_state(SubMode mode)
     }
     GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "ShipOps: %s", state_name(mode));
     _state = mode;
+    switch (_state) {
+    case SubMode::CLIMB_TO_RTL:
+        FALLTHROUGH;
+    case SubMode::RETURN_TO_PERCH:
+        pos_control->set_max_speed_accel_xy(wp_nav->get_default_speed_xy(), wp_nav->get_wp_acceleration());
+        break;
+    case SubMode::PERCH:
+        FALLTHROUGH;
+    case SubMode::OVER_SPOT:
+        FALLTHROUGH;
+    case SubMode::LAUNCH_RECOVERY:
+        FALLTHROUGH;
+    case SubMode::PAYLOAD_PLACE:
+        pos_control->set_max_speed_accel_xy(perch_max_vel_xy * 100.0, perch_max_accel_xy * 100.0);
+        break;
+    }
 }
 
 void ModeShipOperation::set_keep_out_zone_mode(KeepOutZoneMode new_keep_out_zone_mode)

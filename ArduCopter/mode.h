@@ -1542,6 +1542,8 @@ private:
     AP_Float perch_angle;
     AP_Float perch_radius;
     AP_Float perch_altitude;
+    AP_Float perch_max_vel_xy;
+    AP_Float perch_max_accel_xy;
     AP_Float ship_max_accel_xy;
     AP_Float ship_max_jerk_xy;
     AP_Float ship_max_accel_z;
