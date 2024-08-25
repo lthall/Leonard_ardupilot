@@ -678,7 +678,7 @@ void ModeShipOperation::run()
             Vector3p pos = ship.pos_ned.topostype();
             pos += offset.topostype();
             Vector2f zero;
-            pos_control->input_pos_vel_accel_xy(pos.xy(), ship.vel_ned.xy(), zero);
+            pos_control->input_pos_vel_accel_xy(pos.xy(), ship.vel_ned.xy(), zero, false);
             break;
         }
 
