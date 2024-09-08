@@ -149,6 +149,8 @@ private:
     // handle various mavlink messages supplying position:
     bool handle_global_position_int_message(const mavlink_message_t &msg);
     bool handle_follow_target_message(const mavlink_message_t &msg);
+    void update_target_pos_vel_accel(Vector3p pos_ned, Vector3f vel_ned, Vector3f accel_ned);
+    void update_target_heading(float heading);
 
     // write out an onboard-log message to help diagnose follow problems:
     void Log_Write_FOLL();
@@ -163,6 +165,12 @@ private:
     AP_Int8     _alt_type;          // altitude source for follow mode
     AC_P        _p_pos;             // position error P controller
     AP_Int16    _options;           // options for mount behaviour follow mode
+    AP_Float    _max_accel_xy;
+    AP_Float    _max_jerk_xy;
+    AP_Float    _max_accel_z;
+    AP_Float    _max_jerk_z;
+    AP_Float    _max_accel_h;
+    AP_Float    _max_jerk_h;
 
     // local variables
     uint32_t _last_location_update_ms;  // system time of last position update
@@ -171,6 +179,8 @@ private:
     Vector3f _target_accel_ned;     // last known acceleration of target in NED frame in m/s/s
     uint32_t _last_heading_update_ms;   // system time of last heading update
     float _target_heading;          // heading in degrees
+    float _target_heading_rate;          // heading in degrees
+    float _target_heading_accel;          // heading in degrees
     bool _automatic_sysid;          // did we lock onto a sysid automatically?
     float _dist_to_target;          // latest distance to target in meters (for reporting purposes)
     float _bearing_to_target;       // latest bearing to target in degrees (for reporting purposes)
