@@ -141,6 +141,54 @@ const AP_Param::GroupInfo AP_Follow::var_info[] = {
     // @User: Standard
     AP_GROUPINFO("_OPTIONS", 11, AP_Follow, _options, 0),
 
+    // @Param: ACCELXY
+    // @DisplayName: Acceleration limit for the horizontal kinematic input shaping
+    // @Description: Acceleration limit of the horizontal kinematic path generation used to determine how quickly the target varies in velocity
+    // @Range: 0 5
+    // @Units: m/s/s
+    // @User: Advanced
+    AP_GROUPINFO("ACCELXY", 12, AP_Follow, _max_accel_xy, 2.5),
+
+    // @Param: JERKXY
+    // @DisplayName: Jerk limit for the horizontal kinematic input shaping
+    // @Description: Jerk limit of the horizontal kinematic path generation used to determine how quickly the target varies in acceleration
+    // @Range: 0 20
+    // @Units: m/s/s/s
+    // @User: Advanced
+    AP_GROUPINFO("JERKXY", 13, AP_Follow, _max_jerk_xy, 5.0),
+
+    // @Param: ACCELZ
+    // @DisplayName: Acceleration limit for the vertical kinematic input shaping
+    // @Description: Acceleration limit of the vertical kinematic path generation used to determine how quickly the target varies in velocity
+    // @Range: 0 2.5
+    // @Units: m/s/s
+    // @User: Advanced
+    AP_GROUPINFO("ACCELZ", 14, AP_Follow, _max_accel_z, 2.5),
+
+    // @Param: JERKZ
+    // @DisplayName: Jerk limit for the vertical kinematic input shaping
+    // @Description: Jerk limit of the vertical kinematic path generation used to determine how quickly the target varies in acceleration
+    // @Range: 0 5
+    // @Units: m/s/s/s
+    // @User: Advanced
+    AP_GROUPINFO("JERKZ", 15, AP_Follow, _max_jerk_z, 5.0),
+
+    // @Param: ACCELH
+    // @DisplayName: Angular acceleration limit for the heading kinematic input shaping
+    // @Description: Angular acceleration limit of the heading kinematic path generation used to determine how quickly the target varies in angular velocity
+    // @Range: 0 45
+    // @Units: deg/s/s
+    // @User: Advanced
+    AP_GROUPINFO("ACCELH", 16, AP_Follow, _max_accel_h, 90.0),
+
+    // @Param: JERKH
+    // @DisplayName: Angular jerk limit for the heading kinematic input shaping
+    // @Description: Angular jerk limit of the heading kinematic path generation used to determine how quickly the target varies in angular acceleration
+    // @Range: 0 180
+    // @Units: deg/s/s/s
+    // @User: Advanced
+    AP_GROUPINFO("JERKH", 17, AP_Follow, _max_jerk_h, 360.0),
+
     AP_GROUPEND
 };
 
@@ -201,18 +249,15 @@ bool AP_Follow::get_target_position_and_velocity(Vector3p &pos_ned, Vector3f &ve
     // calculate time since last actual position update
     const float dt = (AP_HAL::millis() - _last_location_update_ms) * 0.001f;
 
-    // get velocity estimate
-    if (!get_velocity_ned(vel_ned, dt)) {
-        return false;
-    }
-
-    // project the vehicle position
     Vector3p projected_pos_ned = _target_position_ned;
-    const Vector3p vel_ned_p { vel_ned.x, vel_ned.y, vel_ned.z };
-    projected_pos_ned += vel_ned_p * dt;
+    Vector3f projected_vel_ned = _target_velocity_ned;
+    Vector3f projected_accel_ned = _target_accel_ned;
+    update_pos_vel_accel_xy(projected_pos_ned.xy(), projected_vel_ned.xy(), projected_accel_ned.xy(), dt, Vector2f(), Vector2f(), Vector2f());
+    update_pos_vel_accel(projected_pos_ned.z, projected_vel_ned.z, projected_accel_ned.z, dt, 0.0, 0.0, 0.0);
 
     // return latest position estimate
     pos_ned = projected_pos_ned;
+    vel_ned = projected_vel_ned;
     return true;
 }
 
@@ -374,19 +419,29 @@ bool AP_Follow::handle_global_position_int_message(const mavlink_message_t &msg)
             // absolute altitude
             _target_location.set_alt_cm(packet.alt / 10, Location::AltFrame::ABSOLUTE);
         }
-        if (!_target_location.get_vector_from_origin_NEU(_target_position_ned)) {
+
+        Vector3p pos_ned;
+        if (!_target_location.get_vector_from_origin_NEU(pos_ned)) {
             return false;
         }
-        _target_position_ned.z = -_target_position_ned.z; // NEU->NED
+        pos_ned.z = -pos_ned.z; // NEU->NED
 
-        _target_velocity_ned.x = packet.vx * 0.01f; // velocity north
-        _target_velocity_ned.y = packet.vy * 0.01f; // velocity east
-        _target_velocity_ned.z = packet.vz * 0.01f; // velocity down
+        Vector3f vel_ned;
+        vel_ned.x = packet.vx * 0.01f; // velocity north
+        vel_ned.y = packet.vy * 0.01f; // velocity east
+        vel_ned.z = packet.vz * 0.01f; // velocity down
+
+        Vector3f accel_ned;
+        accel_ned.zero();
+
+        update_target_pos_vel_accel(pos_ned, vel_ned, accel_ned);
 
         // get a local timestamp with correction for transport jitter
         _last_location_update_ms = _jitter.correct_offboard_timestamp_msec(packet.time_boot_ms, AP_HAL::millis());
+
         if (packet.hdg <= 36000) {                  // heading (UINT16_MAX if unknown)
-            _target_heading = packet.hdg * 0.01f;   // convert centi-degrees to degrees
+            float heading = packet.hdg * 0.01f;   // convert centi-degrees to degrees
+            update_target_heading(heading);
             _last_heading_update_ms = _last_location_update_ms;
         }
         // initialise _sysid if zero to sender's id
@@ -417,18 +472,31 @@ bool AP_Follow::handle_follow_target_message(const mavlink_message_t &msg)
         new_loc.lng = packet.lon;
         new_loc.set_alt_m(packet.alt, Location::AltFrame::ABSOLUTE);
 
-        if (!new_loc.get_vector_from_origin_NEU(_target_position_ned)) {
+        Vector3p pos_ned;
+        if (!new_loc.get_vector_from_origin_NEU(pos_ned)) {
             return false;
         }
-        _target_position_ned.z = -_target_position_ned.z; // NEU->NED
-
+        pos_ned.z = -pos_ned.z; // NEU->NED
+        
+        Vector3f vel_ned;
         if (packet.est_capabilities & (1<<1)) {
-            _target_velocity_ned.x = packet.vel[0]; // velocity north
-            _target_velocity_ned.y = packet.vel[1]; // velocity east
-            _target_velocity_ned.z = packet.vel[2]; // velocity down
+            vel_ned.x = packet.vel[0]; // velocity north
+            vel_ned.y = packet.vel[1]; // velocity east
+            vel_ned.z = packet.vel[2]; // velocity down
         } else {
-            _target_velocity_ned.zero();
+            vel_ned.zero();
         }
+
+        Vector3f accel_ned;
+        if (packet.est_capabilities & (1<<1)) {
+            accel_ned.x = packet.acc[0]; // acceleration north
+            accel_ned.y = packet.acc[1]; // acceleration east
+            accel_ned.z = packet.acc[2]; // acceleration down
+        } else {
+            accel_ned.zero();
+        }
+
+        update_target_pos_vel_accel(pos_ned, vel_ned, accel_ned);
 
         // get a local timestamp with correction for transport jitter
         _last_location_update_ms = _jitter.correct_offboard_timestamp_msec(packet.timestamp, AP_HAL::millis());
@@ -437,7 +505,8 @@ bool AP_Follow::handle_follow_target_message(const mavlink_message_t &msg)
             Quaternion q{packet.attitude_q[0], packet.attitude_q[1], packet.attitude_q[2], packet.attitude_q[3]};
             float r, p, y;
             q.to_euler(r,p,y);
-            _target_heading = degrees(y);
+            float heading = degrees(y);
+            update_target_heading(heading);
             _last_heading_update_ms = _last_location_update_ms;
         }
 
@@ -448,6 +517,51 @@ bool AP_Follow::handle_follow_target_message(const mavlink_message_t &msg)
         }
 
         return true;
+}
+
+void AP_Follow::update_target_pos_vel_accel(Vector3p pos_ned, Vector3f vel_ned, Vector3f accel_ned)
+{
+    // calculate time since last actual position update
+    const float dt = (AP_HAL::millis() - _last_location_update_ms) * 0.001f;
+
+    if (dt > AP_FOLLOW_TIMEOUT_MS * 0.001f) {
+        _target_position_ned = pos_ned;
+        _target_velocity_ned = vel_ned;
+        _target_accel_ned = accel_ned;
+    } else {    
+        update_pos_vel_accel_xy(_target_position_ned.xy(), _target_velocity_ned.xy(), _target_accel_ned.xy(), dt, Vector2f(), Vector2f(), Vector2f());
+        update_pos_vel_accel(_target_position_ned.z, _target_velocity_ned.z, _target_accel_ned.z, dt, 0.0, 0.0, 0.0);
+
+        shape_pos_vel_accel_xy(pos_ned.xy().topostype(), vel_ned.xy(), accel_ned.xy(),
+            _target_position_ned.xy(), _target_velocity_ned.xy(), _target_accel_ned.xy(),
+            0.0, _max_accel_xy * 100.0,
+            _max_jerk_xy * 100.0, dt, false);
+        shape_pos_vel_accel(pos_ned.z, vel_ned.z, accel_ned.z,
+            _target_position_ned.z, _target_velocity_ned.z, _target_accel_ned.z,
+            0.0, 0.0, 
+            -_max_accel_z * 100.0, _max_accel_z * 100.0,
+            _max_jerk_z * 100.0, dt, false);
+    }
+}
+
+void AP_Follow::update_target_heading(float heading)
+{
+    // calculate time since last actual position update
+    const float dt = (AP_HAL::millis() - _last_heading_update_ms) * 0.001f;
+
+    if (dt > AP_FOLLOW_TIMEOUT_MS * 0.001f) {
+        _target_heading = heading;
+        _target_heading_rate = 0.0;
+        _target_heading_accel = 0.0;
+    } else {    
+        postype_t _target_heading_p = _target_heading;
+        update_pos_vel_accel(_target_heading_p, _target_heading_rate, _target_heading_accel, dt, 0.0, 0.0, 0.0);
+        _target_heading = wrap_PI(_target_heading_p);
+
+        shape_angle_vel_accel(heading, 0.0, 0.0,
+            _target_heading, _target_heading_rate, _target_heading_accel,
+            0.0, _max_accel_h, _max_jerk_h, dt, false);
+    }
 }
 
 // write out an onboard-log message to help diagnose follow problems:
