@@ -299,7 +299,8 @@ bool AP_Follow::get_target_dist_and_vel_ned(Vector3f &dist_ned, Vector3f &dist_w
 
     // get offsets
     Vector3f offsets;
-    if (!get_offsets_ned(offsets)) {
+    Vector3f offsets_vel;
+    if (!get_offsets_ned(offsets, offsets_vel)) {
         clear_dist_and_bearing_to_target();
         return false;
     }
@@ -307,7 +308,7 @@ bool AP_Follow::get_target_dist_and_vel_ned(Vector3f &dist_ned, Vector3f &dist_w
     // calculate results
     dist_ned = dist_vec;
     dist_with_offs = dist_vec + offsets;
-    vel_ned = veh_vel;
+    vel_ned = veh_vel + offsets_vel;
 
     // record distance and heading for reporting purposes
     if (is_zero(dist_with_offs.x) && is_zero(dist_with_offs.y)) {
@@ -642,7 +643,7 @@ void AP_Follow::init_offsets_if_required(const Vector3f &dist_vec_ned)
 }
 
 // get offsets in meters in NED frame
-bool AP_Follow::get_offsets_ned(Vector3f &offset) const
+bool AP_Follow::get_offsets_ned(Vector3f &offset, Vector3f &offset_vel) const
 {
     const Vector3f &off = _offset.get();
 
@@ -658,8 +659,11 @@ bool AP_Follow::get_offsets_ned(Vector3f &offset) const
         return false;
     }
 
+    offset_vel = Vector3f(-off.y, off.x , 0.0) * _target_heading_rate;
+    
     // rotate offsets from vehicle's perspective to NED
     offset = rotate_vector(off, target_heading_deg);
+    offset_vel = rotate_vector(offset_vel, target_heading_deg);
     return true;
 }
 
@@ -685,7 +689,8 @@ void AP_Follow::clear_dist_and_bearing_to_target()
 bool AP_Follow::get_target_position_and_velocity_ofs(Vector3p &pos_ned, Vector3f &vel_ned) const
 {
     Vector3f ofs_ned;
-    if (!get_offsets_ned(ofs_ned)) {
+    Vector3f ofs_vel;
+    if (!get_offsets_ned(ofs_ned, ofs_vel)) {
         return false;
     }
     if (!get_target_position_and_velocity_ofs(pos_ned, vel_ned)) {
@@ -695,6 +700,8 @@ bool AP_Follow::get_target_position_and_velocity_ofs(Vector3p &pos_ned, Vector3f
     pos_ned.x += ofs_ned.x;
     pos_ned.y += ofs_ned.y;
     pos_ned.z += ofs_ned.z;
+
+    vel_ned += ofs_vel;
     return true;
 }
 
