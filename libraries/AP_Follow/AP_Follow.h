@@ -138,7 +138,7 @@ private:
     void init_offsets_if_required(const Vector3f &dist_vec_ned);
 
     // get offsets in meters in NED frame
-    bool get_offsets_ned(Vector3f &offsets) const;
+    bool get_offsets_ned(Vector3f &offsets, Vector3f &offset_vel) const;
 
     // rotate 3D vector clockwise by specified angle (in degrees)
     Vector3f rotate_vector(const Vector3f &vec, float angle_deg) const;
