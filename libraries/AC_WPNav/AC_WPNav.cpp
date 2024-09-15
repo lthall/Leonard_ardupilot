@@ -465,11 +465,16 @@ bool AC_WPNav::advance_wp_target_along_track(float dt)
     }
     const float offset_z_scaler = _pos_control.pos_offset_z_scaler(terr_offset, get_terrain_margin() * 100.0);
 
-    // input shape the terrain offset
+    // input shape the horizontal and terrain offsets
+    _pos_control.update_xy_offsets();
     _pos_control.update_pos_offset_z(terr_offset);
 
+    // get position controller's position offset (post input shaping) so it can be used in position error calculation
+    const Vector3p& psc_pos_offset_target = _pos_control.get_pos_offset_target_cm();
+
     // get current position and adjust altitude to origin and destination's frame (i.e. _frame)
-    const Vector3f &curr_pos = _inav.get_position_neu_cm() - Vector3f{0, 0, terr_offset};
+    // question: shouldn't this be a Vector3p
+    const Vector3f &curr_pos = _inav.get_position_neu_cm() - psc_pos_offset_target.tofloat();
     Vector3f curr_target_vel = _pos_control.get_vel_desired_cms();
     curr_target_vel.z -= _pos_control.get_vel_offset_z_cms();
 
@@ -504,6 +509,7 @@ bool AC_WPNav::advance_wp_target_along_track(float dt)
     _track_scalar_dt += (track_scaler_dt - _track_scalar_dt) * (dt / track_scaler_tc);
 
     // target position, velocity and acceleration from straight line or spline calculators
+// question: doesn't target_pos need to be Vector3p
     Vector3f target_pos, target_vel, target_accel;
 
     bool s_finished;
@@ -528,13 +534,9 @@ bool AC_WPNav::advance_wp_target_along_track(float dt)
     target_accel *= sq(vel_scaler_dt);
     target_accel += accel_offset;
 
-    // convert final_target.z to altitude above the ekf origin
-    target_pos.z += _pos_control.get_pos_offset_z_cm();
-    target_vel.z += _pos_control.get_vel_offset_z_cms();
-    target_accel.z += _pos_control.get_accel_offset_z_cmss();
-
     // pass new target to the position controller
     _pos_control.set_pos_vel_accel(target_pos.topostype(), target_vel, target_accel);
+    _pos_control.add_offsets_xy();
 
     // check if we've reached the waypoint
     if (!_flags.reached_destination) {

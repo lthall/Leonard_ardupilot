@@ -498,7 +498,7 @@ void ModeAuto::land_start()
     set_submode(SubMode::LAND);
 }
 
-// auto_circle_movetoedge_start - initialise waypoint controller to move to edge of a circle with it's center at the specified location
+// circle_movetoedge_start - initialise waypoint controller to move to edge of a circle with it's center at the specified location
 //  we assume the caller has performed all required GPS_ok checks
 void ModeAuto::circle_movetoedge_start(const Location &circle_center, float radius_m, bool ccw_turn)
 {
@@ -517,8 +517,8 @@ void ModeAuto::circle_movetoedge_start(const Location &circle_center, float radi
 
     // check our distance from edge of circle
     Vector3f circle_edge_neu;
-    copter.circle_nav->get_closest_point_on_circle(circle_edge_neu);
-    float dist_to_edge = (inertial_nav.get_position_neu_cm() - circle_edge_neu).length();
+    float dist_to_edge;
+    copter.circle_nav->get_closest_point_on_circle(circle_edge_neu, dist_to_edge);
 
     // if more than 3m then fly to edge
     if (dist_to_edge > 300.0f) {
@@ -1488,6 +1488,14 @@ bool ModeAuto::shift_alt_to_current_alt(Location& target_loc) const
     return true;
 }
 
+// subtract position controller offsets from target location
+// should be used when the location will be used as a target for the position controller
+void ModeAuto::subtract_pos_offsets(Location& target_loc) const
+{
+    // subtract position controller offsets from target location
+    target_loc.offset(-pos_control->get_pos_offset_cm() * 0.01);
+}
+
 /********************************************************************************/
 // Nav (Must) commands
 /********************************************************************************/
@@ -1528,6 +1536,10 @@ void ModeAuto::do_nav_wp(const AP_Mission::Mission_Command& cmd)
 {
     // calculate default location used when lat, lon or alt is zero
     Location default_loc = copter.current_loc;
+
+    // subtract position offsets
+    subtract_pos_offsets(default_loc);
+
     if (wp_nav->is_active() && wp_nav->reached_wp_destination()) {
         if (!wp_nav->get_wp_destination_loc(default_loc)) {
             // this should never happen
@@ -1648,32 +1660,22 @@ void ModeAuto::do_land(const AP_Mission::Mission_Command& cmd)
 // note: caller should set yaw_mode
 void ModeAuto::do_loiter_unlimited(const AP_Mission::Mission_Command& cmd)
 {
-    // convert back to location
-    Location target_loc(cmd.content.location);
+    // calculate default location used when lat, lon or alt is zero
+    Location default_loc = copter.current_loc;
 
-    // use current location if not provided
-    if (target_loc.lat == 0 && target_loc.lng == 0) {
-        // To-Do: make this simpler
-        Vector3f temp_pos;
-        copter.wp_nav->get_wp_stopping_point_xy(temp_pos.xy());
-        const Location temp_loc(temp_pos, Location::AltFrame::ABOVE_ORIGIN);
-        target_loc.lat = temp_loc.lat;
-        target_loc.lng = temp_loc.lng;
-    }
+    // subtract position offsets
+    subtract_pos_offsets(default_loc);
 
-    // use current altitude if not provided
-    // To-Do: use z-axis stopping point instead of current alt
-    if (target_loc.alt == 0) {
-        // set to current altitude but in command's alt frame
-        int32_t curr_alt;
-        if (copter.current_loc.get_alt_cm(target_loc.get_alt_frame(),curr_alt)) {
-            target_loc.set_alt_cm(curr_alt, target_loc.get_alt_frame());
-        } else {
-            // default to current altitude as alt-above-home
-            target_loc.set_alt_cm(copter.current_loc.alt,
-                                  copter.current_loc.get_alt_frame());
+    // use previous waypoint destination as default if available
+    if (wp_nav->is_active() && wp_nav->reached_wp_destination()) {
+        if (!wp_nav->get_wp_destination_loc(default_loc)) {
+            // this should never happen
+            INTERNAL_ERROR(AP_InternalError::error_t::flow_of_control);
         }
     }
+
+    // get waypoint's location from command and send to wp_nav
+    const Location target_loc = loc_from_cmd(cmd, default_loc);
 
     // start way point navigator and provide it the desired location
     if (!wp_start(target_loc)) {
@@ -1686,7 +1688,13 @@ void ModeAuto::do_loiter_unlimited(const AP_Mission::Mission_Command& cmd)
 // do_circle - initiate moving in a circle
 void ModeAuto::do_circle(const AP_Mission::Mission_Command& cmd)
 {
-    const Location circle_center = loc_from_cmd(cmd, copter.current_loc);
+    // calculate default location used when lat, lon or alt is zero
+    Location default_loc = copter.current_loc;
+
+    // subtract position offsets
+    subtract_pos_offsets(default_loc);
+
+    const Location circle_center = loc_from_cmd(cmd, default_loc);
 
     // calculate radius
     uint16_t circle_radius_m = HIGHBYTE(cmd.p1); // circle radius held in high byte of p1
@@ -1754,6 +1762,10 @@ void ModeAuto::do_spline_wp(const AP_Mission::Mission_Command& cmd)
 {
     // calculate default location used when lat, lon or alt is zero
     Location default_loc = copter.current_loc;
+
+    // subtract position offsets
+    subtract_pos_offsets(default_loc);
+
     if (wp_nav->is_active() && wp_nav->reached_wp_destination()) {
         if (!wp_nav->get_wp_destination_loc(default_loc)) {
             // this should never happen

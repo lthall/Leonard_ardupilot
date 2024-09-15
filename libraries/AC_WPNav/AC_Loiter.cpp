@@ -189,7 +189,9 @@ float AC_Loiter::get_angle_max_cd() const
 /// run the loiter controller
 void AC_Loiter::update(bool avoidance_on)
 {
+    _pos_control.remove_offsets_xy();
     calc_desired_velocity(avoidance_on);
+    _pos_control.add_offsets_xy();
     _pos_control.update_xy_controller();
 }
 

@@ -631,6 +631,10 @@ private:
 
     bool shift_alt_to_current_alt(Location& target_loc) const;
 
+    // subtract position controller offsets from target location
+    // should be used when the location will be used as a target for the position controller
+    void subtract_pos_offsets(Location& target_loc) const;
+
     void do_takeoff(const AP_Mission::Mission_Command& cmd);
     void do_nav_wp(const AP_Mission::Mission_Command& cmd);
     bool set_next_wp(const AP_Mission::Mission_Command& current_cmd, const Location &default_loc);

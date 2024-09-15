@@ -74,6 +74,9 @@ extern const AP_HAL::HAL& hal;
 #define POSCONTROL_VIBE_COMP_P_GAIN 0.250f
 #define POSCONTROL_VIBE_COMP_I_GAIN 0.125f
 
+// velocity offset targets timeout if not updated within 3 seconds
+#define POSCONTROL_POSVELACCEL_OFFSET_TARGET_TIMEOUT_MS 3000
+
 const AP_Param::GroupInfo AC_PosControl::var_info[] = {
     // 0 was used for HOVER
 
@@ -363,10 +366,8 @@ void AC_PosControl::input_pos_xyz(const Vector3p& pos, float pos_offset_z, float
     // Terrain following velocity scalar must be calculated before we remove the position offset
     const float offset_z_scaler = pos_offset_z_scaler(pos_offset_z, pos_offset_z_buffer);
 
-    // remove terrain offsets for flat earth assumption
-    _pos_target.z -= _pos_offset_z;
-    _vel_desired.z -= _vel_offset_z;
-    _accel_desired.z -= _accel_offset_z;
+    // remove offsets including terrain offset for flat earth assumption
+    remove_offsets_xy();
 
     // calculated increased maximum acceleration and jerk if over speed
     const float overspeed_gain = calculate_overspeed_gain();
@@ -406,13 +407,12 @@ void AC_PosControl::input_pos_xyz(const Vector3p& pos, float pos_offset_z, float
                         -constrain_float(accel_max_z_cmss, 0.0f, 750.0f), accel_max_z_cmss,
                         jerk_max_z_cmsss, _dt, false);
 
-    // update the vertical position, velocity and acceleration offsets
+    // update the position, velocity and acceleration offsets
+    update_xy_offsets();
     update_pos_offset_z(pos_offset_z);
 
-    // add terrain offsets
-    _pos_target.z += _pos_offset_z;
-    _vel_desired.z += _vel_offset_z;
-    _accel_desired.z += _accel_offset_z;
+    // add back offsets including terrain offset
+    add_offsets_xy();
 }
 
 
@@ -422,7 +422,7 @@ float AC_PosControl::pos_offset_z_scaler(float pos_offset_z, float pos_offset_z_
     if (is_zero(pos_offset_z_buffer)) {
         return 1.0;
     }
-    float pos_offset_error_z = _inav.get_position_z_up_cm() - (_pos_target.z - _pos_offset_z + pos_offset_z);
+    float pos_offset_error_z = _inav.get_position_z_up_cm() - (_pos_target.z - _pos_offset.z + pos_offset_z);
     return constrain_float((1.0 - (fabsf(pos_offset_error_z) - 0.5 * pos_offset_z_buffer) / (0.5 * pos_offset_z_buffer)), 0.01, 1.0);
 }
 
@@ -542,6 +542,10 @@ void AC_PosControl::init_xy_controller()
     // initialise ekf xy reset handler
     init_ekf_xy_reset();
 
+    // initialise offsets to target offsets and ensure offset targets are zero if they have not been updated.
+    update_xy_offsets();
+    set_posvelaccel_offsets_xy_cm(_pos_offset_target.xy(), _vel_offset_target, _accel_offset_target);
+
     // initialise z_controller time out
     _last_update_xy_ticks = AP::scheduler().ticks32();
 }
@@ -556,8 +560,17 @@ void AC_PosControl::input_accel_xy(const Vector3f& accel)
     // check for ekf xy position reset
     handle_ekf_xy_reset();
 
+    // remove offsets
+    remove_offsets_xy();
+
     update_pos_vel_accel_xy(_pos_target.xy(), _vel_desired.xy(), _accel_desired.xy(), _dt, _limit_vector.xy(), _p_pos_xy.get_error(), _pid_vel_xy.get_error());
     shape_accel_xy(accel, _accel_desired, _jerk_max_xy_cmsss, _dt);
+
+    // update the position, velocity and acceleration offsets
+    update_xy_offsets();
+
+    // add back offsets
+    add_offsets_xy();
 }
 
 /// input_vel_accel_xy - calculate a jerk limited path from the current position, velocity and acceleration to an input velocity and acceleration.
@@ -567,12 +580,21 @@ void AC_PosControl::input_accel_xy(const Vector3f& accel)
 ///     The parameter limit_output specifies if the velocity and acceleration limits are applied to the sum of commanded and correction values or just correction.
 void AC_PosControl::input_vel_accel_xy(Vector2f& vel, const Vector2f& accel, bool limit_output)
 {
+    // remove offsets including terrain offset for flat earth assumption
+    remove_offsets_xy();
+
     update_pos_vel_accel_xy(_pos_target.xy(), _vel_desired.xy(), _accel_desired.xy(), _dt, _limit_vector.xy(), _p_pos_xy.get_error(), _pid_vel_xy.get_error());
 
     shape_vel_accel_xy(vel, accel, _vel_desired.xy(), _accel_desired.xy(),
         _accel_max_xy_cmss, _jerk_max_xy_cmsss, _dt, limit_output);
 
     update_vel_accel_xy(vel, accel, _dt, Vector2f(), Vector2f());
+
+    // update the position, velocity and acceleration offsets
+    update_xy_offsets();
+
+    // add back offsets including terrain offset
+    add_offsets_xy();
 }
 
 /// input_pos_vel_accel_xy - calculate a jerk limited path from the current position, velocity and acceleration to an input position velocity and acceleration.
@@ -582,12 +604,63 @@ void AC_PosControl::input_vel_accel_xy(Vector2f& vel, const Vector2f& accel, boo
 ///     The parameter limit_output specifies if the velocity and acceleration limits are applied to the sum of commanded and correction values or just correction.
 void AC_PosControl::input_pos_vel_accel_xy(Vector2p& pos, Vector2f& vel, const Vector2f& accel, bool limit_output)
 {
+    // remove offsets including terrain offset for flat earth assumption
+    remove_offsets_xy();
+
     update_pos_vel_accel_xy(_pos_target.xy(), _vel_desired.xy(), _accel_desired.xy(), _dt, _limit_vector.xy(), _p_pos_xy.get_error(), _pid_vel_xy.get_error());
 
     shape_pos_vel_accel_xy(pos, vel, accel, _pos_target.xy(), _vel_desired.xy(), _accel_desired.xy(),
                            _vel_max_xy_cms, _accel_max_xy_cmss, _jerk_max_xy_cmsss, _dt, limit_output);
 
     update_pos_vel_accel_xy(pos, vel, accel, _dt, Vector2f(), Vector2f(), Vector2f());
+
+    // update the position, velocity and acceleration offsets
+    update_xy_offsets();
+
+    // add back offsets including terrain offset
+    add_offsets_xy();
+}
+
+/// update the horizontal position and velocity offsets
+/// this moves the offsets (e.g _pos_offset, _vel_offset, _accel_offset) towards the targets (e.g. _pos_offset_target, _vel_offset_target, _accel_offset_target)
+void AC_PosControl::update_xy_offsets()
+{
+    // return immediately if offsets have never been set
+    if (_xy_offset_type == XYOffsetType::NONE) {
+        return;
+    }
+
+    // check for offset target timeout
+    uint32_t now_ms = AP_HAL::millis();
+    if (now_ms - _posvelaccel_offset_target_ms > POSCONTROL_POSVELACCEL_OFFSET_TARGET_TIMEOUT_MS) {
+        _xy_offset_type = XYOffsetType::POS_VEL_ACCEL;
+        _pos_offset_target.zero();
+        _vel_offset_target.zero();
+        _accel_offset_target.zero();
+    }
+
+    // update position, velocity, accel offsets for this iteration
+    update_pos_vel_accel_xy(_pos_offset.xy(), _vel_offset.xy(), _accel_offset.xy(), _dt, _limit_vector.xy(), _p_pos_xy.get_error(), _pid_vel_xy.get_error());
+
+    switch (_xy_offset_type) {
+
+    case XYOffsetType::NONE:
+        break;
+
+    case XYOffsetType::POS_VEL_ACCEL:
+        // input shape horizontal position, velocity and acceleration offsets
+        shape_pos_vel_accel_xy(_pos_offset_target.xy(), _vel_offset_target, _accel_offset_target,
+                               _pos_offset.xy(), _vel_offset.xy(), _accel_offset.xy(),
+                               _vel_max_xy_cms, _accel_max_xy_cmss, _jerk_max_xy_cmsss, _dt, false);
+        break;
+
+    case XYOffsetType::VEL_ACCEL:
+        // input shape horizontal velocity and acceleration offsets
+        shape_vel_accel_xy(_vel_offset_target, _accel_offset_target,
+                           _vel_offset.xy(), _accel_offset.xy(),
+                           _accel_max_xy_cmss, _jerk_max_xy_cmsss, _dt, false);
+        break;
+    }
 }
 
 /// stop_pos_xy_stabilisation - sets the target to the current position to remove any position corrections from the system
@@ -804,10 +877,10 @@ void AC_PosControl::init_z_controller()
     _pid_accel_z.reset_filter();
 
     // initialise vertical offsets
-    _pos_offset_target_z = 0.0;
-    _pos_offset_z = 0.0;
-    _vel_offset_z = 0.0;
-    _accel_offset_z = 0.0;
+    _pos_offset_target.z = 0.0;
+    _pos_offset.z = 0.0;
+    _vel_offset.z = 0.0;
+    _accel_offset.z = 0.0;
 
     // Set accel PID I term based on the current throttle
     // Remove the expected P term due to _accel_desired.z being constrained to _accel_max_z_cmss
@@ -864,20 +937,20 @@ void AC_PosControl::input_vel_accel_z(float &vel, float accel, bool limit_output
 void AC_PosControl::set_pos_target_z_from_climb_rate_cm(float vel)
 {
     // remove terrain offsets for flat earth assumption
-    _pos_target.z -= _pos_offset_z;
-    _vel_desired.z -= _vel_offset_z;
-    _accel_desired.z -= _accel_offset_z;
+    _pos_target.z -= _pos_offset.z;
+    _vel_desired.z -= _vel_offset.z;
+    _accel_desired.z -= _accel_offset.z;
 
     float vel_temp = vel;
     input_vel_accel_z(vel_temp, 0.0);
 
     // update the vertical position, velocity and acceleration offsets
-    update_pos_offset_z(_pos_offset_target_z);
+    update_pos_offset_z(_pos_offset_target.z);
 
     // add terrain offsets
-    _pos_target.z += _pos_offset_z;
-    _vel_desired.z += _vel_offset_z;
-    _accel_desired.z += _accel_offset_z;
+    _pos_target.z += _pos_offset.z;
+    _vel_desired.z += _vel_offset.z;
+    _accel_desired.z += _accel_offset.z;
 }
 
 /// land_at_climb_rate_cm - adjusts target up or down using a commanded climb rate in cm/s
@@ -930,13 +1003,13 @@ void AC_PosControl::set_alt_target_with_slew(float pos)
 /// update_pos_offset_z - updates the vertical offsets used by terrain following
 void AC_PosControl::update_pos_offset_z(float pos_offset_z)
 {
-    postype_t p_offset_z = _pos_offset_z;
-    update_pos_vel_accel(p_offset_z, _vel_offset_z, _accel_offset_z, _dt, MIN(_limit_vector.z, 0.0f), _p_pos_z.get_error(), _pid_vel_z.get_error());
-    _pos_offset_z = p_offset_z;
+    postype_t p_offset_z = _pos_offset.z;
+    update_pos_vel_accel(p_offset_z, _vel_offset.z, _accel_offset.z, _dt, MIN(_limit_vector.z, 0.0f), _p_pos_z.get_error(), _pid_vel_z.get_error());
+    _pos_offset.z = p_offset_z;
 
     // input shape the terrain offset
     shape_pos_vel_accel(pos_offset_z, 0.0f, 0.0f,
-        _pos_offset_z, _vel_offset_z, _accel_offset_z,
+        _pos_offset.z, _vel_offset.z, _accel_offset.z,
         get_max_speed_down_cms(), get_max_speed_up_cms(),
         -get_max_accel_z_cmss(), get_max_accel_z_cmss(),
         _jerk_max_z_cmsss, _dt, false);
@@ -1079,6 +1152,67 @@ Vector3f AC_PosControl::lean_angles_to_accel(const Vector3f& att_target_euler) c
     };
 }
 
+/// set the horizontal position, velocity and acceleration offsets in cm, cms and cm/s/s from EKF origin in NE frame
+/// this is used to initiate the offsets when initialise the position controller or do an offset reset
+void AC_PosControl::set_posvelaccel_offsets_xy_cm(const Vector2p& pos_offset_xy_cm, const Vector2f& vel_offset_xy_cms, const Vector2f& accel_offset_xy_cmss)
+{
+    // set position offset to target
+    _pos_offset.xy() = pos_offset_xy_cm;
+
+    // set velocity offset to target
+    _vel_offset.xy() = vel_offset_xy_cms;
+
+    // set acceleration offset to target
+    _accel_offset.xy() = accel_offset_xy_cmss;
+}
+
+void AC_PosControl::remove_offsets_xy()
+{
+    // remove offsets
+    _pos_target.xy() -= _pos_offset.xy();
+    _vel_desired.xy() -= _vel_offset.xy();
+    _accel_desired.xy() -= _accel_offset.xy();
+}
+
+void AC_PosControl::add_offsets_xy()
+{
+    // add back offsets
+    _pos_target.xy() += _pos_offset.xy();
+    _vel_desired.xy() += _vel_offset.xy();
+    _accel_desired.xy() += _accel_offset.xy();
+}
+
+/// set the horizontal position, velocity and acceleration offset targets in cm, cms and cm/s/s from EKF origin in NE frame
+/// these must be set every 3 seconds (or less) or they will timeout and return to zero
+void AC_PosControl::set_posvelaccel_offset_target_xy_cm(const Vector2p& pos_offset_target_xy_cm, const Vector2f& vel_offset_target_xy_cms, const Vector2f& accel_offset_target_xy_cmss)
+{
+    // set position offset target
+    _xy_offset_type = XYOffsetType::POS_VEL_ACCEL;
+    _pos_offset_target.xy() = pos_offset_target_xy_cm;
+
+    // set velocity offset target and limit to 1/2 maximum
+    _vel_offset_target = vel_offset_target_xy_cms;
+    _vel_offset_target.limit_length(get_max_speed_xy_cms() * 0.5);
+
+    // set acceleration offset target and limit to 1/2 maximum
+    _accel_offset_target = accel_offset_target_xy_cmss;
+    _accel_offset_target.limit_length(get_max_accel_xy_cmss() * 0.5);
+
+    // record time of update so we can detect timeouts
+    _posvelaccel_offset_target_ms = AP_HAL::millis();
+}
+
+/// set the horizontal velocity and acceleration offset targets in cm/s and cm/s/s in NE frame
+/// these must be set every 3 seconds (or less) or they will timeout and return to zero
+void AC_PosControl::set_velaccel_offset_target_xy_cms(const Vector2f& vel_offset_target_xy_cms, const Vector2f& accel_offset_target_xy_cmss)
+{
+    // re-use set_posvelaccel_offset_target_xy_cm but with zero position offset target
+    set_posvelaccel_offset_target_xy_cm(Vector2p(), vel_offset_target_xy_cms, accel_offset_target_xy_cmss);
+
+    // override offset type
+    _xy_offset_type = XYOffsetType::VEL_ACCEL;
+}
+
 // returns the NED target acceleration vector for attitude control
 Vector3f AC_PosControl::get_thrust_vector() const
 {
@@ -1091,10 +1225,12 @@ Vector3f AC_PosControl::get_thrust_vector() const
 ///    function does not change the z axis
 void AC_PosControl::get_stopping_point_xy_cm(Vector2p &stopping_point) const
 {
+    // todo: we should use the current target position and velocity if we are currently running the position controller
     stopping_point = _inav.get_position_xy_cm().topostype();
     float kP = _p_pos_xy.kP();
 
     Vector2f curr_vel = _inav.get_velocity_xy_cms();
+    curr_vel -= _vel_offset.xy();
 
     // calculate current velocity
     float vel_total = curr_vel.length();
@@ -1111,6 +1247,7 @@ void AC_PosControl::get_stopping_point_xy_cm(Vector2p &stopping_point) const
     // convert the stopping distance into a stopping point using velocity vector
     const float t = stopping_dist / vel_total;
     stopping_point += (curr_vel * t).topostype();
+    stopping_point -= _pos_offset.xy();
 }
 
 /// get_stopping_point_z_cm - calculates stopping point in NEU cm based on current position, velocity, vehicle acceleration

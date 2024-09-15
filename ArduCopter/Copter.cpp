@@ -413,6 +413,44 @@ bool Copter::set_desired_speed(float speed)
 }
 
 #if MODE_AUTO_ENABLED
+// add an additional offset to vehicle's target position, velocity and acceleration
+// units are m, m/s and m/s/s in NED frame
+// Z-axis is not currently supported and is ignored
+bool Copter::set_posvelaccel_offset(const Vector3f &pos_offset_NED, const Vector3f &vel_offset_NED, const Vector3f &accel_offset_NED)
+{
+    // only supported in Auto mode
+    if (flightmode != &mode_auto) {
+        return false;
+    }
+
+    pos_control->set_posvelaccel_offset_target_xy_cm(pos_offset_NED.topostype().xy() * 100.0, vel_offset_NED.xy() * 100.0, accel_offset_NED.xy() * 100.0);
+    return true;
+}
+
+// add an additional offset to vehicle's target velocity and acceleration
+// units are m/s and m/s/s in NED frame
+// Z-axis is not currently supported and is ignored
+bool Copter::set_velaccel_offset(const Vector3f &vel_offset_NED, const Vector3f &accel_offset_NED)
+{
+    // only supported in Auto mode
+    if (flightmode != &mode_auto) {
+        return false;
+    }
+
+    pos_control->set_velaccel_offset_target_xy_cms(vel_offset_NED.xy() * 100.0, accel_offset_NED.xy() * 100.0);
+    return true;
+}
+
+// get position and velocity offset to vehicle's target velocity and acceleration
+// units are m and m/s in NED frame
+bool Copter::get_posvelaccel_offset(Vector3f &pos_offset_NED, Vector3f &vel_offset_NED, Vector3f &accel_offset_NED)
+{
+    pos_offset_NED = pos_control->get_pos_offset_cm().tofloat() * 0.01;
+    vel_offset_NED = pos_control->get_vel_offset_cms() * 0.01;
+    accel_offset_NED = pos_control->get_accel_offset_cmss() * 0.01;
+    return true;
+}
+
 // returns true if mode supports NAV_SCRIPT_TIME mission commands
 bool Copter::nav_scripting_enable(uint8_t mode)
 {

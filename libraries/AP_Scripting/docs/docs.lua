@@ -2354,6 +2354,25 @@ function vehicle:set_circle_rate(rate_dps) end
 ---@return number|nil
 function vehicle:get_circle_radius() end
 
+-- add an offset to vehicle's target position, velocity and acceleration in autonomous modes
+---@param pos_offset_NED Vector3f_ud
+---@param vel_offset_NED Vector3f_ud
+---@param accel_offset_NED Vector3f_ud
+---@return boolean
+function vehicle:set_posvelaccel_offset(pos_offset_NED, vel_offset_NED, accel_offset_NED) end
+
+-- add an offset to vehicle's target velocity and acceleration in autonomous modes
+---@param vel_offset_NED Vector3f_ud
+---@param accel_offset_NED Vector3f_ud
+---@return boolean
+function vehicle:set_velaccel_offset(vel_offset_NED, accel_offset_NED) end
+
+-- get position, velocity and acceleration offsets to vehicle's target position in autonomous modes
+---@return Vector3f_ud|nil
+---@return Vector3f_ud|nil
+---@return Vector3f_ud|nil
+function vehicle:get_posvelaccel_offset() end
+
 -- desc
 ---@param roll_deg number
 ---@param pitch_deg number

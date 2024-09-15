@@ -201,6 +201,13 @@ public:
     virtual bool get_circle_radius(float &radius_m) { return false; }
     virtual bool set_circle_rate(float rate_dps) { return false; }
 
+    // position, velocity and acceleration offset target (only used by scripting with Copter)
+    // gets or sets an additional offset to the vehicle's target position, velocity and acceleration
+    // units are m, m/s and m/s/s in NED frame
+    virtual bool set_posvelaccel_offset(const Vector3f &pos_offset_NED, const Vector3f &vel_offset_NED, const Vector3f &accel_offset_NED) { return false; }
+    virtual bool set_velaccel_offset(const Vector3f &vel_offset_NED, const Vector3f &accel_offset_NED) { return false; }
+    virtual bool get_posvelaccel_offset(Vector3f &pos_offset_NED, Vector3f &vel_offset_NED, Vector3f &accel_offset_NED) { return false; }
+
     // get or set steering and throttle (-1 to +1) (for use by scripting with Rover)
     virtual bool set_steering_and_throttle(float steering, float throttle) { return false; }
     virtual bool get_steering_and_throttle(float& steering, float& throttle) { return false; }
