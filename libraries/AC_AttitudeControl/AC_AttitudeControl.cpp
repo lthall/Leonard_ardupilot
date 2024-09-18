@@ -628,12 +628,13 @@ void AC_AttitudeControl::input_angle_step_bf_roll_pitch_yaw(float roll_angle_ste
 // Done as a single thread-safe function to avoid intermediate zero values being seen by the attitude controller
 void AC_AttitudeControl::input_rate_step_bf_roll_pitch_yaw(float roll_rate_step_bf_cd, float pitch_rate_step_bf_cd, float yaw_rate_step_bf_cd)
 {
-    _ang_vel_target.zero();
     // Update the unused targets attitude based on current attitude to condition mode change
     _ahrs.get_quat_body_to_ned(_attitude_target);
     _attitude_target.to_euler(_euler_angle_target);
+    // Set the target angular velocity to be zero to minimize target overshoot after the rate step finishes
+    _ang_vel_target.zero();
     // Convert body-frame angular velocity into euler angle derivative of desired attitude
-    ang_vel_to_euler_rate(_attitude_target, _ang_vel_target, _euler_rate_target);
+    _euler_rate_target.zero();
 
     Vector3f ang_vel_body {roll_rate_step_bf_cd, pitch_rate_step_bf_cd, yaw_rate_step_bf_cd};
     ang_vel_body = ang_vel_body * 0.01f * DEG_TO_RAD;
