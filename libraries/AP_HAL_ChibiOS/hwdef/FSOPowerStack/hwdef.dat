@@ -59,24 +59,32 @@ define DMA_RESERVE_SIZE 0
 
 env DISABLE_SCRIPTING 1
 
-# order of UARTs
-SERIAL_ORDER UART4 UART5
+# ---------------------- UARTs ---------------------------
 
-# UARTs
-
+define HAL_PERIPH_ENABLE_SERIAL_OPTIONS
 # UART4, External Serial Port
 PC10    UART4_TX   UART4
 Pc11    UART4_RX   UART4
 PB7     UART4_CTS  UART4
 PA15    UART4_RTS  UART4
 
-# UART5, External Serial Port
-PC12    UART5_TX   UART5
-PD2     UART5_RX   UART5
+# order of UARTs
+SERIAL_ORDER UART4
+
+define HAL_USE_SERIAL TRUE
+
+define STM32_SERIAL_USE_USART1 FALSE
+define STM32_SERIAL_USE_USART2 FALSE
+define STM32_SERIAL_USE_USART3 FALSE
+define STM32_SERIAL_USE_UART4 TRUE
+
+# ------------------- SWD debugging ----------------------
 
 # SWD debugging
 PA13 JTMS-SWDIO SWD
 PA14 JTCK-SWCLK SWD
+
+# ---------------------- CAN bus -------------------------
 
 # enable CAN support
 PA11 CAN1_RX CAN1
@@ -85,6 +93,8 @@ PA5 GPIO_CAN1_SILENT OUTPUT PUSHPULL SPEED_LOW LOW
 PB5 CAN2_RX CAN2
 PB6 CAN2_TX CAN2
 PA4 GPIO_CAN2_SILENT OUTPUT PUSHPULL SPEED_LOW LOW
+
+# ---------------------- I2C bus ------------------------
 
 # I2C2 is Control and Power Distribution Board
 PA8 I2C2_SDA I2C2
@@ -104,7 +114,8 @@ I2C_ORDER I2C2 I2C3 I2C4
 define HAL_USE_ADC TRUE
 define STM32_ADC_USE_ADC1 TRUE
 
-# analog in
+# ----------------------- ADC's ------------------------
+
 PA0     ADC_MAIN_VOLTAGE    ADC1    SCALE(0.9091)    ANALOG(90)
 PC0     ADC_BAT_1_CURRENT   ADC1    SCALE(0.9091)    ANALOG(91)
 PC1     ADC_BAT_2_CURRENT   ADC1    SCALE(0.9091)    ANALOG(92)
@@ -112,7 +123,8 @@ PC2     ADC_BAT_1_VOLTAGE   ADC1    SCALE(0.9091)    ANALOG(93)
 PC3     ADC_BAT_2_VOLTAGE   ADC1    SCALE(0.9091)    ANALOG(94)
 # VBat channel should be here somewhere too
 
-# Fan Tachometer Inputs
+# --------------- Fan Tachometer Inputs ----------------
+
 PA6     TACH_1  INPUT   OPENDRAIN   GPIO(60) # Input Fan1 Tach
 PA7     TACH_2  INPUT   OPENDRAIN   GPIO(61) # Input Fan2 Tach
 PB0     TACH_3  INPUT   OPENDRAIN   GPIO(62) # Input Fan3 Tach
@@ -122,6 +134,8 @@ define FSO_FAN_TACH1_PIN 60
 define FSO_FAN_TACH2_PIN 61
 define FSO_FAN_TACH3_PIN 62
 define FSO_FAN_TACH4_PIN 63
+
+# ----------------------- GPIO's ------------------------
 
 # PDB input switches
 PB4     H16_FAULT           INPUT   OPENDRAIN   GPIO(64)
