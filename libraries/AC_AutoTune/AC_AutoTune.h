@@ -270,7 +270,6 @@ protected:
     bool     positive_direction;         // false = tuning in negative direction (i.e. left for roll), true = positive direction (i.e. right for roll)
     StepType step;                       // see StepType for what steps are performed
     TuneType tune_type;                  // see TuneType
-    bool     twitch_first_iter;          // true on first iteration of a twitch (used to signal we must step the attitude or rate target)
     uint8_t  axes_completed;             // bitmask of completed axes
     uint32_t step_start_time_ms;                    // start time of current tuning step (used for timeout checks)
     uint32_t step_time_limit_ms;                    // time limit of current autotune process

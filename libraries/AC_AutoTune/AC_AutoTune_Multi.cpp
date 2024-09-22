@@ -1215,7 +1215,6 @@ void AC_AutoTune_Multi::twitch_test_init()
     } else {
         rotation_rate_filt.reset(0.0);
     }
-    twitch_first_iter = true;
     test_rate_max = 0.0;
     test_rate_min = 0.0;
     test_angle_max = 0.0;
@@ -1231,27 +1230,22 @@ void AC_AutoTune_Multi::twitch_test_run(AxisType test_axis, const float dir_sign
     // hold current attitude
 
     if ((tune_type == SP_DOWN) || (tune_type == SP_UP)) {
-        // step angle targets on first iteration
-        if (twitch_first_iter) {
-            twitch_first_iter = false;
-            // Testing increasing stabilize P gain so will set lean angle target
-            switch (test_axis) {
-            case AxisType::ROLL:
-                // request roll to 20deg
-                attitude_control->input_angle_step_bf_roll_pitch_yaw(dir_sign * target_angle, 0.0, 0.0);
-                break;
-            case AxisType::PITCH:
-                // request pitch to 20deg
-                attitude_control->input_angle_step_bf_roll_pitch_yaw(0.0, dir_sign * target_angle, 0.0);
-                break;
-            case AxisType::YAW:
-            case AxisType::YAW_D:
-                // request yaw to 20deg
-                attitude_control->input_angle_step_bf_roll_pitch_yaw(0.0, 0.0, dir_sign * target_angle);
-                break;
-            } 
-        } else {
-            attitude_control->input_rate_bf_roll_pitch_yaw(0.0, 0.0, 0.0);
+        // Testing increasing stabilize P gain so will set lean angle target
+        switch (test_axis) {
+        case AxisType::ROLL:
+            // request roll to 20deg
+            attitude_control->input_angle_step_bf_roll_pitch_yaw(dir_sign * target_angle, 0.0, 0.0);
+            break;
+        case AxisType::PITCH:
+            // request pitch to 20deg
+            attitude_control->input_angle_step_bf_roll_pitch_yaw(0.0, dir_sign * target_angle, 0.0);
+            break;
+        case AxisType::YAW:
+        case AxisType::YAW_D:
+            // request yaw to 20deg
+            attitude_control->input_angle_step_bf_roll_pitch_yaw(0.0, 0.0, dir_sign * target_angle);
+            break;
+        } 
         }
     } else {
         attitude_control->input_rate_bf_roll_pitch_yaw_2(0.0, 0.0, 0.0);
