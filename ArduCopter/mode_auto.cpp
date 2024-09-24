@@ -1492,6 +1492,7 @@ bool ModeAuto::shift_alt_to_current_alt(Location& target_loc) const
 // should be used when the location will be used as a target for the position controller
 void ModeAuto::subtract_pos_offsets(Location& target_loc) const
 {
+    // QUESTION: do we need to remove terrain altitude here too?
     // subtract position controller offsets from target location
     target_loc.offset(-pos_control->get_pos_offset_cm() * 0.01);
 }

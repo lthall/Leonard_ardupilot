@@ -314,12 +314,13 @@ void AC_Circle::init_start_angle(bool use_heading)
         _angle = wrap_PI(_ahrs.yaw-M_PI);
     } else {
         // if we are exactly at the center of the circle, init angle to directly behind vehicle (so vehicle will backup but not change heading)
-        const Vector3f &curr_pos_minus_offset = _inav.get_position_neu_cm() - _pos_control.get_pos_offset_cm().tofloat();
-        if (is_equal(curr_pos_minus_offset.x,float(_center.x)) && is_equal(curr_pos_minus_offset.y,float(_center.y))) {
+        // curr_pos_desired is the position before we add offsets and terrain
+        const Vector3f &curr_pos_desired= _pos_control.get_pos_desired_cm().tofloat();
+        if (is_equal(curr_pos_desired.x,float(_center.x)) && is_equal(curr_pos_desired.y,float(_center.y))) {
             _angle = wrap_PI(_ahrs.yaw-M_PI);
         } else {
             // get bearing from circle center to vehicle in radians
-            float bearing_rad = atan2f(curr_pos_minus_offset.y-_center.y, curr_pos_minus_offset.x-_center.x);
+            float bearing_rad = atan2f(curr_pos_desired.y-_center.y, curr_pos_desired.x-_center.x);
             _angle = wrap_PI(bearing_rad);
         }
     }

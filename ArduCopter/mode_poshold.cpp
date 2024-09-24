@@ -573,7 +573,7 @@ void ModePosHold::update_wind_comp_estimate()
     }
 
     // get position controller accel target
-    const Vector3f accel_target = pos_control->get_accel_target_cmss();
+    const Vector3f& accel_target = pos_control->get_accel_target_cmss();
 
     // update wind compensation in earth-frame lean angles
     if (is_zero(wind_comp_ef.x)) {

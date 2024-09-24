@@ -565,6 +565,7 @@ void AC_PosControl::input_accel_xy(const Vector3f& accel)
 void AC_PosControl::input_vel_accel_xy(Vector2f& vel, const Vector2f& accel, bool limit_output)
 {
     update_pos_vel_accel_xy(_pos_desired.xy(), _vel_desired.xy(), _accel_desired.xy(), _dt, _limit_vector.xy(), _p_pos_xy.get_error(), _pid_vel_xy.get_error());
+
     shape_vel_accel_xy(vel, accel, _vel_desired.xy(), _accel_desired.xy(),
         _accel_max_xy_cmss, _jerk_max_xy_cmsss, _dt, limit_output);
 
@@ -579,6 +580,7 @@ void AC_PosControl::input_vel_accel_xy(Vector2f& vel, const Vector2f& accel, boo
 void AC_PosControl::input_pos_vel_accel_xy(Vector2p& pos, Vector2f& vel, const Vector2f& accel, bool limit_output)
 {
     update_pos_vel_accel_xy(_pos_desired.xy(), _vel_desired.xy(), _accel_desired.xy(), _dt, _limit_vector.xy(), _p_pos_xy.get_error(), _pid_vel_xy.get_error());
+
     shape_pos_vel_accel_xy(pos, vel, accel, _pos_desired.xy(), _vel_desired.xy(), _accel_desired.xy(),
                            _vel_max_xy_cms, _accel_max_xy_cmss, _jerk_max_xy_cmsss, _dt, limit_output);
 
@@ -663,9 +665,9 @@ void AC_PosControl::update_xy_controller()
     // Position Controller
 
     _pos_target.xy() = _pos_desired.xy() + _pos_offset.xy();
-    const Vector3f &curr_pos = _inav.get_position_neu_cm();
 
     // determine the combined position of the actual position and the disturbance from system ID mode
+    const Vector3f &curr_pos = _inav.get_position_neu_cm();
     Vector3f comb_pos = curr_pos;
     comb_pos.xy() += _disturb_pos;
 
@@ -679,9 +681,9 @@ void AC_PosControl::update_xy_controller()
 
     _vel_target.xy() = vel_target;
     _vel_target.xy() += _vel_desired.xy() + _vel_offset.xy();
-    const Vector2f &curr_vel = _inav.get_velocity_xy_cms();
 
     // determine the combined velocity of the actual velocity and the disturbance from system ID mode
+    const Vector2f &curr_vel = _inav.get_velocity_xy_cms();
     Vector2f comb_vel = curr_vel;
     comb_vel += _disturb_vel;
 
@@ -888,8 +890,7 @@ void AC_PosControl::input_vel_accel_z(float &vel, float accel, bool limit_output
 ///     The zero target altitude is varied to follow pos_offset_z
 void AC_PosControl::set_pos_target_z_from_climb_rate_cm(float vel)
 {
-    float vel_temp = vel;
-    input_vel_accel_z(vel_temp, 0.0);
+    input_vel_accel_z(vel, 0.0);
 }
 
 /// land_at_climb_rate_cm - adjusts target up or down using a commanded climb rate in cm/s
@@ -1235,7 +1236,7 @@ void AC_PosControl::get_stopping_point_xy_cm(Vector2p &stopping_point) const
 {
     // todo: we should use the current target position and velocity if we are currently running the position controller
     stopping_point = _inav.get_position_xy_cm().topostype();
-    float kP = _p_pos_xy.kP();
+    stopping_point -= _pos_offset.xy();
 
     Vector2f curr_vel = _inav.get_velocity_xy_cms();
     curr_vel -= _vel_offset.xy();
@@ -1246,7 +1247,8 @@ void AC_PosControl::get_stopping_point_xy_cm(Vector2p &stopping_point) const
     if (!is_positive(vel_total)) {
         return;
     }
-
+    
+    float kP = _p_pos_xy.kP();
     const float stopping_dist = stopping_distance(constrain_float(vel_total, 0.0, _vel_max_xy_cms), kP, _accel_max_xy_cmss);
     if (!is_positive(stopping_dist)) {
         return;
@@ -1255,7 +1257,6 @@ void AC_PosControl::get_stopping_point_xy_cm(Vector2p &stopping_point) const
     // convert the stopping distance into a stopping point using velocity vector
     const float t = stopping_dist / vel_total;
     stopping_point += (curr_vel * t).topostype();
-    stopping_point -= _pos_offset.xy();
 }
 
 /// get_stopping_point_z_cm - calculates stopping point in NEU cm based on current position, velocity, vehicle acceleration
@@ -1328,27 +1329,30 @@ void AC_PosControl::write_log()
                    _vel_desired.y, _vel_target.y, _inav.get_velocity_neu_cms().y,
                    _accel_desired.y, _accel_target.y, accel_y);
 
-        // log offsets if they have ever been used
-//        if (!_pos_offset_target.xy().is_zero()) {
+        // log offsets if they are being used
+        if (!_pos_offset.xy().is_zero()) {
             Write_PSCO(_pos_offset_target.xy(), _pos_offset.xy(), _vel_offset_target.xy(), _vel_offset.xy(), _accel_offset_target.xy(), _accel_offset.xy());
-//        }
+        }
     }
 
     if (is_active_z()) {
         Write_PSCD(-_pos_target.z, -_inav.get_position_z_up_cm(),
                    -_vel_desired.z, -_vel_target.z, -_inav.get_velocity_z_up_cms(),
                    -_accel_desired.z, -_accel_target.z, -get_z_accel_cmss());
-        AP::logger().Write("PSCV",
-                        "TimeUS,PTT,PT,VT,AT",
-                        "smmno",
-                        "F0000",
-                        "Qffff",
-                        AP_HAL::micros64(),
-                        double(_pos_terrain_target * 0.01),
-                        double(_pos_terrain * 0.01),
-                        double(_vel_terrain * 0.01),
-                        double(_accel_terrain * 0.01));
 
+        // log offsets if they are being used
+        if (!is_zero(_pos_terrain)) {
+            AP::logger().Write("PSCV",
+                            "TimeUS,PTT,PT,VT,AT",
+                            "smmno",
+                            "F0000",
+                            "Qffff",
+                            AP_HAL::micros64(),
+                            double(_pos_terrain_target * 0.01),
+                            double(_pos_terrain * 0.01),
+                            double(_vel_terrain * 0.01),
+                            double(_accel_terrain * 0.01));
+        }
     }
 }
 #endif  // HAL_LOGGING_ENABLED
@@ -1476,9 +1480,13 @@ void AC_PosControl::handle_ekf_xy_reset()
     uint32_t reset_ms = _ahrs.getLastPosNorthEastReset(pos_shift);
     if (reset_ms != _ekf_xy_reset_ms) {
 
-        //_pos_offset.xy() += _pos_target.xy() - (_inav.get_position_xy_cm() + _p_pos_xy.get_error()).topostype();
-        //_vel_offset.xy() += _vel_target.xy() - (_inav.get_velocity_xy_cms() + _pid_vel_xy.get_error());
+        // if we want to move EKF steps to the offsets for modes setting absolute position and velocity
+        // we need some sort of switch to select what type of EKF handling we use
+        // To minimise estimated position errors for Auto, RTL and Guided position control.
+        //_pos_offset.xy() += (_inav.get_position_xy_cm() + _p_pos_xy.get_error()).topostype() - _pos_target.xy() ;
+        //_vel_offset.xy() += (_inav.get_velocity_xy_cms() + _pid_vel_xy.get_error()) - _vel_target.xy();
 
+        // To zero real position shift during relative position modes like Loiter, PosHold, Guided velocity and accleration control.
         _pos_target.xy() = (_inav.get_position_xy_cm() + _p_pos_xy.get_error()).topostype();
         _pos_desired.xy() = _pos_target.xy() - _pos_offset.xy();
         _vel_target.xy() = _inav.get_velocity_xy_cms() + _pid_vel_xy.get_error();
@@ -1503,8 +1511,13 @@ void AC_PosControl::handle_ekf_z_reset()
     uint32_t reset_ms = _ahrs.getLastPosDownReset(alt_shift);
     if (reset_ms != 0 && reset_ms != _ekf_z_reset_ms) {
 
-        //_pos_offset.z += _pos_target.z - (_inav.get_position_z_up_cm() + _p_pos_z.get_error());
-        //_vel_offset.z += _vel_target.z - (_inav.get_velocity_z_up_cms() + _pid_vel_z.get_error());
+        // if we want to move EKF steps to the offsets for modes setting absolute position and velocity
+        // we need some sort of switch to select what type of EKF handling we use
+        // To minimise estimated position errors for Auto, RTL and Guided position control.
+        //_pos_offset.z += (_inav.get_position_z_cm() + _p_pos_z.get_error()) - _pos_target.z ;
+        //_vel_offset.z += (_inav.get_velocity_z_cms() + _pid_vel_z.get_error()) - _vel_target.z;
+
+        // To zero real position shift during relative position modes like Loiter, PosHold, Guided velocity and accleration control.
         _pos_target.z = _inav.get_position_z_up_cm() + _p_pos_z.get_error();
         _pos_desired.z = _pos_target.z - (_pos_offset.z - _pos_terrain);
         _vel_target.z = _inav.get_velocity_z_up_cms() + _pid_vel_z.get_error();

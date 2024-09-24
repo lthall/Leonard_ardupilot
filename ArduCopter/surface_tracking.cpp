@@ -43,34 +43,6 @@ void Copter::SurfaceTracking::update_surface_offset()
     }
 }
 
-
-// get target altitude (in cm) above ground
-// returns true if there is a valid target
-bool Copter::SurfaceTracking::get_target_alt_cm(float &target_alt_cm) const
-{
-    // fail if we are not tracking downwards
-    if (surface != Surface::GROUND) {
-        return false;
-    }
-    // check target has been updated recently
-    if (AP_HAL::millis() - last_update_ms > SURFACE_TRACKING_TIMEOUT_MS) {
-        return false;
-    }
-    target_alt_cm = (copter.pos_control->get_pos_target_z_cm() - copter.pos_control->get_pos_offset_z_cm());
-    return true;
-}
-
-// set target altitude (in cm) above ground
-void Copter::SurfaceTracking::set_target_alt_cm(float _target_alt_cm)
-{
-    // fail if we are not tracking downwards
-    if (surface != Surface::GROUND) {
-        return;
-    }
-    copter.pos_control->set_pos_terrain_target_cm(copter.inertial_nav.get_position_z_up_cm() - _target_alt_cm);
-    last_update_ms = AP_HAL::millis();
-}
-
 bool Copter::SurfaceTracking::get_target_dist_for_logging(float &target_dist) const
 {
     if (!valid_for_logging || (surface == Surface::NONE)) {
@@ -79,7 +51,7 @@ bool Copter::SurfaceTracking::get_target_dist_for_logging(float &target_dist) co
 
     const float dir = (surface == Surface::GROUND) ? 1.0f : -1.0f;
     // fix me
-    target_dist = dir * (copter.pos_control->get_pos_target_z_cm() - copter.pos_control->get_pos_offset_z_cm()) * 0.01f;
+    target_dist = dir * copter.pos_control->get_pos_desired_z_cm() * 0.01f;
     return true;
 }
 

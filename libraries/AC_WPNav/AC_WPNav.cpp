@@ -465,7 +465,7 @@ bool AC_WPNav::advance_wp_target_along_track(float dt)
     }
     const float offset_z_scaler = _pos_control.pos_offset_z_scaler(terr_offset, get_terrain_margin() * 100.0);
 
-    // input shape the horizontal and terrain offsets
+    // input shape the terrain offset
     _pos_control.set_pos_terrain_target_cm(terr_offset);
 
     // get position controller's position offset (post input shaping) so it can be used in position error calculation

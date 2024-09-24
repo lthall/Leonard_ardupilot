@@ -297,10 +297,10 @@ public:
     /// set_vel_desired_xy_cms - sets horizontal desired velocity in NEU cm/s
     void set_vel_desired_xy_cms(const Vector2f &vel) {_vel_desired.xy() = vel; }
 
-    /// returns desired velocity (i.e. feed forward) in cm/s in NEU
+    /// get_vel_desired_cms - returns desired velocity in cm/s in NEU
     const Vector3f& get_vel_desired_cms() { return _vel_desired; }
 
-    // returns the target velocity (not including offsets) in NEU cm/s
+    // get_vel_target_cms - returns the target velocity in NEU cm/s
     const Vector3f& get_vel_target_cms() const { return _vel_target; }
 
     /// set_vel_desired_z_cms - sets desired velocity in cm/s in z axis
@@ -312,17 +312,22 @@ public:
 
     /// Acceleration
 
-    // set_accel_desired_xy_cmss set desired acceleration in cm/s in xy axis
+    // set_accel_desired_xy_cmss - set desired acceleration in cm/s in xy axis
     void set_accel_desired_xy_cmss(const Vector2f &accel_cms) { _accel_desired.xy() = accel_cms; }
 
-    // returns the target acceleration (not including offsets) in NEU cm/s/s
+    // get_accel_target_cmss - returns the target acceleration in NEU cm/s/s
     const Vector3f& get_accel_target_cmss() const { return _accel_target; }
 
 
     /// Terrain
 
+    // set_pos_terrain_target_cm - set target terrain altitude in cm
     void set_pos_terrain_target_cm(float pos_terrain_target) {_pos_terrain_target = pos_terrain_target;}
+
+    // init_pos_terrain_cm - initialises the current terrain altitude and target altitude to pos_offset_terrain_cm
     void init_pos_terrain_cm(float pos_offset_terrain_cm);
+
+    // get_pos_terrain_cm - returns the current terrain altitude in cm
     float get_pos_terrain_cm() { return _pos_terrain; }
 
 
@@ -342,7 +347,6 @@ public:
     void set_posvelaccel_offset_target_z_cm(float pos_offset_target_z_cm, float vel_offset_target_z_cms, float accel_offset_target_z_cmss);
     
     /// get the position, velocity or acceleration offets in cm from EKF origin in NEU frame
-    const Vector3p& get_pos_offset_target_cm() const { return _pos_offset_target; }
     const Vector3p& get_pos_offset_cm() const { return _pos_offset; }
     const Vector3f& get_vel_offset_cms() const { return _vel_offset; }
     const Vector3f& get_accel_offset_cmss() const { return _accel_offset; }
