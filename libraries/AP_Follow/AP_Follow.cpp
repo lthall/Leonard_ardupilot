@@ -255,7 +255,7 @@ bool AP_Follow::get_target_position_and_velocity(Vector3p &pos_ned, Vector3f &ve
     update_pos_vel_accel_xy(projected_pos_ned.xy(), projected_vel_ned.xy(), projected_accel_ned.xy(), dt, Vector2f(), Vector2f(), Vector2f());
     update_pos_vel_accel(projected_pos_ned.z, projected_vel_ned.z, projected_accel_ned.z, dt, 0.0, 0.0, 0.0);
 
-    // return latest position estimate
+    // return latest estimates
     pos_ned = projected_pos_ned;
     vel_ned = projected_vel_ned;
     return true;
