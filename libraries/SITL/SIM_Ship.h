@@ -81,7 +81,7 @@ private:
     uint32_t last_update_us;
 
     // reporting period in ms
-    const float reporting_period_ms = 200;
+    const float reporting_period_ms = 1000;
     uint32_t last_report_ms;
     uint32_t last_heartbeat_ms;
 
