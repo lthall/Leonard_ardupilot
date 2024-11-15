@@ -147,7 +147,7 @@ const AP_Param::GroupInfo AP_Follow::var_info[] = {
     // @Range: 0 5
     // @Units: m/s/s
     // @User: Advanced
-    AP_GROUPINFO("ACCELXY", 12, AP_Follow, _max_accel_xy, 2.5),
+    AP_GROUPINFO("_ACCELXY", 12, AP_Follow, _max_accel_xy, 2.5),
 
     // @Param: JERKXY
     // @DisplayName: Jerk limit for the horizontal kinematic input shaping
@@ -155,7 +155,7 @@ const AP_Param::GroupInfo AP_Follow::var_info[] = {
     // @Range: 0 20
     // @Units: m/s/s/s
     // @User: Advanced
-    AP_GROUPINFO("JERKXY", 13, AP_Follow, _max_jerk_xy, 5.0),
+    AP_GROUPINFO("_JERKXY", 13, AP_Follow, _max_jerk_xy, 5.0),
 
     // @Param: ACCELZ
     // @DisplayName: Acceleration limit for the vertical kinematic input shaping
@@ -163,7 +163,7 @@ const AP_Param::GroupInfo AP_Follow::var_info[] = {
     // @Range: 0 2.5
     // @Units: m/s/s
     // @User: Advanced
-    AP_GROUPINFO("ACCELZ", 14, AP_Follow, _max_accel_z, 2.5),
+    AP_GROUPINFO("_ACCELZ", 14, AP_Follow, _max_accel_z, 2.5),
 
     // @Param: JERKZ
     // @DisplayName: Jerk limit for the vertical kinematic input shaping
@@ -171,7 +171,7 @@ const AP_Param::GroupInfo AP_Follow::var_info[] = {
     // @Range: 0 5
     // @Units: m/s/s/s
     // @User: Advanced
-    AP_GROUPINFO("JERKZ", 15, AP_Follow, _max_jerk_z, 5.0),
+    AP_GROUPINFO("_JERKZ", 15, AP_Follow, _max_jerk_z, 5.0),
 
     // @Param: ACCELH
     // @DisplayName: Angular acceleration limit for the heading kinematic input shaping
@@ -179,7 +179,7 @@ const AP_Param::GroupInfo AP_Follow::var_info[] = {
     // @Range: 0 45
     // @Units: deg/s/s
     // @User: Advanced
-    AP_GROUPINFO("ACCELH", 16, AP_Follow, _max_accel_h, 90.0),
+    AP_GROUPINFO("_ACCELH", 16, AP_Follow, _max_accel_h, 90.0),
 
     // @Param: JERKH
     // @DisplayName: Angular jerk limit for the heading kinematic input shaping
@@ -187,7 +187,7 @@ const AP_Param::GroupInfo AP_Follow::var_info[] = {
     // @Range: 0 180
     // @Units: deg/s/s/s
     // @User: Advanced
-    AP_GROUPINFO("JERKH", 17, AP_Follow, _max_jerk_h, 360.0),
+    AP_GROUPINFO("_JERKH", 17, AP_Follow, _max_jerk_h, 360.0),
 
     AP_GROUPEND
 };
