@@ -74,7 +74,7 @@ private:
 
     Location home;
     const char *target_address = "127.0.0.1";
-    const uint16_t target_port = 5762;
+    const uint16_t target_port = 5763;
 
     bool initialised;
     Ship ship;
