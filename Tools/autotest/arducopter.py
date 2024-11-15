@@ -8836,6 +8836,8 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
             "FOLL_SYSID": 77,
             "FOLL_OFS_Z": -10,
         })
+        self.reboot_sitl()
+
         self.wait_ready_to_arm()
         self.takeoff(10)
 
