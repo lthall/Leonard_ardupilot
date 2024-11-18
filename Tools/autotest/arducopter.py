@@ -8835,6 +8835,7 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
             "FOLL_ENABLE": 1,
             "FOLL_SYSID": 77,
             "FOLL_OFS_Z": -10,
+            "FOLL_YAW_BEHAVE": 2,
         })
         self.reboot_sitl()
 
@@ -8842,12 +8843,12 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
         self.takeoff(10)
 
         self.change_mode('FOLLOW')
-        self.set_parameter("SIM_SHIP_SPEED", 10)
+        self.set_parameter("SIM_SHIP_SPEED", 7.5)
 
         # we should be moving with the ship
-        self.wait_groundspeed(9, 11)
+        self.wait_groundspeed(6.5, 8.5)
 
-        self.set_parameter('SIM_SPEEDUP', 1)
+        self.set_parameter('SIM_SPEEDUP', 10)
         self.delay_sim_time(300)
 
         self.disarm_vehicle(force=True)
