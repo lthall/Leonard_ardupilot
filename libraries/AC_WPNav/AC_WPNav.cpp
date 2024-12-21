@@ -463,10 +463,14 @@ bool AC_WPNav::advance_wp_target_along_track(float dt)
     if (_terrain_alt && !get_terrain_offset(terr_offset)) {
         return false;
     }
-    const float offset_z_scaler = _pos_control.pos_offset_z_scaler(terr_offset, get_terrain_margin() * 100.0);
-
     // input shape the terrain offset
     _pos_control.set_pos_terrain_target_cm(terr_offset);
+
+    // replace above with update surface offset
+    // get the current terrain offset
+    // terr_offset = _pos_control.get_pos_terrain_target_cm()
+
+    const float offset_z_scaler = _pos_control.pos_terrain_z_scaler(get_terrain_margin() * 100.0);
 
     // get position controller's position offset (post input shaping) so it can be used in position error calculation
     const Vector3p& psc_pos_offset = _pos_control.get_pos_offset_cm();
