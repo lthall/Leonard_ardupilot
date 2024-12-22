@@ -368,7 +368,7 @@ AC_PosControl::AC_PosControl(AP_AHRS_View& ahrs, const AP_InertialNav& inav,
 void AC_PosControl::input_pos_xyz(const Vector3p& pos, float pos_terrain_target, float terrain_buffer)
 {
     // Terrain following velocity scalar must be calculated before we remove the position offset
-    const float offset_z_scaler = pos_offset_z_scaler(pos_terrain_target, terrain_buffer);
+    const float offset_z_scaler = pos_terrain_z_scaler(terrain_buffer);
     set_pos_terrain_target_cm(pos_terrain_target);
 
     // calculated increased maximum acceleration and jerk if over speed
@@ -411,14 +411,14 @@ void AC_PosControl::input_pos_xyz(const Vector3p& pos, float pos_terrain_target,
 }
 
 
-/// pos_offset_z_scaler - calculates a multiplier used to reduce the horizontal velocity to allow the z position controller to stay within the provided buffer range
-float AC_PosControl::pos_offset_z_scaler(float pos_offset_z, float pos_offset_z_buffer) const
+/// pos_terrain_z_scaler - calculates a multiplier used to reduce the horizontal velocity to allow the z position controller to stay within the provided buffer range
+float AC_PosControl::pos_terrain_z_scaler(float pos_terrain_z_buffer) const
 {
-    if (is_zero(pos_offset_z_buffer)) {
+    if (is_zero(pos_terrain_z_buffer)) {
         return 1.0;
     }
-    float pos_offset_error_z = _inav.get_position_z_up_cm() - (_pos_target.z + (pos_offset_z - _pos_terrain));
-    return constrain_float((1.0 - (fabsf(pos_offset_error_z) - 0.5 * pos_offset_z_buffer) / (0.5 * pos_offset_z_buffer)), 0.01, 1.0);
+    float pos_offset_error_z = _inav.get_position_z_up_cm() - (_pos_target.z + (_pos_terrain_target - _pos_terrain));
+    return constrain_float((1.0 - (fabsf(pos_offset_error_z) - 0.5 * pos_terrain_z_buffer) / (0.5 * pos_terrain_z_buffer)), 0.01, 1.0);
 }
 
 ///

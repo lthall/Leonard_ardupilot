@@ -66,9 +66,6 @@ public:
     ///     The kinematic path is constrained by the maximum acceleration and jerk set using the function set_max_speed_accel_xy.
     void input_pos_xyz(const Vector3p& pos, float pos_terrain_target, float terrain_buffer);
 
-    /// pos_offset_z_scaler - calculates a multiplier used to reduce the horizontal velocity to allow the z position controller to stay within the provided buffer range
-    float pos_offset_z_scaler(float pos_offset_z, float pos_offset_z_buffer) const;
-
     ///
     /// Lateral position controller
     ///
@@ -324,11 +321,17 @@ public:
     // set_pos_terrain_target_cm - set target terrain altitude in cm
     void set_pos_terrain_target_cm(float pos_terrain_target) {_pos_terrain_target = pos_terrain_target;}
 
+    // get_pos_terrain_cm - returns the current terrain altitude in cm
+    float get_pos_terrain_target_cm() { return _pos_terrain_target; }
+
     // init_pos_terrain_cm - initialises the current terrain altitude and target altitude to pos_offset_terrain_cm
     void init_pos_terrain_cm(float pos_offset_terrain_cm);
 
     // get_pos_terrain_cm - returns the current terrain altitude in cm
     float get_pos_terrain_cm() { return _pos_terrain; }
+
+    /// pos_terrain_z_scaler - calculates a multiplier used to reduce the horizontal velocity to allow the z position controller to stay within the provided buffer range
+    float pos_terrain_z_scaler(float pos_terrain_z_buffer) const;
 
 
     /// Offset
