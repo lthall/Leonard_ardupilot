@@ -9,6 +9,7 @@ void Copter::SurfaceTracking::update_surface_offset()
     // check for timeout
     const uint32_t now_ms = millis();
     const bool timeout = (now_ms - last_update_ms) > SURFACE_TRACKING_TIMEOUT_MS;
+    AP_Terrain *terrain = AP::terrain();
 
     // check tracking state and that range finders are healthy
     if (((surface == Surface::GROUND) && copter.rangefinder_alt_ok() && (copter.rangefinder_state.glitch_count == 0)) ||
@@ -32,6 +33,29 @@ void Copter::SurfaceTracking::update_surface_offset()
             reset_target = false;
             last_glitch_cleared_ms = rf_state.glitch_cleared_ms;
         }
+
+#if AP_TERRAIN_AVAILABLE
+    } else if (((surface == Surface::TERRAINDATABASE) && terrain != nullptr))  {
+
+        float terr_alt = 0.0f;
+        float offset_cm = 0.0f;
+        if (terrain->height_above_terrain(terr_alt, true)) {
+            offset_cm = copter.inertial_nav.get_velocity_z_up_cms() - (terr_alt * 100.0);
+            // update position controller target offset to the surface's alt above the EKF origin
+            copter.pos_control->set_pos_terrain_target_cm(offset_cm);
+            last_update_ms = now_ms;
+            valid_for_logging = true;
+        }
+
+        // reset target altitude if this controller has just been engaged
+        // target has been changed between upwards vs downwards
+        // or glitch has cleared
+        if (timeout ||
+            reset_target) {
+            copter.pos_control->init_pos_terrain_cm(offset_cm);
+            reset_target = false;
+        }
+#endif
 
     } else {
         // reset position controller offsets if surface tracking is inactive

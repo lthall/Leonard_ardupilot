@@ -279,7 +279,8 @@ private:
         enum class Surface {
             NONE = 0,
             GROUND = 1,
-            CEILING = 2
+            CEILING = 2,
+            TERRAINDATABASE = 3
         };
         // set surface to track
         void set_surface(Surface new_surface);
