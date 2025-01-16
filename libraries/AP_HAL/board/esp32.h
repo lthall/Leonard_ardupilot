@@ -42,6 +42,14 @@
 #define HAL_BinarySemaphore ESP32::BinarySemaphore
 #endif
 
+#ifndef HAL_HAVE_HARDWARE_DOUBLE
+#define HAL_HAVE_HARDWARE_DOUBLE 0
+#endif
+
+#ifndef HAL_WITH_EKF_DOUBLE
+#define HAL_WITH_EKF_DOUBLE HAL_HAVE_HARDWARE_DOUBLE
+#endif
+
 #define HAL_NUM_CAN_IFACES 0
 #define HAL_MEM_CLASS HAL_MEM_CLASS_192
 
@@ -51,6 +59,10 @@
 
 #define __LITTLE_ENDIAN  1234
 #define __BYTE_ORDER     __LITTLE_ENDIAN
+
+// ArduPilot uses __RAMFUNC__ to place functions in fast instruction RAM
+#define __RAMFUNC__ IRAM_ATTR
+
 
 // whenver u get ... error: "xxxxxxx" is not defined, evaluates to 0 [-Werror=undef]  just define it below as 0
 #define CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY 0
@@ -91,7 +103,7 @@
 // disble temp cal of gyros by default
 #define HAL_INS_TEMPERATURE_CAL_ENABLE 0
 
-//turn off a bunch of advanced plane scheduler table things. see ArduPlane.cpp
+//turn off a bunch of advanced plane scheduler table things. see Plane.cpp
 #define AP_ADVANCEDFAILSAFE_ENABLED 0
 #define AP_ICENGINE_ENABLED 0
 #define AP_OPTICALFLOW_ENABLED 0
@@ -107,12 +119,15 @@
 #define AP_LANDINGGEAR_ENABLED 0
 
 // disable avoid-fence-follow in copter, these all kinda need each other, so its all or none.
-#define AC_AVOID_ENABLED 0
+#define AP_AVOIDANCE_ENABLED 0
 #define AP_FENCE_ENABLED 0
 #define MODE_FOLLOW_ENABLED 0
-#define AC_OAPATHPLANNER_ENABLED 0
+#define AP_OAPATHPLANNER_ENABLED 0
 
 
 // other big things..
 #define HAL_QUADPLANE_ENABLED 0
 #define HAL_GYROFFT_ENABLED 0
+
+// remove once ESP32 isn't so chronically slow
+#define AP_SCHEDULER_OVERTIME_MARGIN_US 50000UL

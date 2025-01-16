@@ -2,14 +2,6 @@
 
 #include <AP_HAL/AP_HAL_Boards.h>
 
-// Just so that it's completely clear...
-#define ENABLED                 1
-#define DISABLED                0
-
-// this avoids a very common config error
-#define ENABLE ENABLED
-#define DISABLE DISABLED
-
 // Frame types
 #define UNDEFINED_FRAME 0
 #define MULTICOPTER_FRAME 1
@@ -95,7 +87,8 @@ enum LoggingParameters {
      LOG_GUIDED_POSITION_TARGET_MSG,
      LOG_SYSIDD_MSG,
      LOG_SYSIDS_MSG,
-     LOG_GUIDED_ATTITUDE_TARGET_MSG
+     LOG_GUIDED_ATTITUDE_TARGET_MSG,
+     LOG_RATE_THREAD_DT_MSG
 };
 
 #define MASK_LOG_ATTITUDE_FAST          (1<<0)

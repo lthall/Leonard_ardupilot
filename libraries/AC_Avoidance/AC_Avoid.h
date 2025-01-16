@@ -1,5 +1,9 @@
 #pragma once
 
+#include "AC_Avoidance_config.h"
+
+#if AP_AVOIDANCE_ENABLED
+
 #include <AP_Common/AP_Common.h>
 #include <AP_Param/AP_Param.h>
 #include <AP_Math/AP_Math.h>
@@ -64,14 +68,7 @@ public:
 
     // adjust vertical climb rate so vehicle does not break the vertical fence
     void adjust_velocity_z(float kP, float accel_cmss, float& climb_rate_cms, float& backup_speed, float dt);
-    void adjust_velocity_z(float kP, float accel_cmss, float& climb_rate_cms, float dt) {
-        float backup_speed = 0.0f;
-        adjust_velocity_z(kP, accel_cmss, climb_rate_cms, backup_speed, dt);
-        if (!is_zero(backup_speed)) {
-            climb_rate_cms = MIN(climb_rate_cms, backup_speed);
-        }
-    }
-    
+    void adjust_velocity_z(float kP, float accel_cmss, float& climb_rate_cms, float dt);
 
     // adjust roll-pitch to push vehicle away from objects
     // roll and pitch value are in centi-degrees
@@ -229,3 +226,5 @@ private:
 namespace AP {
     AC_Avoid *ac_avoid();
 };
+
+#endif  // AP_AVOIDANCE_ENABLED

@@ -1071,8 +1071,8 @@ const AP_Param::GroupInfo AP_OSD_Screen::var_info2[] = {
 #if HAL_WITH_MSP_DISPLAYPORT
     // @Param: TXT_RES
     // @DisplayName: Sets the overlay text resolution (MSP DisplayPort only)
-    // @Description: Sets the overlay text resolution for this screen to either LD 30x16 or HD 50x18 (MSP DisplayPort only)
-    // @Values: 0:30x16,1:50x18
+    // @Description: Sets the overlay text resolution for this screen to either SD 30x16 or HD 50x18/60x22 (MSP DisplayPort only)
+    // @Values: 0:30x16,1:50x18,2:60x22
     // @User: Standard
     AP_GROUPINFO("TXT_RES", 3, AP_OSD_Screen, txt_resolution, 0),
 
@@ -1449,6 +1449,7 @@ void AP_OSD_Screen::draw_altitude(uint8_t x, uint8_t y)
     backend->write(x, y, false, "%4d%c", (int)u_scale(ALTITUDE, alt), u_icon(ALTITUDE));
 }
 
+#if AP_BATTERY_ENABLED
 void AP_OSD_Screen::draw_bat_volt(uint8_t instance, VoltageType type, uint8_t x, uint8_t y)
 {
     AP_BattMonitor &battery = AP::battery();
@@ -1524,6 +1525,7 @@ void AP_OSD_Screen::draw_restvolt(uint8_t x, uint8_t y)
 {
     draw_bat_volt(0,VoltageType::RESTING_VOLTAGE,x,y);
 }
+#endif  // AP_BATTERY_ENABLED
 
 #if AP_RSSI_ENABLED
 void AP_OSD_Screen::draw_rssi(uint8_t x, uint8_t y)
@@ -1549,6 +1551,7 @@ void AP_OSD_Screen::draw_link_quality(uint8_t x, uint8_t y)
 }
 #endif  // AP_RSSI_ENABLED
 
+#if AP_BATTERY_ENABLED
 void AP_OSD_Screen::draw_current(uint8_t instance, uint8_t x, uint8_t y)
 {
     float amps;
@@ -1569,6 +1572,7 @@ void AP_OSD_Screen::draw_current(uint8_t x, uint8_t y)
 {
     draw_current(0, x, y);
 }
+#endif
 
 void AP_OSD_Screen::draw_fltmode(uint8_t x, uint8_t y)
 {
@@ -1592,6 +1596,7 @@ void AP_OSD_Screen::draw_sats(uint8_t x, uint8_t y)
     backend->write(x, y, flash, "%c%c%2u", SYMBOL(SYM_SAT_L), SYMBOL(SYM_SAT_R), nsat);
 }
 
+#if AP_BATTERY_ENABLED
 void AP_OSD_Screen::draw_batused(uint8_t instance, uint8_t x, uint8_t y)
 {
     float mah;
@@ -1610,6 +1615,7 @@ void AP_OSD_Screen::draw_batused(uint8_t x, uint8_t y)
 {
     draw_batused(0, x, y);
 }
+#endif
 
 //Autoscroll message is the same as in minimosd-extra.
 //Thanks to night-ghost for the approach.
@@ -1864,10 +1870,14 @@ void AP_OSD_Screen::draw_sidebars(uint8_t x, uint8_t y)
     static const int aspd_interval = 10; //units between large tick marks
     int alt_interval = (osd->units == AP_OSD::UNITS_AVIATION || osd->units == AP_OSD::UNITS_IMPERIAL) ? 20 : 10;
 
+    // Height values taking into account configurable vertical extension
+    const int bar_total_height = 7 + (osd->sidebar_v_ext * 2);
+    const int bar_middle = bar_total_height / 2;     // Integer division
+
     // render airspeed ladder
     int aspd_symbol_index = fmodf(scaled_aspd, aspd_interval) / aspd_interval * total_sectors;
-    for (int i = 0; i < 7; i++){
-        if (i == 3) {
+    for (int i = 0; i < bar_total_height; i++){
+        if (i == bar_middle) {
             // the middle section of the ladder with the currrent airspeed
             backend->write(x, y+i, false, "%3d%c%c", (int) scaled_aspd, u_icon(SPEED), SYMBOL(SYM_SIDEBAR_R_ARROW));
         } else {
@@ -1879,12 +1889,12 @@ void AP_OSD_Screen::draw_sidebars(uint8_t x, uint8_t y)
     // render the altitude ladder
     // similar formula to above, but accounts for negative altitudes
     int alt_symbol_index = fmodf(fmodf(scaled_alt, alt_interval) + alt_interval, alt_interval) / alt_interval * total_sectors;
-    for (int i = 0; i < 7; i++){
-        if (i == 3) {
+    for (int i = 0; i < bar_total_height; i++){
+        if (i == bar_middle) {
             // the middle section of the ladder with the currrent altitude
-            backend->write(x+16, y+i, false, "%c%d%c", SYMBOL(SYM_SIDEBAR_L_ARROW), (int) scaled_alt, u_icon(ALTITUDE));
+            backend->write(x + 16 + osd->sidebar_h_offset, y+i, false, "%c%d%c", SYMBOL(SYM_SIDEBAR_L_ARROW), (int) scaled_alt, u_icon(ALTITUDE));
         } else {
-            backend->write(x+16, y+i, false,  "%c", SYMBOL(sidebar_sectors[alt_symbol_index]));
+            backend->write(x + 16 + osd->sidebar_h_offset, y+i, false,  "%c", SYMBOL(sidebar_sectors[alt_symbol_index]));
         }
         alt_symbol_index = (alt_symbol_index + 12) % 18;
     }
@@ -2299,6 +2309,7 @@ void  AP_OSD_Screen::draw_flightime(uint8_t x, uint8_t y)
     }
 }
 
+#if AP_BATTERY_ENABLED
 void AP_OSD_Screen::draw_eff(uint8_t x, uint8_t y)
 {
     AP_BattMonitor &battery = AP::battery();
@@ -2316,7 +2327,9 @@ void AP_OSD_Screen::draw_eff(uint8_t x, uint8_t y)
         backend->write(x, y, false, "%c---%c", SYMBOL(SYM_EFF),SYMBOL(SYM_MAH));
     }
 }
+#endif  // AP_BATTERY_ENABLED
 
+#if AP_BATTERY_ENABLED
 void AP_OSD_Screen::draw_climbeff(uint8_t x, uint8_t y)
 {
     char unit_icon = u_icon(DISTANCE);
@@ -2346,6 +2359,7 @@ void AP_OSD_Screen::draw_climbeff(uint8_t x, uint8_t y)
         backend->write(x, y, false,"%c%c---%c",SYMBOL(SYM_PTCHUP),SYMBOL(SYM_EFF),unit_icon);
     }
 }
+#endif
 
 #if BARO_MAX_INSTANCES > 1
 void AP_OSD_Screen::draw_btemp(uint8_t x, uint8_t y)
@@ -2520,6 +2534,7 @@ void AP_OSD_Screen::draw_fence(uint8_t x, uint8_t y)
 }
 #endif
 
+#if AP_RANGEFINDER_ENABLED
 void AP_OSD_Screen::draw_rngf(uint8_t x, uint8_t y)
 {
     RangeFinder *rangefinder = RangeFinder::get_singleton();
@@ -2533,6 +2548,7 @@ void AP_OSD_Screen::draw_rngf(uint8_t x, uint8_t y)
         backend->write(x, y, false, "%c%4.1f%c", SYMBOL(SYM_RNGFD), u_scale(DISTANCE, distance), u_icon(DISTANCE));
     }
 }
+#endif
 
 #define DRAW_SETTING(n) if (n.enabled) draw_ ## n(n.xpos, n.ypos)
 
@@ -2558,7 +2574,9 @@ void AP_OSD_Screen::draw(void)
     DRAW_SETTING(hgt_abvterr);
 #endif
 
+#if AP_RANGEFINDER_ENABLED
     DRAW_SETTING(rngf);
+#endif
     DRAW_SETTING(waypoint);
     DRAW_SETTING(xtrack_error);
     DRAW_SETTING(bat_volt);
@@ -2566,8 +2584,10 @@ void AP_OSD_Screen::draw(void)
     DRAW_SETTING(avgcellvolt);
     DRAW_SETTING(avgcellrestvolt);
     DRAW_SETTING(restvolt);
+#if AP_RSSI_ENABLED
     DRAW_SETTING(rssi);
     DRAW_SETTING(link_quality);
+#endif
     DRAW_SETTING(current);
     DRAW_SETTING(batused);
     DRAW_SETTING(bat2used);

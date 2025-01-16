@@ -54,7 +54,7 @@ struct dirent {
 #define AP_FILESYSTEM_FORMAT_ENABLED 1
 #endif
 
-#if CONFIG_HAL_BOARD == HAL_BOARD_LINUX || CONFIG_HAL_BOARD == HAL_BOARD_SITL
+#if CONFIG_HAL_BOARD == HAL_BOARD_LINUX || CONFIG_HAL_BOARD == HAL_BOARD_SITL || CONFIG_HAL_BOARD == HAL_BOARD_QURT
 #include "AP_Filesystem_posix.h"
 #endif
 
@@ -132,7 +132,9 @@ public:
     AP_Filesystem_Backend::FormatStatus get_format_status() const;
 
     /*
-      load a full file. Use delete to free the data
+      Load a file's contents into memory. Returned object must be `delete`d to
+      free the data. The data is guaranteed to be null-terminated such that it
+      can be treated as a string.
      */
     FileData *load_file(const char *filename);
 
@@ -155,6 +157,14 @@ private:
       find backend by open fd
      */
     const Backend &backend_by_fd(int &fd) const;
+
+    // support for listing out virtual directory entries (e.g. @SYS
+    // then @MISSION)
+    struct {
+        uint8_t backend_ofs;
+        struct dirent de;
+        uint8_t d_off;
+    } virtual_dirent;
 };
 
 namespace AP {

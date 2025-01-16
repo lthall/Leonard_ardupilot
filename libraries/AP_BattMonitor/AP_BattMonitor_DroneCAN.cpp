@@ -26,7 +26,7 @@ const AP_Param::GroupInfo AP_BattMonitor_DroneCAN::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("CURR_MULT", 30, AP_BattMonitor_DroneCAN, _curr_mult, 1.0),
 
-    // Param indexes must be between 30 and 39 to avoid conflict with other battery monitor param tables loaded by pointer
+    // CHECK/UPDATE INDEX TABLE IN AP_BattMonitor_Backend.cpp WHEN CHANGING OR ADDING PARAMETERS
 
     AP_GROUPEND
 };
@@ -42,23 +42,14 @@ AP_BattMonitor_DroneCAN::AP_BattMonitor_DroneCAN(AP_BattMonitor &mon, AP_BattMon
     _state.healthy = false;
 }
 
-void AP_BattMonitor_DroneCAN::subscribe_msgs(AP_DroneCAN* ap_dronecan)
+bool AP_BattMonitor_DroneCAN::subscribe_msgs(AP_DroneCAN* ap_dronecan)
 {
-    if (ap_dronecan == nullptr) {
-        return;
-    }
+    const auto driver_index = ap_dronecan->get_driver_index();
 
-    if (Canard::allocate_sub_arg_callback(ap_dronecan, &handle_battery_info_trampoline, ap_dronecan->get_driver_index()) == nullptr) {
-        AP_BoardConfig::allocation_error("battinfo_sub");
-    }
-
-    if (Canard::allocate_sub_arg_callback(ap_dronecan, &handle_battery_info_aux_trampoline, ap_dronecan->get_driver_index()) == nullptr) {
-        AP_BoardConfig::allocation_error("battinfo_aux_sub");
-    }
-
-    if (Canard::allocate_sub_arg_callback(ap_dronecan, &handle_mppt_stream_trampoline, ap_dronecan->get_driver_index()) == nullptr) {
-        AP_BoardConfig::allocation_error("mppt_stream_sub");
-    }
+    return (Canard::allocate_sub_arg_callback(ap_dronecan, &handle_battery_info_trampoline, driver_index) != nullptr)
+        && (Canard::allocate_sub_arg_callback(ap_dronecan, &handle_battery_info_aux_trampoline, driver_index) != nullptr)
+        && (Canard::allocate_sub_arg_callback(ap_dronecan, &handle_mppt_stream_trampoline, driver_index) != nullptr)
+    ;
 }
 
 /*
@@ -79,7 +70,7 @@ AP_BattMonitor_DroneCAN* AP_BattMonitor_DroneCAN::get_dronecan_backend(AP_DroneC
     const auto &batt = AP::battery();
     for (uint8_t i = 0; i < batt._num_instances; i++) {
         if (batt.drivers[i] == nullptr ||
-            batt.get_type(i) != AP_BattMonitor::Type::UAVCAN_BatteryInfo) {
+            batt.allocated_type(i) != AP_BattMonitor::Type::UAVCAN_BatteryInfo) {
             continue;
         }
         AP_BattMonitor_DroneCAN* driver = (AP_BattMonitor_DroneCAN*)batt.drivers[i];
@@ -90,7 +81,7 @@ AP_BattMonitor_DroneCAN* AP_BattMonitor_DroneCAN::get_dronecan_backend(AP_DroneC
     // find empty uavcan driver
     for (uint8_t i = 0; i < batt._num_instances; i++) {
         if (batt.drivers[i] != nullptr &&
-            batt.get_type(i) == AP_BattMonitor::Type::UAVCAN_BatteryInfo &&
+            batt.allocated_type(i) == AP_BattMonitor::Type::UAVCAN_BatteryInfo &&
             match_battery_id(i, battery_id)) {
 
             AP_BattMonitor_DroneCAN* batmon = (AP_BattMonitor_DroneCAN*)batt.drivers[i];
@@ -241,7 +232,7 @@ void AP_BattMonitor_DroneCAN::handle_battery_info_aux_trampoline(AP_DroneCAN *ap
     for (uint8_t i = 0; i < batt._num_instances; i++) {
         const auto *drv = batt.drivers[i];
         if (drv != nullptr &&
-            batt.get_type(i) == AP_BattMonitor::Type::UAVCAN_BatteryInfo &&
+            batt.allocated_type(i) == AP_BattMonitor::Type::UAVCAN_BatteryInfo &&
             drv->option_is_set(AP_BattMonitor_Params::Options::AllowSplitAuxInfo) &&
             batt.get_serial_number(i) == int32_t(msg.battery_id)) {
             driver = (AP_BattMonitor_DroneCAN *)batt.drivers[i];
@@ -405,7 +396,7 @@ void AP_BattMonitor_DroneCAN::mppt_set_powered_state(bool power_on)
     request.disable = !request.enable;
 
     if (mppt_outputenable_client == nullptr) {
-        mppt_outputenable_client = new Canard::Client<mppt_OutputEnableResponse>{_ap_dronecan->get_canard_iface(), mppt_outputenable_res_cb};
+        mppt_outputenable_client = NEW_NOTHROW Canard::Client<mppt_OutputEnableResponse>{_ap_dronecan->get_canard_iface(), mppt_outputenable_res_cb};
         if (mppt_outputenable_client == nullptr) {
             return;
         }

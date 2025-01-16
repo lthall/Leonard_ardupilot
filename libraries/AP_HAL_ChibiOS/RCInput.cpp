@@ -31,9 +31,7 @@ extern AP_IOMCU iomcu;
 
 #include <AP_Math/AP_Math.h>
 
-#ifndef HAL_NO_UARTDRIVER
 #include <GCS_MAVLink/GCS.h>
-#endif
 
 #define SIG_DETECT_TIMEOUT_US 500000
 using namespace ChibiOS;
@@ -84,15 +82,6 @@ bool RCInput::new_input()
         _last_read = _rcin_timestamp_last_signal;
     }
 
-#if HAL_RCINPUT_WITH_AP_RADIO
-    if (!_radio_init) {
-        _radio_init = true;
-        radio = AP_Radio::get_singleton();
-        if (radio) {
-            radio->init();
-        }
-    }
-#endif
     return valid;
 }
 
@@ -114,12 +103,6 @@ uint16_t RCInput::read(uint8_t channel)
         WITH_SEMAPHORE(rcin_mutex);
         v = _rc_values[channel];
     }
-#if HAL_RCINPUT_WITH_AP_RADIO
-    if (radio && channel == 0) {
-        // hook to allow for update of radio on main thread, for mavlink sends
-        radio->update();
-    }
-#endif
     return v;
 }
 
@@ -136,12 +119,6 @@ uint8_t RCInput::read(uint16_t* periods, uint8_t len)
         WITH_SEMAPHORE(rcin_mutex);
         memcpy(periods, _rc_values, len*sizeof(periods[0]));
     }
-#if HAL_RCINPUT_WITH_AP_RADIO
-    if (radio) {
-        // hook to allow for update of radio on main thread, for mavlink sends
-        radio->update();
-    }
-#endif
     return len;
 }
 
@@ -150,7 +127,7 @@ void RCInput::_timer_tick(void)
     if (!_init) {
         return;
     }
-#ifndef HAL_NO_UARTDRIVER
+#if AP_HAVE_GCS_SEND_TEXT
     const char *rc_protocol = nullptr;
     RCSource source = last_source;
 #endif
@@ -186,7 +163,7 @@ void RCInput::_timer_tick(void)
     if (!have_iocmu_rc) {
         _rcin_last_iomcu_ms = 0;
     }
-#elif AP_RCPROTOCOL_ENABLED || HAL_RCINPUT_WITH_AP_RADIO
+#elif AP_RCPROTOCOL_ENABLED
     const bool have_iocmu_rc = false;
 #endif
 
@@ -199,28 +176,12 @@ void RCInput::_timer_tick(void)
         rcprot.read(_rc_values, _num_channels);
         _rssi = rcprot.get_RSSI();
         _rx_link_quality = rcprot.get_rx_link_quality();
-#ifndef HAL_NO_UARTDRIVER
+#if AP_HAVE_GCS_SEND_TEXT
         rc_protocol = rcprot.protocol_name();
         source = rcprot.using_uart() ? RCSource::RCPROT_BYTES : RCSource::RCPROT_PULSES;
 #endif
     }
 #endif // AP_RCPROTOCOL_ENABLED
-
-#if HAL_RCINPUT_WITH_AP_RADIO
-    if (radio && radio->last_recv_us() != last_radio_us && !have_iocmu_rc) {
-        last_radio_us = radio->last_recv_us();
-        WITH_SEMAPHORE(rcin_mutex);
-        _rcin_timestamp_last_signal = last_radio_us;
-        _num_channels = radio->num_channels();
-        _num_channels = MIN(_num_channels, RC_INPUT_MAX_CHANNELS);
-        for (uint8_t i=0; i<_num_channels; i++) {
-            _rc_values[i] = radio->read(i);
-        }
-#ifndef HAL_NO_UARTDRIVER
-        source = RCSource::APRADIO;
-#endif
-    }
-#endif
 
 #if HAL_WITH_IO_MCU
     {
@@ -229,7 +190,7 @@ void RCInput::_timer_tick(void)
             iomcu.check_rcinput(last_iomcu_us, _num_channels, _rc_values, RC_INPUT_MAX_CHANNELS)) {
             _rcin_timestamp_last_signal = last_iomcu_us;
             _rcin_last_iomcu_ms = now;
-#ifndef HAL_NO_UARTDRIVER
+#if AP_HAVE_GCS_SEND_TEXT
             rc_protocol = iomcu.get_rc_protocol();
             _rssi = iomcu.get_RSSI();
             source = RCSource::IOMCU;
@@ -238,7 +199,7 @@ void RCInput::_timer_tick(void)
     }
 #endif
 
-#ifndef HAL_NO_UARTDRIVER
+#if AP_HAVE_GCS_SEND_TEXT
     if (rc_protocol && (rc_protocol != last_protocol || source != last_source)) {
         last_protocol = rc_protocol;
         last_source = source;
@@ -269,11 +230,6 @@ bool RCInput::rc_bind(int dsmMode)
     AP::RC().start_bind();
 #endif
 
-#if HAL_RCINPUT_WITH_AP_RADIO
-    if (radio) {
-        radio->start_recv_bind();
-    }
-#endif
     return true;
 }
 #endif //#if CONFIG_HAL_BOARD == HAL_BOARD_CHIBIOS

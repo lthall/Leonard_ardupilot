@@ -1,5 +1,7 @@
 #include "Plane.h"
 
+#include <AP_Stats/AP_Stats.h>     // statistics library
+
 /*
   is_flying and crash detection logic
  */
@@ -160,11 +162,11 @@ void Plane::update_is_flying_5Hz(void)
 #if HAL_ADSB_ENABLED
     adsb.set_is_flying(new_is_flying);
 #endif
-#if PARACHUTE == ENABLED
+#if HAL_PARACHUTE_ENABLED
     parachute.set_is_flying(new_is_flying);
 #endif
-#if STATS_ENABLED == ENABLED
-    g2.stats.set_flying(new_is_flying);
+#if AP_STATS_ENABLED
+    AP::stats()->set_flying(new_is_flying);
 #endif
     AP_Notify::flags.flying = new_is_flying;
 

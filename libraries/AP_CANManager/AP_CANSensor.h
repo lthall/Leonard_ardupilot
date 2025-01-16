@@ -36,11 +36,14 @@ public:
     void init(uint8_t driver_index, bool enable_filters) override;
     bool add_interface(AP_HAL::CANIface* can_iface) override;
 
+    // Return true if this sensor has been successfully registered to a driver and initialized.
+    bool initialized() const { return _initialized; }
+
     // handler for incoming frames
     virtual void handle_frame(AP_HAL::CANFrame &frame) = 0;
 
     // handler for outgoing frames
-    bool write_frame(AP_HAL::CANFrame &out_frame, const uint64_t timeout_us);
+    bool write_frame(AP_HAL::CANFrame &out_frame, const uint32_t timeout_us);
 
 #ifdef HAL_BUILD_AP_PERIPH
     static void set_periph(const uint8_t i, const AP_CAN::Protocol protocol, AP_HAL::CANIface* iface) {

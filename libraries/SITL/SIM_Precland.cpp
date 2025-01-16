@@ -85,7 +85,7 @@ const AP_Param::GroupInfo SIM_Precland::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("TYPE", 6, SIM_Precland, _type, SIM_Precland::PRECLAND_TYPE_CYLINDER),
 
-    // @Param: ALT_LIMIT
+    // @Param: ALT_LMT
     // @DisplayName: Precland device alt range
     // @Description: Precland device maximum range altitude
     // @Units: m
@@ -93,7 +93,7 @@ const AP_Param::GroupInfo SIM_Precland::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("ALT_LMT", 7, SIM_Precland, _alt_limit, 15),
 
-    // @Param: DIST_LIMIT
+    // @Param: DIST_LMT
     // @DisplayName: Precland device lateral range
     // @Description: Precland device maximum lateral range
     // @Units: m
@@ -150,7 +150,7 @@ void SIM_Precland::update(const Location &loc)
          */
         auto *sitl = AP::sitl();
         Location shiploc;
-        if (sitl != nullptr && sitl->shipsim.get_location(shiploc) && !shiploc.is_zero()) {
+        if (sitl != nullptr && sitl->models.shipsim.get_location(shiploc) && !shiploc.is_zero()) {
             shiploc.change_alt_frame(Location::AltFrame::ABOVE_ORIGIN);
             device_center = shiploc;
         }

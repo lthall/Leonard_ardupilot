@@ -6,7 +6,9 @@
 #include "AP_OADijkstra.h"
 #include "AP_OABendyRuler.h"
 #include <AP_Logger/AP_Logger.h>
+#include <AP_AHRS/AP_AHRS.h>
 
+#if AP_OAPATHPLANNER_BENDYRULER_ENABLED
 void AP_OABendyRuler::Write_OABendyRuler(const uint8_t type, const bool active, const float target_yaw, const float target_pitch, const bool resist_chg, const float margin, const Location &final_dest, const Location &oa_dest) const
 {
     int32_t oa_dest_alt, final_alt;
@@ -32,7 +34,9 @@ void AP_OABendyRuler::Write_OABendyRuler(const uint8_t type, const bool active, 
     };
     AP::logger().WriteBlock(&pkt, sizeof(pkt));
 }
+#endif  // AP_OAPATHPLANNER_BENDYRULER_ENABLED
 
+#if AP_OAPATHPLANNER_DIJKSTRA_ENABLED
 void AP_OADijkstra::Write_OADijkstra(const uint8_t state, const uint8_t error_id, const uint8_t curr_point, const uint8_t tot_points, const Location &final_dest, const Location &oa_dest) const
 {
     const struct log_OADijkstra pkt{
@@ -49,7 +53,9 @@ void AP_OADijkstra::Write_OADijkstra(const uint8_t state, const uint8_t error_id
     };
     AP::logger().WriteBlock(&pkt, sizeof(pkt));
 }
+#endif
 
+#if AP_OAPATHPLANNER_ENABLED
 void AP_OADijkstra::Write_Visgraph_point(const uint8_t version, const uint8_t point_num, const int32_t Lat, const int32_t Lon) const
 {
     const struct log_OD_Visgraph pkt{
@@ -62,8 +68,9 @@ void AP_OADijkstra::Write_Visgraph_point(const uint8_t version, const uint8_t po
     };
     AP::logger().WriteBlock(&pkt, sizeof(pkt));
 }
+#endif
 
-
+#if AP_AVOIDANCE_ENABLED
 void AC_Avoid::Write_SimpleAvoidance(const uint8_t state, const Vector3f& desired_vel, const Vector3f& modified_vel, const bool back_up) const
 {
     const struct log_SimpleAvoid pkt{
@@ -80,5 +87,6 @@ void AC_Avoid::Write_SimpleAvoidance(const uint8_t state, const Vector3f& desire
     };
     AP::logger().WriteBlock(&pkt, sizeof(pkt));
 }
+#endif
 
 #endif  // HAL_LOGGING_ENABLED

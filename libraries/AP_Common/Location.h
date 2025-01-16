@@ -28,13 +28,17 @@ public:
     };
 
     /// constructors
-    Location();
+    Location() { zero(); }
     Location(int32_t latitude, int32_t longitude, int32_t alt_in_cm, AltFrame frame);
     Location(const Vector3f &ekf_offset_neu, AltFrame frame);
     Location(const Vector3d &ekf_offset_neu, AltFrame frame);
 
     // set altitude
     void set_alt_cm(int32_t alt_cm, AltFrame frame);
+    // set_alt_m - set altitude in metres
+    void set_alt_m(float alt_m, AltFrame frame) {
+        set_alt_cm(alt_m*100, frame);
+    }
 
     // get altitude (in cm) in the desired frame
     // returns false on failure to get altitude in the desired frame which can only happen if the original frame or desired frame is:
@@ -42,6 +46,8 @@ public:
     // - above-home and home is not set
     // - above-origin and origin is not set
     bool get_alt_cm(AltFrame desired_frame, int32_t &ret_alt_cm) const WARN_IF_UNUSED;
+    // same as get_alt_cm but in metres:
+    bool get_alt_m(AltFrame desired_frame, float &ret_alt) const WARN_IF_UNUSED;
 
     // get altitude frame
     AltFrame get_alt_frame() const;
@@ -53,12 +59,17 @@ public:
     // - above-origin and origin is not set
     bool change_alt_frame(AltFrame desired_frame);
 
-    // get position as a vector (in cm) from origin (x,y only or x,y,z)
-    // return false on failure to get the vector which can only
-    // happen if the EKF origin has not been set yet
-    // x, y and z are in centimetres
-    bool get_vector_xy_from_origin_NE(Vector2f &vec_ne) const WARN_IF_UNUSED;
-    bool get_vector_from_origin_NEU(Vector3f &vec_neu) const WARN_IF_UNUSED;
+    // get position as a vector (in cm) from origin (x,y only or
+    // x,y,z) return false on failure to get the vector which can only
+    // happen if the EKF origin has not been set yet x, y and z are in
+    // centimetres.  If this method returns false then vec_ne is
+    // unmodified.
+    template<typename T>
+    bool get_vector_xy_from_origin_NE(T &vec_ne) const WARN_IF_UNUSED;
+    // converts location to a vector from origin; if this method returns
+    // false then vec_neu is unmodified
+    template<typename T>
+    bool get_vector_from_origin_NEU(T &vec_neu) const WARN_IF_UNUSED;
 
     // return horizontal distance in meters between two locations
     ftype get_distance(const Location &loc2) const;
@@ -70,6 +81,9 @@ public:
     // NOT CONSIDERING ALT FRAME!
     Vector3f get_distance_NED(const Location &loc2) const;
     Vector3d get_distance_NED_double(const Location &loc2) const;
+
+    // return the distance in meters in North/East/Down plane as a N/E/D vector to loc2 considering alt frame, if altitude cannot be resolved down distance is 0
+    Vector3f get_distance_NED_alt_frame(const Location &loc2) const;
 
     // return the distance in meters in North/East plane as a N/E vector to loc2
     Vector2f get_distance_NE(const Location &loc2) const;

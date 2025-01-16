@@ -47,6 +47,8 @@ class AP_Mount_Siyi;
 class AP_Mount_Scripting;
 class AP_Mount_Xacti;
 class AP_Mount_Viewpro;
+class AP_Mount_Topotek;
+class AP_Mount_CADDX;
 
 /*
   This is a workaround to allow the MAVLink backend access to the
@@ -67,6 +69,8 @@ class AP_Mount
     friend class AP_Mount_Scripting;
     friend class AP_Mount_Xacti;
     friend class AP_Mount_Viewpro;
+    friend class AP_Mount_Topotek;
+    friend class AP_Mount_CADDX;
 
 public:
     AP_Mount();
@@ -115,6 +119,12 @@ public:
 #if HAL_MOUNT_VIEWPRO_ENABLED
         Viewpro = 11,        /// Viewpro gimbal using a custom serial protocol
 #endif
+#if HAL_MOUNT_TOPOTEK_ENABLED
+        Topotek = 12,        /// Topotek gimbal using a custom serial protocol
+#endif
+#if HAL_MOUNT_CADDX_ENABLED
+        CADDX = 13,        /// CADDX gimbal using a custom serial protocol
+#endif
     };
 
     // init - detect and initialise all mounts
@@ -157,6 +167,7 @@ public:
     void set_yaw_lock(uint8_t instance, bool yaw_lock);
 
     // set angle target in degrees
+    // roll and pitch are in earth-frame
     // yaw_is_earth_frame (aka yaw_lock) should be true if yaw angle is earth-frame, false if body-frame
     void set_angle_target(float roll_deg, float pitch_deg, float yaw_deg, bool yaw_is_earth_frame) { set_angle_target(_primary, roll_deg, pitch_deg, yaw_deg, yaw_is_earth_frame); }
     void set_angle_target(uint8_t instance, float roll_deg, float pitch_deg, float yaw_deg, bool yaw_is_earth_frame);
@@ -199,6 +210,11 @@ public:
     // get poi information.  Returns true on success and fills in gimbal attitude, location and poi location
     bool get_poi(uint8_t instance, Quaternion &quat, Location &loc, Location &poi_loc) const;
 #endif
+
+    // get attitude as a quaternion.  returns true on success.
+    // att_quat will be an earth-frame quaternion rotated such that
+    // yaw is in body-frame.
+    bool get_attitude_quaternion(uint8_t instance, Quaternion& att_quat);
 
     // get mount's current attitude in euler angles in degrees.  yaw angle is in body-frame
     // returns true on success
@@ -265,6 +281,15 @@ public:
     // send camera capture status message to GCS
     void send_camera_capture_status(uint8_t instance, mavlink_channel_t chan) const;
 
+#if AP_MOUNT_SEND_THERMAL_RANGE_ENABLED
+    // send camera thermal range message to GCS
+    void send_camera_thermal_range(uint8_t instance, mavlink_channel_t chan) const;
+#endif
+
+    // change camera settings not normally used by autopilot
+    // setting values from AP_Camera::Setting enum
+    bool change_setting(uint8_t instance, CameraSetting setting, float value);
+
     //
     // rangefinder
     //
@@ -296,12 +321,6 @@ private:
     AP_Mount_Backend *get_instance(uint8_t instance) const;
 
     void handle_gimbal_report(mavlink_channel_t chan, const mavlink_message_t &msg);
-#if AP_MAVLINK_MSG_MOUNT_CONFIGURE_ENABLED
-    void handle_mount_configure(const mavlink_message_t &msg);
-#endif
-#if AP_MAVLINK_MSG_MOUNT_CONTROL_ENABLED
-    void handle_mount_control(const mavlink_message_t &msg);
-#endif
 
     MAV_RESULT handle_command_do_mount_configure(const mavlink_command_int_t &packet);
     MAV_RESULT handle_command_do_mount_control(const mavlink_command_int_t &packet);

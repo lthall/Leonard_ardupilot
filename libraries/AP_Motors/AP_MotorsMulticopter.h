@@ -89,6 +89,9 @@ public:
     // convert values to PWM min and max if not configured
     void                convert_pwm_min_max_param(int16_t radio_min, int16_t radio_max);
 
+    // return thrust for motor motor_num, returns true if value is valid false otherwise
+    bool                get_thrust(uint8_t motor_num, float& thr_out) const override;
+
 #if HAL_LOGGING_ENABLED
     // 10hz logging of voltage scaling and max trust
     void                Log_Write() override;
@@ -192,4 +195,14 @@ protected:
 
     // array of motor output values
     float _actuator[AP_MOTORS_MAX_NUM_MOTORS];
+
+    /* motor enabled, checking the override mask
+       _motor_mask_override is only set for tilt quadplanes
+     */
+    bool motor_enabled_mask(uint8_t i) const {
+        return motor_enabled[i] && (_motor_mask_override & (1U << i)) == 0;
+    }
+
+    // mask of overridden motors (used by quadplane tiltrotors)
+    uint16_t _motor_mask_override;
 };

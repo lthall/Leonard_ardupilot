@@ -1,7 +1,8 @@
 #include <AP_HAL/AP_HAL_Boards.h>
+#include <AP_SerialManager/AP_SerialManager_config.h>
 
 #if defined(AP_NETWORKING_BACKEND_PPP) && !defined(AP_NETWORKING_ENABLED)
-// allow --enable-ppp to enable networking
+// allow --enable-PPP to enable networking
 #define AP_NETWORKING_ENABLED AP_NETWORKING_BACKEND_PPP
 #endif
 
@@ -74,9 +75,9 @@
 #define AP_NETWORKING_DEFAULT_DHCP_ENABLE AP_NETWORKING_DHCP_AVAILABLE
 #endif
 
-// Default Static IP Address: 192.168.13.14
+// Default Static IP Address: 192.168.144.14
 #ifndef AP_NETWORKING_DEFAULT_STATIC_IP_ADDR
-#define AP_NETWORKING_DEFAULT_STATIC_IP_ADDR "192.168.13.14"
+#define AP_NETWORKING_DEFAULT_STATIC_IP_ADDR "192.168.144.14"
 #endif
 
 // Default Netmask: 24
@@ -87,9 +88,9 @@
 #endif
 
 
-// Default Static IP Address: 192.168.13.1
+// Default Static IP Address: 192.168.144.1
 #ifndef AP_NETWORKING_DEFAULT_STATIC_GW_ADDR
-#define AP_NETWORKING_DEFAULT_STATIC_GW_ADDR "192.168.13.1"
+#define AP_NETWORKING_DEFAULT_STATIC_GW_ADDR "192.168.144.1"
 #endif
 
 // Default MAC Address: C2:AF:51:03:CF:46
@@ -102,9 +103,13 @@
 #define AP_NETWORKING_TESTS_ENABLED 0
 #endif
 
+#ifndef AP_NETWORKING_CAN_MCAST_ENABLED
+#define AP_NETWORKING_CAN_MCAST_ENABLED 0
+#endif
+
 #if AP_NETWORKING_TESTS_ENABLED
 #ifndef AP_NETWORKING_TEST_IP
-#define AP_NETWORKING_TEST_IP "192.168.13.2"
+#define AP_NETWORKING_TEST_IP "192.168.144.2"
 #endif
 #endif
 
@@ -133,3 +138,6 @@
 #define AP_NETWORKING_REMOTE_PPP_IP "0.0.0.0"
 #endif
 
+#ifndef AP_NETWORKING_REGISTER_PORT_ENABLED
+#define AP_NETWORKING_REGISTER_PORT_ENABLED AP_NETWORKING_ENABLED && AP_SERIALMANAGER_REGISTER_ENABLED
+#endif

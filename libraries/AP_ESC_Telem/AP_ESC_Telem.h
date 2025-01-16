@@ -7,7 +7,9 @@
 
 #if HAL_WITH_ESC_TELEM
 
-#define ESC_TELEM_MAX_ESCS NUM_SERVO_CHANNELS
+#ifndef ESC_TELEM_MAX_ESCS
+    #define ESC_TELEM_MAX_ESCS NUM_SERVO_CHANNELS
+#endif
 static_assert(ESC_TELEM_MAX_ESCS > 0, "Cannot have 0 ESC telemetry instances");
 
 #define ESC_TELEM_DATA_TIMEOUT_MS 5000UL
@@ -67,6 +69,20 @@ public:
     // get an individual ESC's consumption in milli-Ampere.hour if available, returns true on success
     bool get_consumption_mah(uint8_t esc_index, float& consumption_mah) const;
 
+#if AP_EXTENDED_ESC_TELEM_ENABLED
+    // get an individual ESC's input duty cycle if available, returns true on success
+    bool get_input_duty(uint8_t esc_index, uint8_t& input_duty) const;
+
+    // get an individual ESC's output duty cycle if available, returns true on success
+    bool get_output_duty(uint8_t esc_index, uint8_t& output_duty) const;
+
+    // get an individual ESC's status flags if available, returns true on success
+    bool get_flags(uint8_t esc_index, uint32_t& flags) const;
+
+    // get an individual ESC's percentage of output power if available, returns true on success
+    bool get_power_percentage(uint8_t esc_index, uint8_t& power_percentage) const;
+#endif
+
     // return the average motor frequency in Hz for dynamic filtering
     float get_average_motor_frequency_hz(uint32_t servo_channel_mask) const { return get_average_motor_rpm(servo_channel_mask) * (1.0f / 60.0f); };
 
@@ -120,6 +136,12 @@ private:
     // helper that validates RPM data
     static bool rpm_data_within_timeout (const volatile AP_ESC_Telem_Backend::RpmData &instance, const uint32_t now_us, const uint32_t timeout_us);
     static bool was_rpm_data_ever_reported (const volatile AP_ESC_Telem_Backend::RpmData &instance);
+
+#if AP_EXTENDED_DSHOT_TELEM_V2_ENABLED
+    // helpers that aggregate data in EDTv2 messages
+    static uint16_t merge_edt2_status(uint16_t old_status, uint16_t new_status);
+    static uint16_t merge_edt2_stress(uint16_t old_stress, uint16_t new_stress);
+#endif
 
     // rpm data
     volatile AP_ESC_Telem_Backend::RpmData _rpm_data[ESC_TELEM_MAX_ESCS];

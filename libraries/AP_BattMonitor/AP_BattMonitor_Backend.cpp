@@ -13,6 +13,10 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "AP_BattMonitor_config.h"
+
+#if AP_BATTERY_ENABLED
+
 #include <AP_Common/AP_Common.h>
 #include <AP_HAL/AP_HAL.h>
 #include "AP_BattMonitor.h"
@@ -21,6 +25,27 @@
 #if AP_BATTERY_ESC_TELEM_OUTBOUND_ENABLED
 #include "AP_ESC_Telem/AP_ESC_Telem.h"
 #endif
+
+/*
+  All backends use the same parameter table and set of indices. Therefore, two
+  backends must not use the same index. The list of used indices and
+  corresponding backends is below.
+
+    1-6:    AP_BattMonitor_Analog.cpp
+    10-11:  AP_BattMonitor_SMBus.cpp
+    20:     AP_BattMonitor_Sum.cpp
+    22-24:  AP_BattMonitor_INA3221.cpp
+    25-26:  AP_BattMonitor_INA2xx.cpp
+    27-28:  AP_BattMonitor_INA2xx.cpp, AP_BattMonitor_INA239.cpp (legacy duplication)
+    30:     AP_BattMonitor_DroneCAN.cpp
+    36:     AP_BattMonitor_ESC.cpp
+    40-43:  AP_BattMonitor_FuelLevel_Analog.cpp
+    45-48:  AP_BattMonitor_FuelLevel_Analog.cpp
+    50-51:  AP_BattMonitor_Synthetic_Current.cpp
+    56-61:  AP_BattMonitor_AD7091R5.cpp
+
+  Usage does not need to be contiguous. The maximum possible index is 63.
+*/
 
 /*
   base class constructor.
@@ -162,6 +187,11 @@ AP_BattMonitor::Failsafe AP_BattMonitor_Backend::update_failsafes(void)
 
     if (low_capacity) {
         return AP_BattMonitor::Failsafe::Low;
+    }
+
+    // 5 second health timeout
+    if ((now - _state.last_healthy_ms) > 5000) {
+        return AP_BattMonitor::Failsafe::Unhealthy;
     }
 
     // if we've gotten this far then battery is ok
@@ -334,3 +364,5 @@ void AP_BattMonitor_Backend::update_consumed(AP_BattMonitor::BattMonitor_State &
         state.consumed_wh  += 0.001 * mah * state.voltage;
     }
 }
+
+#endif  // AP_BATTERY_ENABLED

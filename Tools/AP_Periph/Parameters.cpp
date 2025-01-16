@@ -69,6 +69,10 @@ extern const AP_HAL::HAL &hal;
   #define APD_ESC_SERIAL_1 -1
 #endif
 
+#ifndef AP_PERIPH_PROBE_CONTINUOUS
+#define AP_PERIPH_PROBE_CONTINUOUS 0
+#endif
+
 /*
  *  AP_Periph parameter definitions
  *
@@ -82,9 +86,9 @@ const AP_Param::Info AP_Periph_FW::var_info[] = {
     GSCALAR(format_version,         "FORMAT_VERSION", 0),
 
     // @Param: CAN_NODE
-    // @DisplayName: UAVCAN node that is used for this network
-    // @Description: UAVCAN node should be set implicitly or 0 for dynamic node allocation
-    // @Range: 0 250
+    // @DisplayName: DroneCAN node ID used by this node on all networks
+    // @Description: Value of 0 requests any ID from a DNA server, any other value sets that ID ignoring DNA
+    // @Range: 0 127
     // @User: Advanced
     // @RebootRequired: True
     GSCALAR(can_node,         "CAN_NODE", HAL_CAN_DEFAULT_NODE_ID),
@@ -305,7 +309,7 @@ const AP_Param::Info AP_Periph_FW::var_info[] = {
     // @Increment: 1
     // @User: Standard
     // @RebootRequired: True
-    GSCALAR(rangefinder_baud, "RNGFND_BAUDRATE", HAL_PERIPH_RANGEFINDER_BAUDRATE_DEFAULT),
+    GARRAY(rangefinder_baud, 0, "RNGFND_BAUDRATE", HAL_PERIPH_RANGEFINDER_BAUDRATE_DEFAULT),
 
     // @Param: RNGFND_PORT
     // @DisplayName: Rangefinder Serial Port
@@ -314,7 +318,27 @@ const AP_Param::Info AP_Periph_FW::var_info[] = {
     // @Increment: 1
     // @User: Advanced
     // @RebootRequired: True
-    GSCALAR(rangefinder_port, "RNGFND_PORT", AP_PERIPH_RANGEFINDER_PORT_DEFAULT),
+    GARRAY(rangefinder_port, 0, "RNGFND_PORT", AP_PERIPH_RANGEFINDER_PORT_DEFAULT),
+
+#if RANGEFINDER_MAX_INSTANCES > 1
+    // @Param: RNGFND2_BAUDRATE
+    // @DisplayName: Rangefinder serial baudrate
+    // @Description: Rangefinder serial baudrate.
+    // @Values: 1:1200,2:2400,4:4800,9:9600,19:19200,38:38400,57:57600,111:111100,115:115200,230:230400,256:256000,460:460800,500:500000,921:921600,1500:1500000
+    // @Increment: 1
+    // @User: Standard
+    // @RebootRequired: True
+    GARRAY(rangefinder_baud, 1, "RNGFND2_BAUDRATE", HAL_PERIPH_RANGEFINDER_BAUDRATE_DEFAULT),
+
+    // @Param: RNGFND2_PORT
+    // @DisplayName: Rangefinder Serial Port
+    // @Description: This is the serial port number where SERIALx_PROTOCOL will be set to Rangefinder.
+    // @Range: 0 10
+    // @Increment: 1
+    // @User: Advanced
+    // @RebootRequired: True
+    GARRAY(rangefinder_port, 1, "RNGFND2_PORT", -1),
+#endif
 
     // @Param: RNGFND_MAX_RATE
     // @DisplayName: Rangefinder max rate
@@ -382,6 +406,15 @@ const AP_Param::Info AP_Periph_FW::var_info[] = {
     // @Group: OUT
     // @Path: ../libraries/SRV_Channel/SRV_Channels.cpp
     GOBJECT(servo_channels, "OUT",     SRV_Channels),
+
+    // @Param: ESC_RATE
+    // @DisplayName: ESC Update Rate
+    // @Description: Rate in Hz that ESC PWM outputs (function is MotorN) will update at
+    // @Units: Hz
+    // @Range: 50 400
+    // @Increment: 1
+    // @User: Advanced
+    GSCALAR(esc_rate, "ESC_RATE", 400), // effective Copter and QuadPlane default after clamping
 
     // @Param: ESC_PWM_TYPE
     // @DisplayName: Output PWM type
@@ -648,6 +681,60 @@ const AP_Param::Info AP_Periph_FW::var_info[] = {
     // @Group: RELAY
     // @Path: ../libraries/AP_Relay/AP_Relay.cpp
     GOBJECT(relay,                 "RELAY", AP_Relay),
+#endif
+
+#ifdef HAL_PERIPH_ENABLE_DEVICE_TEMPERATURE
+    // @Param: TEMP_MSG_RATE
+    // @DisplayName: Temperature sensor message rate
+    // @Description: This is the rate Temperature sensor data is sent in Hz. Zero means no send. Each sensor with source DroneCAN is sent in turn.
+    // @Units: Hz
+    // @Range: 0 200
+    // @Increment: 1
+    // @User: Standard
+    GSCALAR(temperature_msg_rate, "TEMP_MSG_RATE", 0),
+#endif
+
+    // @Param: OPTIONS
+    // @DisplayName: AP Periph Options
+    // @Description: Bitmask of AP Periph Options
+    // @Bitmask: 0: Enable continuous sensor probe
+    // @User: Standard
+    GSCALAR(options, "OPTIONS", AP_PERIPH_PROBE_CONTINUOUS),
+
+#ifdef HAL_PERIPH_ENABLE_RPM_STREAM
+    // @Param: RPM_MSG_RATE
+    // @DisplayName: RPM sensor message rate
+    // @Description: This is the rate RPM sensor data is sent in Hz. Zero means no send. Each sensor with a set ID is sent in turn.
+    // @Units: Hz
+    // @Range: 0 200
+    // @Increment: 1
+    // @User: Standard
+    GSCALAR(rpm_msg_rate, "RPM_MSG_RATE", 0),
+#endif
+
+#if AP_EXTENDED_ESC_TELEM_ENABLED && HAL_WITH_ESC_TELEM
+    // @Param: ESC_EXT_TLM_RATE
+    // @DisplayName: ESC Extended telemetry message rate
+    // @Description: This is the rate at which extended ESC Telemetry will be sent across the CAN bus for each ESC
+    // @Units: Hz
+    // @Range: 0 50
+    // @Increment: 1
+    // @User: Advanced
+    GSCALAR(esc_extended_telem_rate, "ESC_EXT_TLM_RATE", AP_PERIPH_ESC_TELEM_RATE_DEFAULT / 10),
+#endif
+
+
+#ifdef HAL_PERIPH_ENABLE_IMU
+    // @Param: IMU_SAMPLE_RATE
+    // @DisplayName: IMU Sample Rate
+    // @Description: IMU Sample Rate
+    // @Range: 0 1000
+    // @User: Standard
+    GSCALAR(imu_sample_rate, "INS_SAMPLE_RATE", 0),
+
+    // @Group: INS
+    // @Path: ../libraries/AP_InertialSensor/AP_InertialSensor.cpp
+    GOBJECT(imu, "INS", AP_InertialSensor),
 #endif
 
     AP_VAREND

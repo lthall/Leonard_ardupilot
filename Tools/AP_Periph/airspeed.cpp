@@ -21,7 +21,7 @@ void AP_Periph_FW::can_airspeed_update(void)
         return;
     }
 #if AP_PERIPH_PROBE_CONTINUOUS
-    if (!airspeed.healthy()) {
+    if (option_is_set(PeriphOptions::PROBE_CONTINUOUS) && !hal.util->get_soft_armed() && !airspeed.healthy()) {
         uint32_t now = AP_HAL::millis();
         static uint32_t last_probe_ms;
         if (now - last_probe_ms >= 1000) {
@@ -72,7 +72,7 @@ void AP_Periph_FW::can_airspeed_update(void)
     }
 #endif
 
-    uint8_t buffer[UAVCAN_EQUIPMENT_AIR_DATA_RAWAIRDATA_MAX_SIZE] {};
+    uint8_t buffer[UAVCAN_EQUIPMENT_AIR_DATA_RAWAIRDATA_MAX_SIZE];
     uint16_t total_size = uavcan_equipment_air_data_RawAirData_encode(&pkt, buffer, !periph.canfdout());
 
     canard_broadcast(UAVCAN_EQUIPMENT_AIR_DATA_RAWAIRDATA_SIGNATURE,

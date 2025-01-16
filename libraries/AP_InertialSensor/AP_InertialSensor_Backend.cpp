@@ -2,6 +2,7 @@
 
 #include <AP_HAL/AP_HAL.h>
 #include <AP_AHRS/AP_AHRS.h>
+#include "AP_InertialSensor_rate_config.h"
 #include "AP_InertialSensor.h"
 #include "AP_InertialSensor_Backend.h"
 #include <AP_Logger/AP_Logger.h>
@@ -173,7 +174,7 @@ void AP_InertialSensor_Backend::_rotate_and_correct_gyro(uint8_t instance, Vecto
  */
 void AP_InertialSensor_Backend::_publish_gyro(uint8_t instance, const Vector3f &gyro) /* front end */
 {
-    if ((1U<<instance) & _imu.imu_kill_mask) {
+    if (has_been_killed(instance)) {
         return;
     }
     _imu._gyro[instance] = gyro;
@@ -222,6 +223,7 @@ void AP_InertialSensor_Backend::apply_gyro_filters(const uint8_t instance, const
 
     Vector3f gyro_filtered = gyro;
 
+#if AP_INERTIALSENSOR_HARMONICNOTCH_ENABLED
     // apply the harmonic notch filters
     for (auto &notch : _imu.harmonic_notches) {
         if (!notch.params.enabled()) {
@@ -246,6 +248,7 @@ void AP_InertialSensor_Backend::apply_gyro_filters(const uint8_t instance, const
         }
         save_gyro_window(instance, gyro_filtered, filter_phase++);
     }
+#endif  // AP_INERTIALSENSOR_HARMONICNOTCH_ENABLED
 
     // apply the low pass filter last to attenuate any notch induced noise
     gyro_filtered = _imu._gyro_filter[instance].apply(gyro_filtered);
@@ -256,19 +259,33 @@ void AP_InertialSensor_Backend::apply_gyro_filters(const uint8_t instance, const
 #if HAL_GYROFFT_ENABLED
         _imu._post_filter_gyro_filter[instance].reset();
 #endif
+#if AP_INERTIALSENSOR_HARMONICNOTCH_ENABLED
         for (auto &notch : _imu.harmonic_notches) {
             notch.filter[instance].reset();
+        }
+#endif
+        gyro_filtered = _imu._gyro_filtered[instance];
+    }
+
+#if AP_INERTIALSENSOR_FAST_SAMPLE_WINDOW_ENABLED
+    if (_imu.is_rate_loop_gyro_enabled(instance)) {
+        if (_imu.push_next_gyro_sample(gyro_filtered)) {
+            // if we used the value, record it for publication to the front-end
+            _imu._gyro_filtered[instance] = gyro_filtered;
         }
     } else {
         _imu._gyro_filtered[instance] = gyro_filtered;
     }
+#else
+    _imu._gyro_filtered[instance] = gyro_filtered;
+#endif
 }
 
 void AP_InertialSensor_Backend::_notify_new_gyro_raw_sample(uint8_t instance,
                                                             const Vector3f &gyro,
                                                             uint64_t sample_us)
 {
-    if ((1U<<instance) & _imu.imu_kill_mask) {
+    if (has_been_killed(instance)) {
         return;
     }
     float dt;
@@ -365,7 +382,7 @@ void AP_InertialSensor_Backend::_notify_new_gyro_raw_sample(uint8_t instance,
  */
 void AP_InertialSensor_Backend::_notify_new_delta_angle(uint8_t instance, const Vector3f &dangle)
 {
-    if ((1U<<instance) & _imu.imu_kill_mask) {
+    if (has_been_killed(instance)) {
         return;
     }
     float dt;
@@ -492,7 +509,7 @@ void AP_InertialSensor_Backend::log_gyro_raw(uint8_t instance, const uint64_t sa
  */
 void AP_InertialSensor_Backend::_publish_accel(uint8_t instance, const Vector3f &accel) /* front end */
 {
-    if ((1U<<instance) & _imu.imu_kill_mask) {
+    if (has_been_killed(instance)) {
         return;
     }
     _imu._accel[instance] = accel;
@@ -522,7 +539,7 @@ void AP_InertialSensor_Backend::_notify_new_accel_raw_sample(uint8_t instance,
                                                              uint64_t sample_us,
                                                              bool fsync_set)
 {
-    if ((1U<<instance) & _imu.imu_kill_mask) {
+    if (has_been_killed(instance)) {
         return;
     }
     float dt;
@@ -609,7 +626,7 @@ void AP_InertialSensor_Backend::_notify_new_accel_raw_sample(uint8_t instance,
  */
 void AP_InertialSensor_Backend::_notify_new_delta_velocity(uint8_t instance, const Vector3f &dvel)
 {
-    if ((1U<<instance) & _imu.imu_kill_mask) {
+    if (has_been_killed(instance)) {
         return;
     }
     float dt;
@@ -751,7 +768,7 @@ void AP_InertialSensor_Backend::_inc_gyro_error_count(uint8_t instance)
  */
 void AP_InertialSensor_Backend::_publish_temperature(uint8_t instance, float temperature) /* front end */
 {
-    if ((1U<<instance) & _imu.imu_kill_mask) {
+    if (has_been_killed(instance)) {
         return;
     }
     _imu._temperature[instance] = temperature;
@@ -774,9 +791,10 @@ void AP_InertialSensor_Backend::update_gyro(uint8_t instance) /* front end */
 {    
     WITH_SEMAPHORE(_sem);
 
-    if ((1U<<instance) & _imu.imu_kill_mask) {
+    if (has_been_killed(instance)) {
         return;
     }
+
     if (_imu._new_gyro_data[instance]) {
         _publish_gyro(instance, _imu._gyro_filtered[instance]);
 #if HAL_GYROFFT_ENABLED
@@ -786,6 +804,14 @@ void AP_InertialSensor_Backend::update_gyro(uint8_t instance) /* front end */
         _imu._new_gyro_data[instance] = false;
     }
 
+    update_gyro_filters(instance);
+}
+
+/*
+  propagate filter changes from front end to backend
+ */
+void AP_InertialSensor_Backend::update_gyro_filters(uint8_t instance) /* front end */
+{
     // possibly update filter frequency
     const float gyro_rate = _gyro_raw_sample_rate(instance);
 
@@ -797,11 +823,13 @@ void AP_InertialSensor_Backend::update_gyro(uint8_t instance) /* front end */
         _last_gyro_filter_hz = _gyro_filter_cutoff();
     }
 
+#if AP_INERTIALSENSOR_HARMONICNOTCH_ENABLED
     for (auto &notch : _imu.harmonic_notches) {
         if (notch.params.enabled()) {
             notch.update_params(instance, sensors_converging(), gyro_rate);
         }
     }
+#endif
 }
 
 /*
@@ -811,14 +839,23 @@ void AP_InertialSensor_Backend::update_accel(uint8_t instance) /* front end */
 {    
     WITH_SEMAPHORE(_sem);
 
-    if ((1U<<instance) & _imu.imu_kill_mask) {
+    if (has_been_killed(instance)) {
         return;
     }
     if (_imu._new_accel_data[instance]) {
         _publish_accel(instance, _imu._accel_filtered[instance]);
         _imu._new_accel_data[instance] = false;
     }
-    
+
+    update_accel_filters(instance);
+}
+
+
+/*
+  propagate filter changes from front end to backend
+ */
+void AP_InertialSensor_Backend::update_accel_filters(uint8_t instance) /* front end */
+{
     // possibly update filter frequency
     if (_last_accel_filter_hz != _accel_filter_cutoff()) {
         _imu._accel_filter[instance].set_cutoff_frequency(_accel_raw_sample_rate(instance), _accel_filter_cutoff());

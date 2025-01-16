@@ -25,7 +25,6 @@ private:
 
     uint32_t telem_delay() const override { return 0; }
     bool try_send_message(enum ap_message id) override { return true; }
-    bool handle_guided_request(AP_Mission::Mission_Command &cmd) override { return true; }
     uint8_t sysid_my_gcs() const override { return 1; }
 
 protected:
@@ -34,11 +33,9 @@ protected:
     MAV_MODE base_mode() const override { return (MAV_MODE)MAV_MODE_FLAG_CUSTOM_MODE_ENABLED; }
     MAV_STATE vehicle_system_status() const override { return MAV_STATE_CALIBRATING; }
 
-    bool set_home_to_current_location(bool _lock) override { return false; }
-    bool set_home(const Location& loc, bool _lock) override { return false; }
-
     void send_nav_controller_output() const override {};
     void send_pid_tuning() override {};
+    uint8_t send_available_mode(uint8_t index) const override { return 0; }
 };
 
 /*
@@ -59,7 +56,7 @@ protected:
 
     GCS_MAVLINK_Dummy *new_gcs_mavlink_backend(GCS_MAVLINK_Parameters &params,
                                                AP_HAL::UARTDriver &uart) override {
-        return new GCS_MAVLINK_Dummy(params, uart);
+        return NEW_NOTHROW GCS_MAVLINK_Dummy(params, uart);
     }
 
 private:

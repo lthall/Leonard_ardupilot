@@ -86,11 +86,11 @@ const AP_Param::GroupInfo AP_MotorsMulticopter::var_info[] = {
 
     // @Param: PWM_TYPE
     // @DisplayName: Output PWM type
-    // @Description: This selects the output PWM type, allowing for normal PWM continuous output, OneShot, brushed or DShot motor output
-    // @Values: 0:Normal,1:OneShot,2:OneShot125,3:Brushed,4:DShot150,5:DShot300,6:DShot600,7:DShot1200,8:PWMRange
+    // @Description: This selects the output PWM type, allowing for normal PWM continuous output, OneShot, brushed or DShot motor output.PWMRange and PWMAngle are PWM special/rare cases for ESCs that dont calibrate normally (some Sub motors) or where each ESC must have its PWM range set individually using the Servo params instead of PWM_MIN/MAX parameters.
+    // @Values: 0:Normal,1:OneShot,2:OneShot125,3:Brushed,4:DShot150,5:DShot300,6:DShot600,7:DShot1200,8:PWMRange,9:PWMAngle
     // @User: Advanced
     // @RebootRequired: True
-    AP_GROUPINFO("PWM_TYPE", 15, AP_MotorsMulticopter, _pwm_type, PWM_TYPE_NORMAL),
+    AP_GROUPINFO("PWM_TYPE", 15, AP_MotorsMulticopter, _pwm_type, float(PWMType::NORMAL)),
 
     // @Param: PWM_MIN
     // @DisplayName: PWM output minimum
@@ -272,6 +272,8 @@ void AP_MotorsMulticopter::output()
     // check for any external limit flags
     update_external_limits();
 
+    // clear mask of overridden motors
+    _motor_mask_override = 0;
 };
 
 void AP_MotorsMulticopter::update_external_limits()
@@ -345,6 +347,7 @@ void AP_MotorsMulticopter::update_throttle_filter()
 // return current_limit as a number from 0 ~ 1 in the range throttle_min to throttle_max
 float AP_MotorsMulticopter::get_current_limit_max_throttle()
 {
+#if AP_BATTERY_ENABLED
     AP_BattMonitor &battery = AP::battery();
 
     const uint8_t batt_idx = thr_lin.get_battery_index();
@@ -376,6 +379,9 @@ float AP_MotorsMulticopter::get_current_limit_max_throttle()
 
     // limit max throttle
     return get_throttle_hover() + ((1.0 - get_throttle_hover()) * _throttle_limit);
+#else
+    return 1.0;
+#endif
 }
 
 #if HAL_LOGGING_ENABLED
@@ -451,6 +457,21 @@ float AP_MotorsMulticopter::actuator_spin_up_to_ground_idle() const
     return constrain_float(_spin_up_ratio, 0.0f, 1.0f) * thr_lin.get_spin_min();
 }
 
+// return throttle out for motor motor_num, returns true if value is valid false otherwise
+bool AP_MotorsMulticopter::get_thrust(uint8_t motor_num, float& thr_out) const
+{
+    if (motor_num >= AP_MOTORS_MAX_NUM_MOTORS || !motor_enabled[motor_num]) {
+        return false;
+    }
+
+    // Constrain to linearization range.
+    const float actuator = constrain_float(_actuator[motor_num], thr_lin.get_spin_min(), thr_lin.get_spin_max());
+
+    // Remove linearization and compensation gain
+    thr_out = thr_lin.actuator_to_thrust(actuator) / thr_lin.get_compensation_gain();
+    return true;
+}
+
 // parameter checks for MOT_PWM_MIN/MAX, returns true if parameters are valid
 bool AP_MotorsMulticopter::check_mot_pwm_params() const
 {
@@ -468,7 +489,7 @@ void AP_MotorsMulticopter::update_throttle_range()
 {
     // if all outputs are digital adjust the range. We also do this for type PWM_RANGE, as those use the
     // scaled output, which is then mapped to PWM via the SRV_Channel library
-    if (SRV_Channels::have_digital_outputs(get_motor_mask()) || (_pwm_type == PWM_TYPE_PWM_RANGE)) {
+    if (SRV_Channels::have_digital_outputs(get_motor_mask()) || (_pwm_type == PWMType::PWM_RANGE) || (_pwm_type == PWMType::PWM_ANGLE)) {
         _pwm_min.set_and_default(1000);
         _pwm_max.set_and_default(2000);
     }
@@ -724,9 +745,11 @@ void AP_MotorsMulticopter::output_motor_mask(float thrust, uint16_t mask, float 
     const int16_t pwm_min = get_pwm_output_min();
     const int16_t pwm_range = get_pwm_output_max() - pwm_min;
 
+    _motor_mask_override = mask;
+
     for (uint8_t i = 0; i < AP_MOTORS_MAX_NUM_MOTORS; i++) {
-        if (motor_enabled[i]) {
-            if ((mask & (1U << i)) && armed() && get_interlock()) {
+        if (motor_enabled[i] && (mask & (1U << i)) != 0) {
+            if (armed() && get_interlock()) {
                 /*
                  apply rudder mixing differential thrust
                  copter frame roll is plane frame yaw as this only
@@ -734,11 +757,12 @@ void AP_MotorsMulticopter::output_motor_mask(float thrust, uint16_t mask, float 
                  */
                 float diff_thrust = get_roll_factor(i) * rudder_dt * 0.5f;
                 set_actuator_with_slew(_actuator[i], thrust + diff_thrust);
-                int16_t pwm_output = pwm_min + pwm_range * _actuator[i];
-                rc_write(i, pwm_output);
             } else {
-                rc_write(i, pwm_min);
+                // zero throttle
+                _actuator[i] = 0.0;
             }
+            int16_t pwm_output = pwm_min + pwm_range * _actuator[i];
+            rc_write(i, pwm_output);
         }
     }
 }

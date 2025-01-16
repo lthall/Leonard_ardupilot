@@ -23,6 +23,13 @@ bool ModeAlthold::init(bool ignore_checks) {
 // should be called at 100hz or more
 void ModeAlthold::run()
 {
+    run_pre();
+    control_depth();
+    run_post();
+}
+
+void ModeAlthold::run_pre()
+{
     uint32_t tnow = AP_HAL::millis();
 
     // initialize vertical speeds and acceleration
@@ -84,13 +91,14 @@ void ModeAlthold::run()
             attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(target_roll, target_pitch, target_yaw_rate);
             sub.last_pilot_heading = ahrs.yaw_sensor; // update heading to hold
 
-        } else { // call attitude controller holding absolute absolute bearing
+        } else { // call attitude controller holding absolute bearing
             attitude_control->input_euler_angle_roll_pitch_yaw(target_roll, target_pitch, sub.last_pilot_heading, true);
         }
     }
+}
 
-    control_depth();
-
+void ModeAlthold::run_post()
+{
     motors.set_forward(channel_forward->norm_input());
     motors.set_lateral(channel_lateral->norm_input());
 }
@@ -103,13 +111,12 @@ void ModeAlthold::control_depth() {
     //we allow full control to the pilot, but as soon as there's no input, we handle being at surface/bottom
     if (fabsf(target_climb_rate_cm_s) < 0.05f)  {
         if (sub.ap.at_surface) {
-            position_control->set_pos_target_z_cm(MIN(position_control->get_pos_target_z_cm(), g.surface_depth - 5.0f)); // set target to 5 cm below surface level
+            position_control->set_pos_desired_z_cm(MIN(position_control->get_pos_desired_z_cm(), g.surface_depth - 5.0f)); // set target to 5 cm below surface level
         } else if (sub.ap.at_bottom) {
-            position_control->set_pos_target_z_cm(MAX(inertial_nav.get_position_z_up_cm() + 10.0f, position_control->get_pos_target_z_cm())); // set target to 10 cm above bottom
+            position_control->set_pos_desired_z_cm(MAX(inertial_nav.get_position_z_up_cm() + 10.0f, position_control->get_pos_desired_z_cm())); // set target to 10 cm above bottom
         }
     }
 
     position_control->set_pos_target_z_from_climb_rate_cm(target_climb_rate_cm_s);
     position_control->update_z_controller();
-
 }

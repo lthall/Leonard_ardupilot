@@ -45,9 +45,6 @@
 #define AP_MISSION_RESTART_DEFAULT          0       // resume the mission from the last command run by default
 
 #define AP_MISSION_OPTIONS_DEFAULT          0       // Do not clear the mission when rebooting
-#define AP_MISSION_MASK_MISSION_CLEAR       (1<<0)  // If set then Clear the mission on boot
-#define AP_MISSION_MASK_DIST_TO_LAND_CALC   (1<<1)  // Allow distance to best landing calculation to be run on failsafe
-#define AP_MISSION_MASK_CONTINUE_AFTER_LAND (1<<2)  // Allow mission to continue after land
 
 #define AP_MISSION_MAX_WP_HISTORY           7       // The maximum number of previous wp commands that will be stored from the active missions history
 #define LAST_WP_PASSED (AP_MISSION_MAX_WP_HISTORY-2)
@@ -665,18 +662,27 @@ public:
     // find the nearest landing sequence starting point (DO_LAND_START) and
     // return its index.  Returns 0 if no appropriate DO_LAND_START point can
     // be found.
-    uint16_t get_landing_sequence_start();
+    uint16_t get_landing_sequence_start(const Location &current_loc);
 
     // find the nearest landing sequence starting point (DO_LAND_START) and
     // switch to that mission item.  Returns false if no DO_LAND_START
     // available.
-    bool jump_to_landing_sequence(void);
+    bool jump_to_landing_sequence(const Location &current_loc);
 
     // jumps the mission to the closest landing abort that is planned, returns false if unable to find a valid abort
+    bool jump_to_abort_landing_sequence(const Location &current_loc);
+
+    // Scripting helpers for the above functions to fill in the location
+#if AP_SCRIPTING_ENABLED
+    bool jump_to_landing_sequence(void);
     bool jump_to_abort_landing_sequence(void);
+#endif
+
+    // find the closest point on the mission after a DO_RETURN_PATH_START and before DO_LAND_START or landing
+    bool jump_to_closest_mission_leg(const Location &current_loc);
 
     // check which is the shortest route to landing an RTL via a DO_LAND_START or continuing on the current mission plan
-    bool is_best_land_sequence(void);
+    bool is_best_land_sequence(const Location &current_loc);
 
     // set in_landing_sequence flag
     void set_in_landing_sequence_flag(bool flag)
@@ -689,11 +695,19 @@ public:
         return _flags.in_landing_sequence;
     }
 
+    // get in_return_path flag
+    bool get_in_return_path_flag() const {
+        return _flags.in_return_path;
+    }
+
     // force mission to resume when start_or_resume() is called
     void set_force_resume(bool force_resume)
     {
         _force_resume = force_resume;
     }
+
+    // returns true if configured to resume
+    bool is_resume() const { return _restart == 0 || _force_resume; }
 
     // get a reference to the AP_Mission semaphore, allowing an external caller to lock the
     // storage while working with multiple waypoints
@@ -715,14 +729,23 @@ public:
     void reset_wp_history(void);
 
     /*
-      return true if MIS_OPTIONS is set to allow continue of mission
-      logic after a land and the next waypoint is a takeoff. If this
+      Option::FailsafeToBestLanding -  continue mission
+      logic after a land if the next waypoint is a takeoff. If this
       is false then after a landing is complete the vehicle should 
       disarm and mission logic should stop
      */
+    enum class Option {
+        CLEAR_ON_BOOT            =  0,  // clear mission on vehicle boot
+        FAILSAFE_TO_BEST_LANDING =  1,  // on failsafe, find fastest path along mission home
+        CONTINUE_AFTER_LAND      =  2,  // continue running mission (do not disarm) after land if takeoff is next waypoint
+    };
+    bool option_is_set(Option option) const {
+        return (_options.get() & (uint16_t)option) != 0;
+    }
+
     bool continue_after_land_check_for_takeoff(void);
     bool continue_after_land(void) const {
-        return (_options.get() & AP_MISSION_MASK_CONTINUE_AFTER_LAND) != 0;
+        return option_is_set(Option::CONTINUE_AFTER_LAND);
     }
 
     // user settable parameters
@@ -755,6 +778,10 @@ public:
     }
 #endif
 
+#if HAL_LOGGING_ENABLED
+    void set_log_start_mission_item_bit(uint32_t bit) { log_start_mission_item_bit = bit; }
+#endif
+
 private:
     static AP_Mission *_singleton;
 
@@ -774,6 +801,7 @@ private:
         bool do_cmd_all_done;        // true if all "do"/"conditional" commands have been completed (stops unnecessary searching through eeprom for do commands)
         bool in_landing_sequence;   // true if the mission has jumped to a landing
         bool resuming_mission;      // true if the mission is resuming and set false once the aircraft attains the interrupted WP
+        bool in_return_path;        // true if the mission has passed a DO_RETURN_PATH_START waypoint either in the course of the mission or via a `jump_to_closest_mission_leg` call
     } _flags;
 
     // mission WP resume history
@@ -838,6 +866,10 @@ private:
 
     // approximate the distance travelled to get to a landing.  DO_JUMP commands are observed in look forward.
     bool distance_to_landing(uint16_t index, float &tot_distance,Location current_loc);
+
+    // Approximate the distance traveled to return to the mission path. DO_JUMP commands are observed in look forward.
+    // Stop searching once reaching a landing or do-land-start
+    bool distance_to_mission_leg(uint16_t index, uint16_t &search_remaining, float &rejoin_distance, uint16_t &rejoin_index, const Location& current_loc);
 
     // calculate the location of a resume cmd wp
     bool calc_rewind_pos(Mission_Command& rewind_cmd);
@@ -914,12 +946,18 @@ private:
     bool start_command_do_sprayer(const AP_Mission::Mission_Command& cmd);
     bool start_command_do_scripting(const AP_Mission::Mission_Command& cmd);
     bool start_command_do_gimbal_manager_pitchyaw(const AP_Mission::Mission_Command& cmd);
+    bool start_command_fence(const AP_Mission::Mission_Command& cmd);
 
     /*
       handle format conversion of storage format to allow us to update
       format to take advantage of new packing
      */
     void format_conversion(uint8_t tag_byte, const Mission_Command &cmd, PackedContent &packed_content) const;
+
+#if HAL_LOGGING_ENABLED
+    // if not -1, this bit in LOG_BITMASK specifies whether to log a message each time we start a command:
+    uint32_t log_start_mission_item_bit = -1;
+#endif
 };
 
 namespace AP

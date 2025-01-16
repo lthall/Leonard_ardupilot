@@ -3,7 +3,6 @@
 #define AP_PARAM_VEHICLE_NAME plane
 
 #include <AP_Common/AP_Common.h>
-#include <AP_Gripper/AP_Gripper.h>
 
 // Global parameter class.
 //
@@ -203,7 +202,7 @@ public:
         k_param_curr_amp_offset,
         k_param_NavEKF,  // deprecated - remove
         k_param_mission, // mission library
-        k_param_serial_manager, // serial manager library
+        k_param_serial_manager_old, // serial manager library
         k_param_NavEKF2_old,  // deprecated - remove
         k_param_land_pre_flare_alt, // unused - moved to AP_Landing
         k_param_land_pre_flare_airspeed = 149,  // unused - moved to AP_Landing
@@ -344,6 +343,7 @@ public:
 
         k_param_mixing_offset,
         k_param_dspoiler_rud_rate,
+        k_param_airspeed_stall,
 
         k_param_logger = 253, // Logging Group
 
@@ -357,6 +357,14 @@ public:
         k_param_acro_yaw_rate,
         k_param_takeoff_throttle_max_t,
         k_param_autotune_options,
+        k_param_takeoff_throttle_min,
+        k_param_takeoff_options,
+        k_param_takeoff_throttle_idle,
+
+        k_param_pullup = 270,
+        k_param_quicktune,
+        k_param_mode_autoland, 
+
     };
 
     AP_Int16 format_version;
@@ -479,14 +487,12 @@ public:
     // var_info for holding Parameter information
     static const struct AP_Param::GroupInfo var_info[];
 
+    // just to make compilation easier when all things are compiled out...
+    uint8_t unused_integer;
+
     // button reporting library
 #if HAL_BUTTON_ENABLED
     AP_Button *button_ptr;
-#endif
-
-#if STATS_ENABLED == ENABLED
-    // vehicle statistics
-    AP_Stats stats;
 #endif
 
 #if AP_ICENGINE_ENABLED
@@ -517,16 +523,7 @@ public:
     // home reset altitude threshold
     AP_Int8 home_reset_threshold;
 
-#if AP_GRIPPER_ENABLED
-    // Payload Gripper
-    AP_Gripper gripper;
-#endif
-
     AP_Int32 flight_options;
-
-#if AP_SCRIPTING_ENABLED
-    AP_Scripting scripting;
-#endif // AP_SCRIPTING_ENABLED
 
     AP_Int8 takeoff_throttle_accel_count;
     AP_Int8 takeoff_timeout;
@@ -567,7 +564,7 @@ public:
     } fwd_batt_cmp;
 
 
-#if OFFBOARD_GUIDED == ENABLED
+#if AP_PLANE_OFFBOARD_GUIDED_SLEW_ENABLED
     // guided yaw heading PID
     AC_PID guidedHeading{5000.0,  0.0,   0.0, 0 ,  10.0,   5.0,  5.0 ,  5.0  , 0.0};
 #endif
@@ -589,8 +586,10 @@ public:
     
     AP_Int8         axis_bitmask; // axes to be autotuned
 
-    // just to make compilation easier when all things are compiled out...
-    uint8_t unused_integer;
+#if AP_RANGEFINDER_ENABLED
+    // orientation of rangefinder to use for landing
+    AP_Int8 rangefinder_land_orient;
+#endif
 };
 
 extern const AP_Param::Info var_info[];

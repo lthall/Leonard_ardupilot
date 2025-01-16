@@ -268,7 +268,12 @@ void AP_Param::check_group_info(const struct AP_Param::GroupInfo *  group_info,
         if (size == 0) {
             FATAL("invalid type in %s", group_info[i].name);
         }
-        if (prefix_length + strlen(group_info[i].name) > 16) {
+        uint8_t param_name_length = prefix_length + strlen(group_info[i].name);
+        if (type == AP_PARAM_VECTOR3F) {
+            // need room for _X/_Y/_Z
+            param_name_length += 2;
+        }
+        if (param_name_length > 16) {
             FATAL("suffix is too long in %s", group_info[i].name);
         }
         (*total_size) += size + sizeof(struct Param_header);
@@ -1266,6 +1271,7 @@ void AP_Param::save(bool force_save)
         if (hal.util->get_soft_armed() && hal.scheduler->in_main_thread()) {
             // if we are armed in main thread then don't sleep, instead we lose the
             // parameter save
+            INTERNAL_ERROR(AP_InternalError::error_t::flow_of_control);
             return;
         }
         // when we are disarmed then loop waiting for a slot to become
@@ -1359,8 +1365,7 @@ bool AP_Param::load(void)
         return false;
     }
 
-    AP_Param *ap;
-    ap = this;
+    AP_Param *ap = this;
     if (idx != 0) {
         ap = (AP_Param *)((ptrdiff_t)ap) - (idx*sizeof(float));
     }
@@ -1611,7 +1616,7 @@ void AP_Param::load_defaults_file_from_filesystem(const char *default_file, bool
 #endif
     } else {
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
-        AP_HAL::panic("Failed to load defaults from %s\n", default_file);
+        AP_HAL::panic("Failed to load defaults from %s", default_file);
 #else
         printf("Failed to load defaults from %s\n", default_file);
 #endif
@@ -1973,8 +1978,7 @@ void AP_Param::convert_old_parameter(const struct ConversionInfo *info, float sc
 
     // find the new variable in the variable structures
     enum ap_var_type ptype;
-    AP_Param *ap2;
-    ap2 = find(&info->new_name[0], &ptype);
+    AP_Param *ap2 = find(&info->new_name[0], &ptype);
     if (ap2 == nullptr) {
         DEV_PRINTF("Unknown conversion '%s'\n", info->new_name);
         return;
@@ -2037,7 +2041,7 @@ void AP_Param::convert_old_parameters_scaled(const struct ConversionInfo *conver
 // is_top_level: Is true if the class had its own top level key, param_key. It is false if the class was a subgroup
 void AP_Param::convert_class(uint16_t param_key, void *object_pointer,
                                     const struct AP_Param::GroupInfo *group_info,
-                                    uint16_t old_index, uint16_t old_top_element, bool is_top_level)
+                                    uint16_t old_index, bool is_top_level)
 {
     const uint8_t group_shift = is_top_level ? 0 : 6;
 
@@ -2076,6 +2080,29 @@ void AP_Param::convert_class(uint16_t param_key, void *object_pointer,
     // we need to flush here to prevent a later set_default_by_name()
     // causing a save to be done on a converted parameter
     flush();
+}
+
+// convert an object which was stored in a vehicle's G2 into a new
+// object in AP_Vehicle.cpp:
+void AP_Param::convert_g2_objects(const void *g2, const G2ObjectConversion g2_conversions[], uint8_t num_conversions)
+{
+    // Find G2's Top Level Key
+    ConversionInfo info;
+    if (!find_top_level_key_by_pointer(g2, info.old_key)) {
+        return;
+    }
+    for (uint8_t i=0; i<num_conversions; i++) {
+        const auto &c { g2_conversions[i] };
+        convert_class(info.old_key, c.object_pointer, c.var_info, c.old_index, false);
+    }
+}
+
+void AP_Param::convert_toplevel_objects(const TopLevelObjectConversion conversions[], uint8_t num_conversions)
+{
+    for (uint8_t i=0; i<num_conversions; i++) {
+        const auto &c { conversions[i] };
+        convert_class(c.old_index, c.object_pointer, c.var_info, 0, true);
+    }
 }
 
 /*
@@ -2376,7 +2403,7 @@ bool AP_Param::load_defaults_file(const char *filename, bool last_pass)
     num_param_overrides = 0;
     num_read_only = 0;
 
-    param_overrides = new param_override[num_defaults];
+    param_overrides = NEW_NOTHROW param_override[num_defaults];
     if (param_overrides == nullptr) {
         AP_HAL::panic("AP_Param: Failed to allocate overrides");
         return false;
@@ -2471,7 +2498,7 @@ void AP_Param::load_param_defaults(const volatile char *ptr, int32_t length, boo
         return;
     }
 
-    param_overrides = new param_override[num_defaults];
+    param_overrides = NEW_NOTHROW param_override[num_defaults];
     if (param_overrides == nullptr) {
         AP_HAL::panic("AP_Param: Failed to allocate overrides");
         return;
@@ -2512,7 +2539,7 @@ void AP_Param::load_param_defaults(const volatile char *ptr, int32_t length, boo
         AP_Param *vp = find(pname, &var_type);
         if (!vp) {
             if (last_pass) {
-#if ENABLE_DEBUG
+#if ENABLE_DEBUG && (AP_PARAM_MAX_EMBEDDED_PARAM > 0)
                 ::printf("Ignored unknown param %s from embedded region (offset=%u)\n",
                          pname, unsigned(ptr - param_defaults_data.data));
                 hal.console->printf(
@@ -2867,7 +2894,7 @@ void AP_Param::add_default(AP_Param *ap, float v)
     }
 
     // add to list
-    defaults_list *new_item = new defaults_list;
+    defaults_list *new_item = NEW_NOTHROW defaults_list;
     if (new_item == nullptr) {
         return;
     }
@@ -2923,14 +2950,14 @@ void AP_Param::show_all(AP_HAL::BetterStream *port, bool showKeyValues)
     ParamToken token;
     AP_Param *ap;
     enum ap_var_type type;
-    float default_value = nanf("0x4152");  // from logger quiet_nanf
+    float default_value = NaNf;  // from logger quiet_nanf
 
     for (ap=AP_Param::first(&token, &type, &default_value);
          ap;
          ap=AP_Param::next_scalar(&token, &type, &default_value)) {
         if (showKeyValues) {
             ::printf("Key %u: Index %u: GroupElement %u : Default %f  :", (unsigned)var_info(token.key).key, (unsigned)token.idx, (unsigned)token.group_element, default_value);
-            default_value = nanf("0x4152");
+            default_value = NaNf;
         }
         show(ap, token, type, port);
         hal.scheduler->delay(1);

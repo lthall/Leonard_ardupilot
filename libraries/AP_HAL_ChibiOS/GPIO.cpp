@@ -24,9 +24,7 @@
 #ifndef HAL_BOOTLOADER_BUILD
 #include <SRV_Channel/SRV_Channel.h>
 #endif
-#ifndef HAL_NO_UARTDRIVER
 #include <GCS_MAVLink/GCS.h>
-#endif
 #include <AP_Vehicle/AP_Vehicle_Type.h>
 #include <AP_Math/AP_Math.h>
 
@@ -290,11 +288,11 @@ AP_HAL::DigitalSource* GPIO::channel(uint16_t pin)
 {
     struct gpio_entry *g = gpio_by_pin_num(pin);
     if (g != nullptr) {
-        return new DigitalSource(g->pal_line);
+        return NEW_NOTHROW DigitalSource(g->pal_line);
     }
 #if HAL_WITH_IO_MCU
     if (AP_BoardConfig::io_enabled() && iomcu.valid_GPIO_pin(pin)) {
-        return new IOMCU_DigitalSource(pin);
+        return NEW_NOTHROW IOMCU_DigitalSource(pin);
     }
 #endif
     return nullptr;
@@ -621,9 +619,7 @@ void GPIO::timer_tick()
         // INTERNAL_ERROR() to get the reporting mechanism
 
         if (_gpio_tab[i].isr_disabled_ticks == 0) {
-#ifndef HAL_NO_UARTDRIVER
             GCS_SEND_TEXT(MAV_SEVERITY_ERROR,"ISR flood on pin %u", _gpio_tab[i].pin_num);
-#endif
             // Only trigger internal error if armed
             if (hal.util->get_soft_armed()) {
                 INTERNAL_ERROR(AP_InternalError::error_t::gpio_isr);
@@ -644,9 +640,7 @@ void GPIO::timer_tick()
         const uint8_t ISR_retry_ticks = 100U;
         if ((_gpio_tab[i].isr_disabled_ticks > ISR_retry_ticks) && (_gpio_tab[i].fn != nullptr)) {
             // Try re-enabling
-#ifndef HAL_NO_UARTDRIVER
             GCS_SEND_TEXT(MAV_SEVERITY_NOTICE, "Retrying pin %d after ISR flood", _gpio_tab[i].pin_num);
-#endif
             if (attach_interrupt(_gpio_tab[i].pin_num, _gpio_tab[i].fn, _gpio_tab[i].isr_mode)) {
                 // Success, reset quota
                 _gpio_tab[i].isr_quota = quota;

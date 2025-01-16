@@ -19,6 +19,7 @@
 #pragma once
 
 #include "AP_RCProtocol_config.h"
+#include <AP_RCTelemetry/AP_RCTelemetry_config.h>
 
 #if AP_RCPROTOCOL_CRSF_ENABLED
 
@@ -45,6 +46,9 @@ public:
     void process_byte(uint8_t byte, uint32_t baudrate) override;
     void process_handshake(uint32_t baudrate) override;
     void update(void) override;
+#if HAL_CRSF_TELEM_ENABLED
+    void start_bind(void) override;
+#endif
     // support for CRSF v3
     bool change_baud_rate(uint32_t baudrate);
     // bootstrap baudrate
@@ -76,7 +80,9 @@ public:
 
     enum FrameType {
         CRSF_FRAMETYPE_GPS = 0x02,
+        CRSF_FRAMETYPE_VARIO = 0x07,
         CRSF_FRAMETYPE_BATTERY_SENSOR = 0x08,
+        CRSF_FRAMETYPE_BARO_VARIO = 0x09,
         CRSF_FRAMETYPE_HEARTBEAT = 0x0B,
         CRSF_FRAMETYPE_VTX = 0x0F,
         CRSF_FRAMETYPE_VTX_TELEM = 0x10,
@@ -151,6 +157,8 @@ public:
     // Commands for CRSF_COMMAND_RX
     enum CommandRX {
         CRSF_COMMAND_RX_BIND = 0x01,
+        CRSF_COMMAND_RX_CANCEL_BIND = 0x02,
+        CRSF_COMMAND_RX_SET_BIND_ID = 0x03,
     };
 
     // Commands for CRSF_COMMAND_GENERAL

@@ -366,6 +366,8 @@ public:
     const EKFGSF_yaw *get_yawEstimator(void) const;
 
 private:
+    class AP_DAL &dal;
+
     uint8_t num_cores; // number of allocated cores
     uint8_t primary;   // current primary core
     NavEKF3_core *core = nullptr;
@@ -448,6 +450,15 @@ private:
     AP_Int8 _primary_core;          // initial core number
     AP_Enum<LogLevel> _log_level;   // log verbosity level
     AP_Float _gpsVAccThreshold;     // vertical accuracy threshold to use GPS as an altitude source
+    AP_Int32 _options;              // bit mask of processing options
+
+    // enum for processing options
+    enum class Option {
+        JammingExpected     = (1<<0),
+    };
+    bool option_is_enabled(Option option) const {
+        return (_options & (uint32_t)option) != 0;
+    }
 
 // Possible values for _flowUse
 #define FLOW_USE_NONE    0
@@ -487,6 +498,7 @@ private:
     const uint8_t extNavIntervalMin_ms = 20;       // The minimum allowed time between measurements from external navigation sensors (msec)
     const float maxYawEstVelInnov = 2.0f;          // Maximum acceptable length of the velocity innovation returned by the EKF-GSF yaw estimator (m/s)
     const uint16_t deadReckonDeclare_ms = 1000;    // Time without equivalent position or velocity observation to constrain drift before dead reckoning is declared (msec)
+    const uint16_t gpsNoFixTimeout_ms = 2000;      // Time without a fix required to reset GPS alignment checks when EK3_OPTIONS bit 0 is set (msec)
 
     // time at start of current filter update
     uint64_t imuSampleTime_us;
@@ -518,7 +530,6 @@ private:
         float core_delta;             // the amount of D position change between cores when a change happened
     } pos_down_reset_data;
 
-#define MAX_EKF_CORES     3 // maximum allowed EKF Cores to be instantiated
 #define CORE_ERR_LIM      1 // -LIM to LIM relative error range for a core
 #define BETTER_THRESH   0.5 // a lane should have this much relative error difference to be considered for overriding a healthy primary core
     

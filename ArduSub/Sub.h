@@ -67,8 +67,8 @@
 // Local modules
 #include "defines.h"
 #include "config.h"
-#include "GCS_Mavlink.h"
-#include "RC_Channel.h"         // RC Channel Library
+#include "GCS_MAVLink_Sub.h"
+#include "RC_Channel_Sub.h"         // RC Channel Library
 #include "Parameters.h"
 #include "AP_Arming_Sub.h"
 #include "GCS_Sub.h"
@@ -78,7 +78,7 @@
 #include <AP_OpticalFlow/AP_OpticalFlow.h>     // Optical Flow library
 
 // libraries which are dependent on #defines in defines.h and/or config.h
-#if RCMAP_ENABLED == ENABLED
+#if RCMAP_ENABLED
 #include <AP_RCMapper/AP_RCMapper.h>        // RC input mapping library
 #endif
 
@@ -88,12 +88,7 @@
 #include <AP_RPM/AP_RPM.h>
 #endif
 
-#include <AP_Gripper/AP_Gripper_config.h>
-#if AP_GRIPPER_ENABLED
-#include <AP_Gripper/AP_Gripper.h>             // gripper stuff
-#endif
-
-#if AVOIDANCE_ENABLED == ENABLED
+#if AVOIDANCE_ENABLED
 #include <AC_Avoidance/AC_Avoid.h>           // Stop at fence library
 #endif
 
@@ -116,6 +111,7 @@ public:
     friend class ModeStabilize;
     friend class ModeAcro;
     friend class ModeAlthold;
+    friend class ModeSurftrak;
     friend class ModeGuided;
     friend class ModePoshold;
     friend class ModeAuto;
@@ -146,19 +142,19 @@ private:
     RC_Channel *channel_forward;
     RC_Channel *channel_lateral;
 
-#if HAL_LOGGING_ENABLED
-    AP_Logger logger;
-#endif
-
     AP_LeakDetector leak_detector;
 
     struct {
         bool enabled:1;
         bool alt_healthy:1; // true if we can trust the altitude from the rangefinder
         int16_t alt_cm;     // tilt compensated altitude (in cm) from rangefinder
+        int16_t min_cm;     // min rangefinder distance (in cm)
+        int16_t max_cm;     // max rangefinder distance (in cm)
         uint32_t last_healthy_ms;
-        LowPassFilterFloat alt_cm_filt; // altitude filter
-    } rangefinder_state = { false, false, 0, 0 };
+        float inertial_alt_cm;                  // inertial alt at time of last rangefinder sample
+        float rangefinder_terrain_offset_cm;    // terrain height above EKF origin
+        LowPassFilterFloat alt_cm_filt;         // altitude filter
+    } rangefinder_state = { false, false, 0, 0, 0, 0, 0, 0 };
 
 #if AP_RPM_ENABLED
     AP_RPM rpm_sensor;
@@ -210,7 +206,7 @@ private:
 
     Mode::Number prev_control_mode;
 
-#if RCMAP_ENABLED == ENABLED
+#if RCMAP_ENABLED
     RCMapper rcmap;
 #endif
 
@@ -236,7 +232,18 @@ private:
     } failsafe;
 
     bool any_failsafe_triggered() const {
-        return (failsafe.pilot_input || battery.has_failsafed() || failsafe.gcs || failsafe.ekf || failsafe.terrain);
+        return (
+            failsafe.pilot_input
+            || battery.has_failsafed()
+            || failsafe.gcs
+            || failsafe.ekf
+            || failsafe.terrain
+            || failsafe.leak
+            || failsafe.internal_pressure
+            || failsafe.internal_temperature
+            || failsafe.crash
+            || failsafe.sensor_health
+        );
     }
 
     // sensor health for logging
@@ -277,7 +284,6 @@ private:
     // Altitude
     // The cm/s we are moving up or down based on filtered data - Positive = UP
     int16_t climb_rate;
-    float target_rangefinder_alt;      // desired altitude in cm above the ground
 
     // Turn counter
     int32_t quarter_turn_count;
@@ -349,7 +355,7 @@ private:
     AP_Mount camera_mount;
 #endif
 
-#if AVOIDANCE_ENABLED == ENABLED
+#if AVOIDANCE_ENABLED
     AC_Avoid avoid;
 #endif
 
@@ -400,9 +406,15 @@ private:
     float get_roi_yaw();
     float get_look_ahead_yaw();
     float get_pilot_desired_climb_rate(float throttle_control);
-    float get_surface_tracking_climb_rate(int16_t target_rate, float current_alt_target, float dt);
     void rotate_body_frame_to_NE(float &x, float &y);
 #if HAL_LOGGING_ENABLED
+    // methods for AP_Vehicle:
+    const AP_Int32 &get_log_bitmask() override { return g.log_bitmask; }
+    const struct LogStructure *get_log_structures() const override {
+        return log_structure;
+    }
+    uint8_t get_num_log_structures() const override;
+
     void Log_Write_Control_Tuning();
     void Log_Write_Attitude();
     void Log_Write_Data(LogDataID id, int32_t value);
@@ -422,10 +434,13 @@ private:
     void userhook_SuperSlowLoop();
     void update_home_from_EKF();
     void set_home_to_current_location_inflight();
-    bool set_home_to_current_location(bool lock) WARN_IF_UNUSED;
-    bool set_home(const Location& loc, bool lock) WARN_IF_UNUSED;
-    bool far_from_EKF_origin(const Location& loc);
+    bool set_home_to_current_location(bool lock) override WARN_IF_UNUSED;
+    bool set_home(const Location& loc, bool lock) override WARN_IF_UNUSED;
+    float get_alt_rel() const WARN_IF_UNUSED;
+    float get_alt_msl() const WARN_IF_UNUSED;
     void exit_mission();
+    void set_origin(const Location& loc);
+    bool ensure_ekf_origin();
     bool verify_loiter_unlimited();
     bool verify_loiter_time();
     bool verify_wait_delay();
@@ -477,7 +492,6 @@ private:
     void read_barometer(void);
     void init_rangefinder(void);
     void read_rangefinder(void);
-    bool rangefinder_alt_ok(void) const;
     void terrain_update();
     void terrain_logging();
     void init_ardupilot() override;
@@ -500,7 +514,7 @@ private:
     void do_loiter_unlimited(const AP_Mission::Mission_Command& cmd);
     void do_circle(const AP_Mission::Mission_Command& cmd);
     void do_loiter_time(const AP_Mission::Mission_Command& cmd);
-#if NAV_GUIDED == ENABLED
+#if NAV_GUIDED
     void do_nav_guided_enable(const AP_Mission::Mission_Command& cmd);
     void do_guided_limits(const AP_Mission::Mission_Command& cmd);
 #endif
@@ -517,12 +531,10 @@ private:
     bool verify_surface(const AP_Mission::Mission_Command& cmd);
     bool verify_RTL(void);
     bool verify_circle(const AP_Mission::Mission_Command& cmd);
-#if NAV_GUIDED == ENABLED
+#if NAV_GUIDED
     bool verify_nav_guided_enable(const AP_Mission::Mission_Command& cmd);
 #endif
     bool verify_nav_delay(const AP_Mission::Mission_Command& cmd);
-
-    void log_init(void);
 
     void failsafe_leak_check();
     void failsafe_internal_pressure_check();
@@ -534,9 +546,6 @@ private:
     void translate_wpnav_rp(float &lateral_out, float &forward_out);
     void translate_circle_nav_rp(float &lateral_out, float &forward_out);
     void translate_pos_control_rp(float &lateral_out, float &forward_out);
-
-    bool surface_init(void);
-    void surface_run();
 
     void stats_update();
 
@@ -589,6 +598,7 @@ private:
     ModeCircle mode_circle;
     ModeSurface mode_surface;
     ModeMotordetect mode_motordetect;
+    ModeSurftrak mode_surftrak;
 
     // Auto
     AutoSubMode auto_mode;   // controls which auto controller is run
@@ -600,6 +610,7 @@ private:
 
 public:
     void mainloop_failsafe_check();
+    bool rangefinder_alt_ok() const WARN_IF_UNUSED;
 
     static Sub *_singleton;
 
@@ -613,6 +624,11 @@ public:
 
     // For Lua scripting, so index is 1..4, not 0..3
     uint8_t get_and_clear_button_count(uint8_t index);
+
+#if AP_RANGEFINDER_ENABLED
+    float get_rangefinder_target_cm() const WARN_IF_UNUSED { return mode_surftrak.get_rangefinder_target_cm(); }
+    bool set_rangefinder_target_cm(float new_target_cm) { return mode_surftrak.set_rangefinder_target_cm(new_target_cm); }
+#endif // AP_RANGEFINDER_ENABLED
 #endif // AP_SCRIPTING_ENABLED
 };
 

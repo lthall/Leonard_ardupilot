@@ -21,6 +21,8 @@
 
 #include "AP_Scheduler_config.h"
 
+#if AP_SCHEDULER_ENABLED
+
 #include "AP_Scheduler.h"
 
 #include <AP_HAL/AP_HAL.h>
@@ -59,8 +61,9 @@ const AP_Param::GroupInfo AP_Scheduler::var_info[] = {
     // @Param: LOOP_RATE
     // @DisplayName: Scheduling main loop rate
     // @Description: This controls the rate of the main control loop in Hz. This should only be changed by developers. This only takes effect on restart. Values over 400 are considered highly experimental.
-    // @Values: 50:50Hz,100:100Hz,200:200Hz,250:250Hz,300:300Hz,400:400Hz
+    // @Range: 50 400
     // @RebootRequired: True
+    // @Units: Hz
     // @User: Advanced
     AP_GROUPINFO("LOOP_RATE",  1, AP_Scheduler, _loop_rate_hz, SCHEDULER_DEFAULT_LOOP_RATE),
 
@@ -123,7 +126,7 @@ void AP_Scheduler::init(const AP_Scheduler::Task *tasks, uint8_t num_tasks, uint
 
     _num_tasks = _num_vehicle_tasks + _num_common_tasks;
 
-   _last_run = new uint16_t[_num_tasks];
+   _last_run = NEW_NOTHROW uint16_t[_num_tasks];
     _tick_counter = 0;
 
     // setup initial performance counters
@@ -345,7 +348,8 @@ void AP_Scheduler::loop()
     _rsem.take_blocking();
     hal.util->persistent_data.scheduler_task = -1;
 
-    const uint32_t sample_time_us = AP_HAL::micros();
+    _loop_sample_time_us = AP_HAL::micros64();
+    const uint32_t sample_time_us = uint32_t(_loop_sample_time_us);
     
     if (_loop_timer_start_us == 0) {
         _loop_timer_start_us = sample_time_us;
@@ -360,7 +364,7 @@ void AP_Scheduler::loop()
           for testing low CPU conditions we can add an optional delay in SITL
         */
         auto *sitl = AP::sitl();
-        uint32_t loop_delay_us = sitl->loop_delay.get();
+        uint32_t loop_delay_us = sitl? sitl->loop_delay.get() : 1000U;
         hal.scheduler->delay_microseconds(loop_delay_us);
     }
 #endif
@@ -443,6 +447,11 @@ void AP_Scheduler::update_logging()
 // Write a performance monitoring packet
 void AP_Scheduler::Log_Write_Performance()
 {
+    uint64_t rtc = 0;
+#if AP_RTC_ENABLED
+    UNUSED_RESULT(AP::rtc().get_utc_usec(rtc));
+#endif
+
     const AP_HAL::Util::PersistentData &pd = hal.util->persistent_data;
     struct log_Performance pkt = {
         LOG_PACKET_HEADER_INIT(LOG_PERFORMANCE_MSG),
@@ -460,6 +469,7 @@ void AP_Scheduler::Log_Write_Performance()
         i2c_count        : pd.i2c_count,
         i2c_isr_count    : pd.i2c_isr_count,
         extra_loop_us    : extra_loop_us,
+        rtc              : rtc,
     };
     AP::logger().WriteCriticalBlock(&pkt, sizeof(pkt));
 }
@@ -539,3 +549,5 @@ AP_Scheduler &scheduler()
 }
 
 };
+
+#endif  // AP_SCHEDULER_ENABLED

@@ -353,7 +353,11 @@ void AP_Relay::init()
             continue;
         }
 
-        if (function == AP_Relay_Params::FUNCTION::RELAY) {
+        bool use_default_param = (function == AP_Relay_Params::FUNCTION::RELAY);
+#ifdef HAL_BUILD_AP_PERIPH
+        use_default_param |= (function >= AP_Relay_Params::FUNCTION::DroneCAN_HARDPOINT_0 && function <= AP_Relay_Params::FUNCTION::DroneCAN_HARDPOINT_15);
+#endif
+        if (use_default_param) {
             // relay by instance number, set the state to match our output
             const AP_Relay_Params::DefaultState default_state = _params[instance].default_state;
             if ((default_state == AP_Relay_Params::DefaultState::OFF) ||
@@ -407,6 +411,10 @@ void AP_Relay::set_pin_by_instance(uint8_t instance, bool value)
 #endif
 
     const bool initial_value = get_pin(pin);
+
+    if (_params[instance].inverted > 0) {
+        value = !value;
+    }
 
     if (initial_value != value) {
         set_pin(pin, value);
@@ -494,6 +502,10 @@ bool AP_Relay::get(uint8_t instance) const
     if (instance >= ARRAY_SIZE(_params)) {
         // invalid instance
         return false;
+    }
+
+    if (_params[instance].inverted > 0) {
+        return !get_pin(_params[instance].pin.get());
     }
 
     return get_pin(_params[instance].pin.get());

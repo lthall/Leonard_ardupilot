@@ -1,12 +1,15 @@
 #pragma once
 
+#include "AP_BattMonitor_config.h"
+
+#if AP_BATTERY_ENABLED
+
 #include <AP_Common/AP_Common.h>
 #include <AP_Param/AP_Param.h>
 #include <AP_Math/AP_Math.h>
 #include <AP_TemperatureSensor/AP_TemperatureSensor_config.h>
 #include <GCS_MAVLink/GCS_MAVLink.h>
 #include "AP_BattMonitor_Params.h"
-#include "AP_BattMonitor_config.h"
 
 // maximum number of battery monitors
 #ifndef AP_BATT_MONITOR_MAX_INSTANCES
@@ -67,6 +70,7 @@ class AP_BattMonitor
     friend class AP_BattMonitor_INA239;
     friend class AP_BattMonitor_LTC2946;
     friend class AP_BattMonitor_AD7091R5;
+    friend class AP_BattMonitor_INA3221;
 
     friend class AP_BattMonitor_Torqeedo;
     friend class AP_BattMonitor_FuelLevel_Analog;
@@ -78,6 +82,7 @@ public:
     // battery failsafes must be defined in levels of severity so that vehicles wont fall backwards
     enum class Failsafe : uint8_t {
         None = 0,
+        Unhealthy,
         Low,
         Critical
     };
@@ -112,6 +117,7 @@ public:
         EFI                            = 27,
         AD7091R5                       = 28,
         Scripting                      = 29,
+        INA3221                        = 30,
     };
 
     FUNCTOR_TYPEDEF(battery_failsafe_handler_fn_t, void, const char *, const int8_t);
@@ -150,6 +156,7 @@ public:
         float       resistance;                // resistance, in Ohms, calculated by comparing resting voltage vs in flight voltage
         Failsafe failsafe;                     // stage failsafe the battery is in
         bool        healthy;                   // battery monitor is communicating correctly
+        uint32_t    last_healthy_ms;           // Time when monitor was last healthy
         bool        is_powering_off;           // true when power button commands power off
         bool        powerOffNotified;          // only send powering off notification once
         uint32_t    time_remaining;            // remaining battery time
@@ -157,6 +164,7 @@ public:
         uint8_t     state_of_health_pct;       // state of health (SOH) in percent
         bool        has_state_of_health_pct;   // state_of_health_pct is only valid if this is true
         uint8_t     instance;                  // instance number of this backend
+        Type        type;                      // allocated instance type
         const struct AP_Param::GroupInfo *var_info;
     };
 
@@ -216,10 +224,13 @@ public:
     /// returns the highest failsafe action that has been triggered
     int8_t get_highest_failsafe_priority(void) const { return _highest_failsafe_priority; };
 
-    /// get_type - returns battery monitor type
-    enum Type get_type() const { return get_type(AP_BATT_PRIMARY_INSTANCE); }
-    enum Type get_type(uint8_t instance) const {
+    /// configured_type - returns battery monitor type as configured in parameters
+    enum Type configured_type(uint8_t instance) const {
         return (Type)_params[instance]._type.get();
+    }
+    /// allocated_type - returns battery monitor type as allocated
+    enum Type allocated_type(uint8_t instance) const {
+        return state[instance].type;
     }
 
     /// get_serial_number - returns battery serial number
@@ -252,6 +263,8 @@ public:
     // MPPT Control (Solar panels)
     void MPPT_set_powered_state_to_all(const bool power_on);
     void MPPT_set_powered_state(const uint8_t instance, const bool power_on);
+
+    bool option_is_set(uint8_t instance, AP_BattMonitor_Params::Options option) const;
 
     // cycle count
     bool get_cycle_count(uint8_t instance, uint16_t &cycles) const;
@@ -315,3 +328,5 @@ private:
 namespace AP {
     AP_BattMonitor &battery();
 };
+
+#endif  // AP_BATTERY_ENABLED

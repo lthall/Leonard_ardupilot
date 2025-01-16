@@ -120,7 +120,7 @@ bool AP_Arming_Sub::arm(AP_Arming::Method method, bool do_arming_checks)
         // Always use absolute altitude for ROV
         // ahrs.resetHeightDatum();
         // AP::logger().Write_Event(LogEvent::EKF_ALT_RESET);
-    } else if (ahrs.home_is_set() && !ahrs.home_is_locked()) {
+    } else if (!ahrs.home_is_locked()) {
         // Reset home position if it has already been set before (but not locked)
         if (!sub.set_home_to_current_location(false)) {
             // ignore this failure
@@ -149,6 +149,14 @@ bool AP_Arming_Sub::arm(AP_Arming::Method method, bool do_arming_checks)
     // flag exiting this function
     in_arm_motors = false;
 
+    // if we do not have an ekf origin then we can't use the WMM tables
+    if (!sub.ensure_ekf_origin()) {
+        gcs().send_text(MAV_SEVERITY_WARNING, "Compass performance degraded");
+        if (check_enabled(ARMING_CHECK_PARAMETERS)) {
+            check_failed(ARMING_CHECK_PARAMETERS, true, "No world position, check ORIGIN_* parameters");
+            return false;
+        }
+    }
     // return success
     return true;
 }

@@ -1,5 +1,8 @@
-#include "AP_Mount_Servo.h"
+#include "AP_Mount_config.h"
+
 #if HAL_MOUNT_SERVO_ENABLED
+
+#include "AP_Mount_Servo.h"
 
 #include <AP_AHRS/AP_AHRS.h>
 #include <GCS_MAVLink/GCS_MAVLink.h>
@@ -55,20 +58,9 @@ void AP_Mount_Servo::update()
         }
 
         // RC radio manual angle control, but with stabilization from the AHRS
-        case MAV_MOUNT_MODE_RC_TARGETING: {
-            // update targets using pilot's RC inputs
-            MountTarget rc_target;
-            get_rc_target(mnt_target.target_type, rc_target);
-            switch (mnt_target.target_type) {
-            case MountTargetType::ANGLE:
-                mnt_target.angle_rad = rc_target;
-                break;
-            case MountTargetType::RATE:
-                mnt_target.rate_rads = rc_target;
-                break;
-            }
+        case MAV_MOUNT_MODE_RC_TARGETING:
+            update_mnt_target_from_rc_target();
             break;
-        }
 
         // point mount to a GPS point given by the mission planner
         case MAV_MOUNT_MODE_GPS_POINT:
@@ -119,6 +111,18 @@ void AP_Mount_Servo::update()
     move_servo(_pan_idx,  degrees(_angle_bf_output_rad.z)*10, _params.yaw_angle_min*10, _params.yaw_angle_max*10);
 }
 
+// returns true if this mount can control its roll
+bool AP_Mount_Servo::has_roll_control() const
+{
+    return SRV_Channels::function_assigned(_roll_idx) && roll_range_valid();
+}
+
+// returns true if this mount can control its tilt
+bool AP_Mount_Servo::has_pitch_control() const
+{
+    return SRV_Channels::function_assigned(_tilt_idx) && pitch_range_valid();
+}
+
 // returns true if this mount can control its pan (required for multicopters)
 bool AP_Mount_Servo::has_pan_control() const
 {
@@ -128,14 +132,23 @@ bool AP_Mount_Servo::has_pan_control() const
 // get attitude as a quaternion.  returns true on success
 bool AP_Mount_Servo::get_attitude_quaternion(Quaternion& att_quat)
 {
-    // no feedback from gimbal so simply report targets
-    // mnt_target.angle_rad always holds latest angle targets
-
-    // ensure yaw target is in body-frame with limits applied
-    const float yaw_bf = constrain_float(mnt_target.angle_rad.get_bf_yaw(), radians(_params.yaw_angle_min), radians(_params.yaw_angle_max));
+    // No feedback from gimbal so simply report demanded servo angles (which is
+    // not the same as target angles).
+    float roll_rad = 0.0f;
+    float pitch_rad = 0.0f;
+    float yaw_rad = 0.0f;
+    if (has_roll_control()) {
+        roll_rad = constrain_float(_angle_bf_output_rad.x, radians(_params.roll_angle_min), radians(_params.roll_angle_max));
+    }
+    if (has_pitch_control()) {
+        pitch_rad = constrain_float(_angle_bf_output_rad.y, radians(_params.pitch_angle_min), radians(_params.pitch_angle_max));
+    }
+    if (has_pan_control()) {
+        yaw_rad = constrain_float(_angle_bf_output_rad.z, radians(_params.yaw_angle_min), radians(_params.yaw_angle_max));
+    }
 
     // convert to quaternion
-    att_quat.from_euler(Vector3f{mnt_target.angle_rad.roll, mnt_target.angle_rad.pitch, yaw_bf});
+    att_quat.from_euler(roll_rad, pitch_rad, yaw_rad);
     return true;
 }
 

@@ -270,22 +270,6 @@ void AP_MotorsHeli_Single::calculate_armed_scalars()
         _main_rotor._rsc_mode.save();
         _heliflags.save_rsc_mode = false;
     }
-
-    // allow use of external governor autorotation bailout
-    if (_heliflags.in_autorotation) {
-        _main_rotor.set_autorotation_flag(_heliflags.in_autorotation);
-        // set bailout ramp time
-        _main_rotor.use_bailout_ramp_time(_heliflags.enable_bailout);
-        if (use_tail_RSC()) {
-            _tail_rotor.set_autorotation_flag(_heliflags.in_autorotation);
-            _tail_rotor.use_bailout_ramp_time(_heliflags.enable_bailout);
-        }
-    } else {
-        _main_rotor.set_autorotation_flag(false);
-        if (use_tail_RSC()) {
-            _tail_rotor.set_autorotation_flag(false);
-        }
-    }
 }
 
 // calculate_scalars - recalculates various scalers used.
@@ -326,18 +310,12 @@ void AP_MotorsHeli_Single::calculate_scalars()
         _tail_rotor.set_runup_time(_main_rotor._runup_time.get());
         _tail_rotor.set_critical_speed(_main_rotor._critical_speed.get());
         _tail_rotor.set_idle_output(_main_rotor._idle_output.get());
-        _tail_rotor.set_arot_idle_output(_main_rotor._arot_idle_output.get());
-        _tail_rotor.set_rsc_arot_man_enable(_main_rotor._rsc_arot_man_enable.get());
-        _tail_rotor.set_rsc_arot_engage_time(_main_rotor._rsc_arot_engage_time.get());
     } else {
         _tail_rotor.set_control_mode(ROTOR_CONTROL_MODE_DISABLED);
         _tail_rotor.set_ramp_time(0);
         _tail_rotor.set_runup_time(0);
         _tail_rotor.set_critical_speed(0);
         _tail_rotor.set_idle_output(0);
-        _tail_rotor.set_arot_idle_output(0);
-        _tail_rotor.set_rsc_arot_man_enable(0);
-        _tail_rotor.set_rsc_arot_engage_time(0);
     }
 }
 
@@ -364,7 +342,7 @@ void AP_MotorsHeli_Single::update_motor_control(AP_MotorsHeli_RSC::RotorControlS
     }
 
     // Check if both rotors are run-up, tail rotor controller always returns true if not enabled
-    _heliflags.rotor_runup_complete = ( _main_rotor.is_runup_complete() && _tail_rotor.is_runup_complete() );
+    set_rotor_runup_complete(_main_rotor.is_runup_complete() && _tail_rotor.is_runup_complete());
 
     // Check if both rotors are spooled down, tail rotor controller always returns true if not enabled
     _heliflags.rotor_spooldown_complete = ( _main_rotor.is_spooldown_complete() );
@@ -383,10 +361,6 @@ void AP_MotorsHeli_Single::move_actuators(float roll_out, float pitch_out, float
     // initialize limits flag
     limit.throttle_lower = false;
     limit.throttle_upper = false;
-
-    if (_heliflags.inverted_flight) {
-        coll_in = 1 - coll_in;
-    }
 
     // rescale roll_out and pitch_out into the min and max ranges to provide linear motion
     // across the input range instead of stopping when the input hits the constrain value
@@ -414,10 +388,9 @@ void AP_MotorsHeli_Single::move_actuators(float roll_out, float pitch_out, float
     }
 
     // ensure not below landed/landing collective
-    if (_heliflags.landing_collective && collective_out < _collective_land_min_pct && !_heliflags.in_autorotation) {
+    if (_heliflags.landing_collective && collective_out < _collective_land_min_pct && !_main_rotor.in_autorotation()) {
         collective_out = _collective_land_min_pct;
         limit.throttle_lower = true;
-
     }
 
     // updates below land min collective flag
@@ -473,7 +446,7 @@ float AP_MotorsHeli_Single::get_yaw_offset(float collective)
         return 0.0;
     }
 
-    if (_heliflags.in_autorotation || (get_control_output() <= _main_rotor.get_idle_output())) {
+    if (_main_rotor.autorotation.active() || (_main_rotor.get_control_output() <= _main_rotor.get_idle_output())) {
         // Motor is stopped or at idle, and thus not creating torque
         return 0.0;
     }
@@ -660,6 +633,9 @@ bool AP_MotorsHeli_Single::arming_checks(size_t buflen, char *buffer) const
 // Called from system.cpp
 void AP_MotorsHeli_Single::heli_motors_param_conversions(void)
 {
+    // Run common conversions from base class
+    AP_MotorsHeli::heli_motors_param_conversions();
+
     // PARAMETER_CONVERSION - Added: Nov-2023
     // Convert trim for DDFP tails
     // Previous DDFP configs used servo trim for setting the yaw trim, which no longer works with thrust linearisation. Convert servo trim
@@ -697,3 +673,19 @@ bool AP_MotorsHeli_Single::use_tail_RSC() const
     return (type == TAIL_TYPE::DIRECTDRIVE_VARPITCH) ||
            (type == TAIL_TYPE::DIRECTDRIVE_VARPIT_EXT_GOV);
 }
+
+#if HAL_LOGGING_ENABLED
+void AP_MotorsHeli_Single::Log_Write(void)
+{
+    // Write swash plate logging
+    // For single heli we have to apply an additional cyclic scaler of sqrt(2.0) because the
+    // definition of when we achieve _cyclic_max is different to dual heli. In single, _cyclic_max
+    // is limited at sqrt(2.0), in dual it is limited at 1.0
+    float cyclic_angle_scaler = get_cyclic_angle_scaler() * sqrtf(2.0);
+    _swashplate.write_log(cyclic_angle_scaler, _collective_min_deg.get(), _collective_max_deg.get(), _collective_min.get(), _collective_max.get());
+
+    // Write RSC logging
+    _main_rotor.write_log();
+    _tail_rotor.write_log();
+}
+#endif

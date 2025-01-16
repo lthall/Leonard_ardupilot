@@ -136,6 +136,7 @@ extern const AP_HAL::HAL& hal;
 #define INV3_ID_ICM42605      0x42
 #define INV3_ID_ICM42688      0x47
 #define INV3_ID_IIM42652      0x6f
+#define INV3_ID_IIM42653      0x56
 #define INV3_ID_ICM42670      0x67
 #define INV3_ID_ICM45686      0xE9
 
@@ -166,8 +167,8 @@ struct PACKED FIFODataHighRes {
 #define INV3_SAMPLE_SIZE sizeof(FIFOData)
 #define INV3_HIGHRES_SAMPLE_SIZE sizeof(FIFODataHighRes)
 
-static_assert(sizeof(FIFOData) == 16);
-static_assert(sizeof(FIFODataHighRes) == 20);
+static_assert(sizeof(FIFOData) == 16, "FIFOData must be 16 bytes");
+static_assert(sizeof(FIFODataHighRes) == 20, "FIFODataHighRes must be 20 bytes");
 
 #define INV3_FIFO_BUFFER_LEN 8
 
@@ -185,12 +186,12 @@ AP_InertialSensor_Invensensev3::~AP_InertialSensor_Invensensev3()
 #if HAL_INS_HIGHRES_SAMPLE
     if (highres_sampling) {
         if (fifo_buffer != nullptr) {
-            hal.util->free_type(fifo_buffer, INV3_FIFO_BUFFER_LEN * INV3_HIGHRES_SAMPLE_SIZE, AP_HAL::Util::MEM_DMA_SAFE);
+            hal.util->free_type(fifo_buffer, INV3_FIFO_BUFFER_LEN * INV3_HIGHRES_SAMPLE_SIZE + 1, AP_HAL::Util::MEM_DMA_SAFE);
         }
     } else
 #endif
     if (fifo_buffer != nullptr) {
-        hal.util->free_type(fifo_buffer, INV3_FIFO_BUFFER_LEN * INV3_SAMPLE_SIZE, AP_HAL::Util::MEM_DMA_SAFE);
+        hal.util->free_type(fifo_buffer, INV3_FIFO_BUFFER_LEN * INV3_SAMPLE_SIZE + 1, AP_HAL::Util::MEM_DMA_SAFE);
     }
 }
 
@@ -207,7 +208,7 @@ AP_InertialSensor_Backend *AP_InertialSensor_Invensensev3::probe(AP_InertialSens
     }
 
     AP_InertialSensor_Invensensev3 *sensor =
-        new AP_InertialSensor_Invensensev3(imu, std::move(_dev), _rotation);
+        NEW_NOTHROW AP_InertialSensor_Invensensev3(imu, std::move(_dev), _rotation);
     if (!sensor || !sensor->hardware_init()) {
         delete sensor;
         return nullptr;
@@ -258,6 +259,12 @@ void AP_InertialSensor_Invensensev3::start()
         devtype = DEVTYPE_INS_IIM42652;
         temp_sensitivity = 1.0 / 2.07;
         break;
+    case Invensensev3_Type::IIM42653:
+        devtype = DEVTYPE_INS_IIM42653;
+        temp_sensitivity = 1.0 / 2.07;
+        gyro_scale = GYRO_SCALE_4000DPS;
+        accel_scale = ACCEL_SCALE_32G;
+        break;
     case Invensensev3_Type::ICM42688:
         devtype = DEVTYPE_INS_ICM42688;
         temp_sensitivity = 1.0 / 2.07;
@@ -294,6 +301,7 @@ void AP_InertialSensor_Invensensev3::start()
         switch (inv3_type) {
             case Invensensev3_Type::ICM42688: // HiRes 19bit
             case Invensensev3_Type::IIM42652: // HiRes 19bit
+            case Invensensev3_Type::IIM42653: // HiRes 19bit
             case Invensensev3_Type::ICM45686: // HiRes 20bit
                 highres_sampling = dev->bus_type() == AP_HAL::Device::BUS_TYPE_SPI;
                 break;
@@ -335,14 +343,10 @@ void AP_InertialSensor_Invensensev3::start()
     // pre-calculate backend period
     backend_period_us = 1000000UL / backend_rate_hz;
 
-    if (!_imu.register_gyro(gyro_instance, backend_rate_hz, dev->get_bus_id_devtype(devtype)) ||
-        !_imu.register_accel(accel_instance, backend_rate_hz, dev->get_bus_id_devtype(devtype))) {
+    if (!_imu.register_gyro(gyro_instance, sampling_rate_hz, dev->get_bus_id_devtype(devtype)) ||
+        !_imu.register_accel(accel_instance, sampling_rate_hz, dev->get_bus_id_devtype(devtype))) {
         return;
     }
-
-    // update backend sample rate
-    _set_accel_raw_sample_rate(accel_instance, backend_rate_hz);
-    _set_gyro_raw_sample_rate(gyro_instance, backend_rate_hz);
 
     // indicate what multiplier is appropriate for the sensors'
     // readings to fit them into an int16_t:
@@ -358,10 +362,10 @@ void AP_InertialSensor_Invensensev3::start()
     // allocate fifo buffer
 #if HAL_INS_HIGHRES_SAMPLE
     if (highres_sampling) {
-        fifo_buffer = hal.util->malloc_type(INV3_FIFO_BUFFER_LEN * INV3_HIGHRES_SAMPLE_SIZE, AP_HAL::Util::MEM_DMA_SAFE);
+        fifo_buffer = hal.util->malloc_type(INV3_FIFO_BUFFER_LEN * INV3_HIGHRES_SAMPLE_SIZE + 1, AP_HAL::Util::MEM_DMA_SAFE);
     } else
 #endif
-    fifo_buffer = hal.util->malloc_type(INV3_FIFO_BUFFER_LEN * INV3_SAMPLE_SIZE, AP_HAL::Util::MEM_DMA_SAFE);
+    fifo_buffer = hal.util->malloc_type(INV3_FIFO_BUFFER_LEN * INV3_SAMPLE_SIZE + 1, AP_HAL::Util::MEM_DMA_SAFE);
 
     if (fifo_buffer == nullptr) {
         AP_HAL::panic("Invensensev3: Unable to allocate FIFO buffer");
@@ -373,16 +377,15 @@ void AP_InertialSensor_Invensensev3::start()
 
 // get a startup banner to output to the GCS
 bool AP_InertialSensor_Invensensev3::get_output_banner(char* banner, uint8_t banner_len) {
-    if (fast_sampling) {
-        snprintf(banner, banner_len, "IMU%u: fast%s sampling enabled %.1fkHz",
-            gyro_instance,
+    snprintf(banner, banner_len, "IMU%u:%s%s sampling %.1fkHz/%.1fkHz",
+        gyro_instance,
+        fast_sampling ? " fast" : " normal",
 #if HAL_INS_HIGHRES_SAMPLE
-            highres_sampling ? ", high-resolution" :
+        highres_sampling ? " hi-res" :
 #endif
-            "" , backend_rate_hz * 0.001);
-        return true;
-    }
-    return false;
+        "", backend_rate_hz * 0.001,
+        sampling_rate_hz * 0.001);
+    return true;
 }
 
 /*
@@ -519,6 +522,8 @@ void AP_InertialSensor_Invensensev3::read_fifo()
 
     uint8_t reg_counth;
     uint8_t reg_data;
+    uint8_t* samples = nullptr;
+    uint8_t* tfr_buffer = (uint8_t*)fifo_buffer;
 
     switch (inv3_type) {
     case Invensensev3_Type::ICM45686:
@@ -555,18 +560,28 @@ void AP_InertialSensor_Invensensev3::read_fifo()
 
     while (n_samples > 0) {
         uint8_t n = MIN(n_samples, INV3_FIFO_BUFFER_LEN);
-        if (!block_read(reg_data, (uint8_t*)fifo_buffer, n * fifo_sample_size)) {
+
+        // we don't use read_registers() here to ensure that the fifo buffer that we have allocated
+        // gets passed all the way down to the SPI DMA handling. This involves one transfer to send
+        // the register read and then another using the same buffer and length which is handled specially
+        // for the read
+        tfr_buffer[0] = reg_data | BIT_READ_FLAG;
+        // transfer will also be sending data, make sure that data is zero
+        memset(tfr_buffer + 1, 0, n * fifo_sample_size);
+        if (!dev->transfer(tfr_buffer, n * fifo_sample_size + 1, tfr_buffer, n * fifo_sample_size + 1)) {
             goto check_registers;
         }
+        samples = tfr_buffer + 1;
+
 #if HAL_INS_HIGHRES_SAMPLE
         if (highres_sampling) {
-            if (!accumulate_highres_samples((FIFODataHighRes*)fifo_buffer, n)) {
+            if (!accumulate_highres_samples((FIFODataHighRes*)samples, n)) {
                 need_reset = true;
                 break;
             }
         } else
 #endif
-        if (!accumulate_samples((FIFOData*)fifo_buffer, n)) {
+        if (!accumulate_samples((FIFOData*)samples, n)) {
             need_reset = true;
             break;
         }
@@ -649,21 +664,21 @@ void AP_InertialSensor_Invensensev3::register_write_bank(uint8_t bank, uint8_t r
 }
 
 // calculate the fast sampling backend rate
-uint16_t AP_InertialSensor_Invensensev3::calculate_fast_sampling_backend_rate(uint16_t base_odr, uint16_t max_odr) const
+uint16_t AP_InertialSensor_Invensensev3::calculate_fast_sampling_backend_rate(uint16_t base_backend_rate, uint16_t max_backend_rate) const
 {
     // constrain the gyro rate to be at least the loop rate
-    uint8_t loop_limit = 1;
-    if (get_loop_rate_hz() > base_odr) {
-        loop_limit = 2;
+    uint8_t min_base_rate_multiplier = 1;
+    if (get_loop_rate_hz() > base_backend_rate) {
+        min_base_rate_multiplier = 2;
     }
-    if (get_loop_rate_hz() > base_odr * 2) {
-        loop_limit = 4;
+    if (get_loop_rate_hz() > base_backend_rate * 2) {
+        min_base_rate_multiplier = 4;
     }
     // constrain the gyro rate to be a 2^N multiple
-    uint8_t fast_sampling_rate = constrain_int16(get_fast_sampling_rate(), loop_limit, 8);
+    uint8_t fast_sampling_rate_multiplier = constrain_int16(get_fast_sampling_rate(), min_base_rate_multiplier, 8);
 
     // calculate rate we will be giving samples to the backend
-    return constrain_int16(base_odr * fast_sampling_rate, base_odr, max_odr);
+    return constrain_int16(base_backend_rate * fast_sampling_rate_multiplier, base_backend_rate, max_backend_rate);
 }
 
 /*
@@ -786,6 +801,7 @@ void AP_InertialSensor_Invensensev3::set_filter_and_scaling(void)
             }
         }
     }
+    sampling_rate_hz = backend_rate_hz; // sampling rate and backend rate are the same
 
     // disable gyro and accel as per 12.9 in the ICM-42688 docs
     register_write(INV3REG_PWR_MGMT0, 0x00);
@@ -812,6 +828,7 @@ void AP_InertialSensor_Invensensev3::set_filter_and_scaling(void)
     case Invensensev3_Type::ICM42688:
     case Invensensev3_Type::ICM42605:
     case Invensensev3_Type::IIM42652:
+    case Invensensev3_Type::IIM42653:
     case Invensensev3_Type::ICM42670: {
         /*
           fix for the "stuck gyro" issue, which affects all IxM42xxx
@@ -841,6 +858,7 @@ void AP_InertialSensor_Invensensev3::set_filter_and_scaling(void)
 void AP_InertialSensor_Invensensev3::set_filter_and_scaling_icm42670(void)
 {
     backend_rate_hz = 1600;
+    sampling_rate_hz = 1600;
     // use low-noise mode
     register_write(INV3REG_70_PWR_MGMT0, 0x0f);
     hal.scheduler->delay_microseconds(300);
@@ -865,27 +883,24 @@ void AP_InertialSensor_Invensensev3::set_filter_and_scaling_icm42670(void)
  */
 void AP_InertialSensor_Invensensev3::set_filter_and_scaling_icm456xy(void)
 {
-    uint8_t odr_config = 4;
-    backend_rate_hz = 1600;
-    // always fast sampling
-    fast_sampling = dev->bus_type() == AP_HAL::Device::BUS_TYPE_SPI;
+    uint8_t odr_config;
+    backend_rate_hz = 800;
 
-    if (enable_fast_sampling(accel_instance) && get_fast_sampling_rate() > 1) {
-        backend_rate_hz = calculate_fast_sampling_backend_rate(backend_rate_hz, backend_rate_hz * 4);
+    fast_sampling = dev->bus_type() == AP_HAL::Device::BUS_TYPE_SPI;
+    if (enable_fast_sampling(accel_instance) && get_fast_sampling_rate() && fast_sampling) {
+        // For ICM45686 we only set 3200 or 6400Hz as sampling rates
+        // we don't need to read FIFO faster than requested rate
+        backend_rate_hz = calculate_fast_sampling_backend_rate(800, 6400);
+    } else {
+        fast_sampling = false;
     }
 
-    // this sensor actually only supports 2 speeds
-    backend_rate_hz = constrain_int16(backend_rate_hz, 3200, 6400);
-
-    switch (backend_rate_hz) {
-    case 6400: // 6.4Khz
-        odr_config = 3;
-        break;
-    case 3200: // 3.2Khz
-        odr_config = 4;
-        break;
-    default:
-        break;
+    if (backend_rate_hz <= 3200) {
+        odr_config = 0x04; // 3200Hz
+        sampling_rate_hz = 3200;
+    } else {
+        odr_config = 0x03; // 6400Hz
+        sampling_rate_hz = 6400;
     }
 
     // Disable FIFO first
@@ -954,6 +969,9 @@ bool AP_InertialSensor_Invensensev3::check_whoami(void)
         return true;
     case INV3_ID_IIM42652:
         inv3_type = Invensensev3_Type::IIM42652;
+        return true;
+    case INV3_ID_IIM42653:
+        inv3_type = Invensensev3_Type::IIM42653;
         return true;
     case INV3_ID_ICM42670:
         inv3_type = Invensensev3_Type::ICM42670;
@@ -1030,6 +1048,7 @@ bool AP_InertialSensor_Invensensev3::hardware_init(void)
     switch (inv3_type) {
     case Invensensev3_Type::ICM45686:
     case Invensensev3_Type::ICM40609:
+    case Invensensev3_Type::IIM42653:
         _clip_limit = 29.5f * GRAVITY_MSS;
         break;
     case Invensensev3_Type::ICM42688:
@@ -1037,7 +1056,7 @@ bool AP_InertialSensor_Invensensev3::hardware_init(void)
     case Invensensev3_Type::ICM42605:
     case Invensensev3_Type::ICM40605:
     case Invensensev3_Type::ICM42670:
-        _clip_limit = 15.5f * GRAVITY_MSS;
+        _clip_limit = (16.0f - 0.5f) * GRAVITY_MSS;
         break;
     }
 

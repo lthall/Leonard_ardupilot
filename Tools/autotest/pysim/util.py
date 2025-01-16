@@ -29,24 +29,6 @@ RADIUS_OF_EARTH = 6378100.0  # in meters
 windowID = []
 
 
-def m2ft(x):
-    """Meters to feet."""
-    return float(x) / 0.3048
-
-
-def ft2m(x):
-    """Feet to meters."""
-    return float(x) * 0.3048
-
-
-def kt2mps(x):
-    return x * 0.514444444
-
-
-def mps2kt(x):
-    return x / 0.514444444
-
-
 def topdir():
     """Return top of git tree where autotest is running from."""
     d = os.path.dirname(os.path.realpath(__file__))
@@ -434,19 +416,18 @@ def start_SITL(binary,
                gdb=False,
                gdb_no_tui=False,
                wipe=False,
-               synthetic_clock=True,
                home=None,
                model=None,
                speedup=1,
                sim_rate_hz=None,
-               defaults_filepath=None,
+               defaults_filepath=[],
                unhide_parameters=False,
                gdbserver=False,
                breakpoints=[],
                disable_breakpoints=False,
                customisations=[],
                lldb=False,
-               enable_fgview_output=False,
+               enable_fgview=False,
                supplementary=False,
                stdout_prefix=None):
 
@@ -524,34 +505,42 @@ def start_SITL(binary,
             raise RuntimeError("DISPLAY was not set")
 
     cmd.append(binary)
+
+    if defaults_filepath is None:
+        defaults_filepath = []
+    if not isinstance(defaults_filepath, list):
+        defaults_filepath = [defaults_filepath]
+    defaults = [reltopdir(path) for path in defaults_filepath]
+
     if not supplementary:
         if wipe:
             cmd.append('-w')
-        if synthetic_clock:
-            cmd.append('-S')
         if home is not None:
             cmd.extend(['--home', home])
         cmd.extend(['--model', model])
         if speedup is not None and speedup != 1:
-            cmd.extend(['--speedup', str(speedup)])
+            ntf = tempfile.NamedTemporaryFile(mode="w", delete=False)
+            print(f"SIM_SPEEDUP {speedup}", file=ntf)
+            ntf.close()
+            # prepend it so that a caller can override the speedup in
+            # passed-in defaults:
+            defaults = [ntf.name] + defaults
         if sim_rate_hz is not None:
             cmd.extend(['--rate', str(sim_rate_hz)])
         if unhide_parameters:
             cmd.extend(['--unhide-groups'])
         # somewhere for MAVProxy to connect to:
         cmd.append('--serial1=tcp:2')
-        if enable_fgview_output:
+        if enable_fgview:
             cmd.append("--enable-fgview")
 
-    if defaults_filepath is not None:
-        if isinstance(defaults_filepath, list):
-            defaults = [reltopdir(path) for path in defaults_filepath]
-            if len(defaults):
-                cmd.extend(['--defaults', ",".join(defaults)])
-        else:
-            cmd.extend(['--defaults', reltopdir(defaults_filepath)])
+    if len(defaults):
+        cmd.extend(['--defaults', ",".join(defaults)])
 
     cmd.extend(customisations)
+
+    if "--defaults" in customisations:
+        raise ValueError("--defaults must be passed in via defaults_filepath keyword argument, not as part of customisation list")  # noqa
 
     pexpect_logfile_prefix = stdout_prefix
     if pexpect_logfile_prefix is None:

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <GCS_MAVLink/GCS.h>
-#include "GCS_Mavlink.h"
+#include "GCS_MAVLink_Tracker.h"
 
 class GCS_Tracker : public GCS
 {
@@ -28,7 +28,7 @@ protected:
 
     GCS_MAVLINK_Tracker *new_gcs_mavlink_backend(GCS_MAVLINK_Parameters &params,
                                                  AP_HAL::UARTDriver &uart) override {
-        return new GCS_MAVLINK_Tracker(params, uart);
+        return NEW_NOTHROW GCS_MAVLINK_Tracker(params, uart);
     }
 
 private:

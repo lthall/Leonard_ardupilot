@@ -18,6 +18,7 @@
 #include <AP_Notify/AP_Notify.h>
 #include <AP_OpticalFlow/AP_OpticalFlow.h>
 #include <AP_GPS/AP_GPS.h>
+#include <RC_Channel/RC_Channel.h>
 
 #include "MissionItemProtocol_Waypoints.h"
 #include "MissionItemProtocol_Rally.h"
@@ -98,6 +99,11 @@ void GCS::send_to_active_channels(uint32_t msgid, const char *pkt)
         if (!c.is_active()) {
             continue;
         }
+#if HAL_HIGH_LATENCY2_ENABLED
+        if (c.is_high_latency_link) {
+            continue;
+        }
+#endif
         // size checks done by this method:
         c.send_message(pkt, entry);
     }
@@ -119,7 +125,7 @@ void GCS::send_named_float(const char *name, float value) const
 void GCS::enable_high_latency_connections(bool enabled)
 {
     high_latency_link_enabled = enabled;
-    gcs().send_text(MAV_SEVERITY_NOTICE, "High Latency %s", enabled ? "enabled" : "disabled");
+    GCS_SEND_TEXT(MAV_SEVERITY_NOTICE, "High Latency %s", enabled ? "enabled" : "disabled");
 }
 
 bool GCS::get_high_latency_status()
@@ -330,12 +336,22 @@ void GCS::update_sensor_status_flags()
 
     // give GCS status of prearm checks. This is enabled if any arming checks are enabled.
     // it is healthy if armed or checks are passing
-#if !defined(HAL_BUILD_AP_PERIPH)
+#if AP_ARMING_ENABLED
     control_sensors_present |= MAV_SYS_STATUS_PREARM_CHECK;
     if (AP::arming().get_enabled_checks()) {
         control_sensors_enabled |= MAV_SYS_STATUS_PREARM_CHECK;
         if (hal.util->get_soft_armed() || AP_Notify::flags.pre_arm_check) {
             control_sensors_health |= MAV_SYS_STATUS_PREARM_CHECK;
+        }
+    }
+#endif
+
+#if AP_RC_CHANNEL_ENABLED
+    if (rc().has_ever_seen_rc_input()) {
+        control_sensors_present |= MAV_SYS_STATUS_SENSOR_RC_RECEIVER;
+        control_sensors_enabled |= MAV_SYS_STATUS_SENSOR_RC_RECEIVER;
+        if (!rc().in_rc_failsafe()) {  // should this be has_valid_input?
+            control_sensors_health |= MAV_SYS_STATUS_SENSOR_RC_RECEIVER;
         }
     }
 #endif
@@ -360,9 +376,11 @@ bool GCS::out_of_time() const
         return false;
     }
 
+#if AP_SCHEDULER_ENABLED
     if (min_loop_time_remaining_for_message_send_us() <= AP::scheduler().time_available_usec()) {
         return false;
     }
+#endif
 
     return true;
 }
@@ -387,5 +405,26 @@ bool GCS_MAVLINK::check_payload_size(uint16_t max_payload_len)
     }
     return true;
 }
+
+#if AP_SCRIPTING_ENABLED
+/*
+  lua access to command_int
+
+  Note that this is called with the AP_Scheduler lock, ensuring the
+  main thread does not race with a lua command_int
+*/
+MAV_RESULT GCS::lua_command_int_packet(const mavlink_command_int_t &packet)
+{
+    // for now we assume channel 0. In the future we may create a dedicated channel
+    auto *ch = chan(0);
+    if (ch == nullptr) {
+        return MAV_RESULT_UNSUPPORTED;
+    }
+    // we need a dummy message for some calls
+    mavlink_message_t msg {};
+
+    return ch->handle_command_int_packet(packet, msg);
+}
+#endif // AP_SCRIPTING_ENABLED
 
 #endif  // HAL_GCS_ENABLED

@@ -1,5 +1,9 @@
 #pragma once
 
+#include "AC_Avoidance_config.h"
+
+#if AP_OAPATHPLANNER_DIJKSTRA_ENABLED
+
 #include <AP_Common/AP_Common.h>
 #include <AP_Common/Location.h>
 #include <AP_Math/AP_Math.h>
@@ -57,7 +61,7 @@ private:
         DIJKSTRA_ERROR_TOO_MANY_FENCE_POINTS,
         DIJKSTRA_ERROR_NO_POSITION_ESTIMATE,
         DIJKSTRA_ERROR_COULD_NOT_FIND_PATH
-    };
+    } _error_id;
 
     // return error message for a given error id
     const char* get_error_msg(AP_OADijkstra_Error error_id) const;
@@ -219,3 +223,5 @@ private:
     // reference to AP_OAPathPlanner options param
     AP_Int16 &_options;
 };
+
+#endif  // AP_OAPATHPLANNER_DIJKSTRA_ENABLED

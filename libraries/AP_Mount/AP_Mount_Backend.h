@@ -84,6 +84,7 @@ public:
     void set_yaw_lock(bool yaw_lock) { _yaw_lock = yaw_lock; }
 
     // set angle target in degrees
+    // roll and pitch are in earth-frame
     // yaw_is_earth_frame (aka yaw_lock) should be true if yaw angle is earth-frame, false if body-frame
     void set_angle_target(float roll_deg, float pitch_deg, float yaw_deg, bool yaw_is_earth_frame);
 
@@ -105,16 +106,6 @@ public:
     // handle do_gimbal_manager_configure.  Returns MAV_RESULT_ACCEPTED on success
     // requires original message in order to extract caller's sysid and compid
     MAV_RESULT handle_command_do_gimbal_manager_configure(const mavlink_command_int_t &packet, const mavlink_message_t &msg);
-
-#if AP_MAVLINK_MSG_MOUNT_CONFIGURE_ENABLED
-    // process MOUNT_CONFIGURE messages received from GCS. deprecated.
-    void handle_mount_configure(const mavlink_mount_configure_t &msg);
-#endif
-
-#if AP_MAVLINK_MSG_MOUNT_CONTROL_ENABLED
-    // process MOUNT_CONTROL messages received from GCS. deprecated.
-    void handle_mount_control(const mavlink_mount_control_t &packet);
-#endif
 
     // send a GIMBAL_DEVICE_ATTITUDE_STATUS message to GCS
     void send_gimbal_device_attitude_status(mavlink_channel_t chan);
@@ -197,6 +188,14 @@ public:
     // send camera capture status message to GCS
     virtual void send_camera_capture_status(mavlink_channel_t chan) const {}
 
+#if AP_MOUNT_SEND_THERMAL_RANGE_ENABLED
+    // send camera thermal status message to GCS
+    virtual void send_camera_thermal_range(mavlink_channel_t chan) const {}
+#endif
+
+    // change camera settings not normally used by autopilot
+    virtual bool change_setting(CameraSetting setting, float value) { return false; }
+
 #if AP_MOUNT_POI_TO_LATLONALT_ENABLED
     // get poi information.  Returns true on success and fills in gimbal attitude, location and poi location
     bool get_poi(uint8_t instance, Quaternion &quat, Location &loc, Location &poi_loc);
@@ -240,8 +239,20 @@ protected:
     // options parameter bitmask handling
     enum class Options : uint8_t {
         RCTARGETING_LOCK_FROM_PREVMODE = (1U << 0), // RC_TARGETING mode's lock/follow state maintained from previous mode
+        NEUTRAL_ON_RC_FS               = (1U << 1), // move mount to netral position on RC failsafe
     };
     bool option_set(Options opt) const { return (_params.options.get() & (uint8_t)opt) != 0; }
+
+    // called when mount mode is RC-targetting, updates the mnt_target object from RC inputs:
+    void update_mnt_target_from_rc_target();
+
+    // returns true if user has configured a valid roll angle range
+    // allows user to disable roll even on 3-axis gimbal
+    bool roll_range_valid() const { return (_params.roll_angle_min < _params.roll_angle_max); }
+
+    // returns true if user has configured a valid pitch angle range
+    // allows user to disable pitch even on 3-axis gimbal
+    bool pitch_range_valid() const { return (_params.pitch_angle_min < _params.pitch_angle_max); }
 
     // returns true if user has configured a valid yaw angle range
     // allows user to disable yaw even on 3-axis gimbal
@@ -250,25 +261,9 @@ protected:
     // returns true if mavlink heartbeat should be suppressed for this gimbal (only used by Solo gimbal)
     virtual bool suppress_heartbeat() const { return false; }
 
-#if AP_MOUNT_POI_TO_LATLONALT_ENABLED
-    // calculate the Location that the gimbal is pointing at
-    void calculate_poi();
-#endif
-
     // change to RC_TARGETTING mode if rc inputs have changed by more than the dead zone
     // should be called on every update
     void set_rctargeting_on_rcinput_change();
-
-    // get pilot input (in the range -1 to +1) received through RC
-    void get_rc_input(float& roll_in, float& pitch_in, float& yaw_in) const;
-
-    // get angle or rate targets from pilot RC
-    // target_type will be either ANGLE or RATE, rpy will be the target angle in deg or rate in deg/s
-    void get_rc_target(MountTargetType& target_type, MountTarget& rpy) const;
-
-    // get angle targets (in radians) to a Location
-    // returns true on success, false on failure
-    bool get_angle_target_to_location(const Location &loc, MountTarget& angle_rad) const WARN_IF_UNUSED;
 
     // get angle targets (in radians) to ROI location
     // returns true on success, false on failure
@@ -298,7 +293,6 @@ protected:
     uint8_t     _instance;  // this instance's number
 
     MAV_MOUNT_MODE  _mode;          // current mode (see MAV_MOUNT_MODE enum)
-    bool _yaw_lock;                 // yaw_lock used in RC_TARGETING mode. True if the gimbal's yaw target is maintained in earth-frame, if false (aka "follow") it is maintained in body-frame
 
     // structure for MAVLink Targeting angle and rate targets
     struct {
@@ -306,6 +300,26 @@ protected:
         MountTarget angle_rad;      // angle target in radians
         MountTarget rate_rads;      // rate target in rad/s
     } mnt_target;
+
+private:
+
+    // get pilot input (in the range -1 to +1) received through RC
+    void get_rc_input(float& roll_in, float& pitch_in, float& yaw_in) const;
+
+    // get angle or rate targets from pilot RC
+    // target_type will be either ANGLE or RATE, rpy will be the target angle in deg or rate in deg/s
+    void get_rc_target(MountTargetType& target_type, MountTarget& rpy) const;
+
+    // get angle targets (in radians) to a Location
+    // returns true on success, false on failure
+    bool get_angle_target_to_location(const Location &loc, MountTarget& angle_rad) const WARN_IF_UNUSED;
+
+#if AP_MOUNT_POI_TO_LATLONALT_ENABLED
+    // calculate the Location that the gimbal is pointing at
+    void calculate_poi();
+#endif
+
+    bool _yaw_lock;                 // yaw_lock used in RC_TARGETING mode. True if the gimbal's yaw target is maintained in earth-frame, if false (aka "follow") it is maintained in body-frame
 
 #if AP_MOUNT_POI_TO_LATLONALT_ENABLED
     struct {

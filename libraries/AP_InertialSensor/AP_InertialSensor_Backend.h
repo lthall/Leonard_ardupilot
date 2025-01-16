@@ -53,6 +53,15 @@ public:
      */
     virtual bool update() = 0; /* front end */
 
+    // if AP_INERTIALSENSOR_FAST_SAMPLE_WINDOW_ENABLED
+    /*
+     * Update the filter parameters. Called by the frontend to propagate
+     * filter parameters to the frontend structure via the
+     * update_gyro_filters() and update_accel_filters() functions
+     */
+    void update_filters() __RAMFUNC__; /* front end */
+    // endif AP_INERTIALSENSOR_FAST_SAMPLE_WINDOW_ENABLED
+
     /*
      * optional function to accumulate more samples. This is needed for drivers that don't use a timer to gather samples
      */
@@ -84,6 +93,13 @@ public:
 #if HAL_EXTERNAL_AHRS_ENABLED
     virtual void handle_external(const AP_ExternalAHRS::ins_data_message_t &pkt) {}
 #endif
+
+#if AP_INERTIALSENSOR_KILL_IMU_ENABLED
+    bool has_been_killed(uint8_t instance) const { return ((1U<<instance) & _imu.imu_kill_mask); }
+#else
+    bool has_been_killed(uint8_t instance) const { return false; }
+#endif
+
 
     /*
       device driver IDs. These are used to fill in the devtype field
@@ -129,6 +145,7 @@ public:
         DEVTYPE_INS_ICM42670 = 0x3A,
         DEVTYPE_INS_ICM45686 = 0x3B,
         DEVTYPE_INS_SCHA63T  = 0x3C,
+        DEVTYPE_INS_IIM42653 = 0x3D,
     };
 
 protected:
@@ -139,7 +156,11 @@ protected:
     HAL_Semaphore _sem;
 
     //Default Clip Limit
-    float _clip_limit = 15.5f * GRAVITY_MSS;
+    float _clip_limit = (16.0f - 0.5f) * GRAVITY_MSS;
+
+    // instance numbers of accel and gyro data
+    uint8_t gyro_instance;
+    uint8_t accel_instance;
 
     void _rotate_and_correct_accel(uint8_t instance, Vector3f &accel) __RAMFUNC__;
     void _rotate_and_correct_gyro(uint8_t instance, Vector3f &gyro) __RAMFUNC__;
@@ -265,9 +286,11 @@ protected:
 
     // common gyro update function for all backends
     void update_gyro(uint8_t instance) __RAMFUNC__; /* front end */
+    void update_gyro_filters(uint8_t instance) __RAMFUNC__; /* front end */
 
     // common accel update function for all backends
     void update_accel(uint8_t instance) __RAMFUNC__; /* front end */
+    void update_accel_filters(uint8_t instance) __RAMFUNC__; /* front end */
 
     // support for updating filter at runtime
     uint16_t _last_accel_filter_hz;
@@ -279,6 +302,14 @@ protected:
 
     void set_accel_orientation(uint8_t instance, enum Rotation rotation) {
         _imu._accel_orientation[instance] = rotation;
+    }
+
+    uint8_t get_gyro_instance() const {
+        return gyro_instance;
+    }
+
+    uint8_t get_accel_instance() const {
+        return accel_instance;
     }
 
     // increment clipping counted. Used by drivers that do decimation before supplying

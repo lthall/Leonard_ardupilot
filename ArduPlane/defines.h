@@ -10,6 +10,8 @@
 
 #define TAKEOFF_RUDDER_WARNING_TIMEOUT 3000 //ms that GCS warning about not returning arming rudder to neutral repeats
 
+#define GPS_GND_CRS_MIN_SPD 5 // m/s, used to set when intial_direction.heading is captured in NAV_TAKEOFF and Mode TAKEOFF
+
 // failsafe
 // ----------------------
 enum failsafe_state {
@@ -45,6 +47,7 @@ enum failsafe_action_long {
     FS_ACTION_LONG_GLIDE = 2,
     FS_ACTION_LONG_PARACHUTE = 3,
     FS_ACTION_LONG_AUTO = 4,
+    FS_ACTION_LONG_AUTOLAND = 5,
 };
 
 // type of stick mixing enabled
@@ -61,19 +64,7 @@ enum class RtlAutoland {
     RTL_THEN_DO_LAND_START = 1,
     RTL_IMMEDIATE_DO_LAND_START = 2,
     NO_RTL_GO_AROUND = 3,
-};
-    
-
-enum ChannelMixing {
-    MIXING_DISABLED = 0,
-    MIXING_UPUP     = 1,
-    MIXING_UPDN     = 2,
-    MIXING_DNUP     = 3,
-    MIXING_DNDN     = 4,
-    MIXING_UPUP_SWP = 5,
-    MIXING_UPDN_SWP = 6,
-    MIXING_DNUP_SWP = 7,
-    MIXING_DNDN_SWP = 8,
+    DO_RETURN_PATH_START = 4,
 };
 
 // PID broadcast bitmask
@@ -103,6 +94,7 @@ enum log_messages {
     LOG_AETR_MSG,
     LOG_OFG_MSG,
     LOG_TSIT_MSG,
+    LOG_TILT_MSG,
 };
 
 #define MASK_LOG_ATTITUDE_FAST          (1<<0)
@@ -167,6 +159,7 @@ enum FlightOptions {
     DISABLE_GROUND_PID_SUPPRESSION = (1<<11),
     ENABLE_LOITER_ALT_CONTROL = (1<<12),
     INDICATE_WAITING_FOR_RUDDER_NEUTRAL = (1<<13),
+    IMMEDIATE_CLIMB_IN_AUTO = (1<<14),
 };
 
 enum CrowFlapOptions {

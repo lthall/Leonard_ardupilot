@@ -19,19 +19,14 @@
 extern const AP_HAL::HAL& hal;
 
 #ifndef OPTICAL_FLOW_TYPE_DEFAULT
- #if CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_CHIBIOS_SKYVIPER_F412 || defined(HAL_HAVE_PIXARTFLOW_SPI)
-  #define OPTICAL_FLOW_TYPE_DEFAULT Type::PIXART
- #elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_BEBOP
-  #define OPTICAL_FLOW_TYPE_DEFAULT Type::BEBOP
- #else
   #define OPTICAL_FLOW_TYPE_DEFAULT Type::NONE
- #endif
 #endif
 
 const AP_Param::GroupInfo AP_OpticalFlow::var_info[] = {
     // @Param: _TYPE
     // @DisplayName: Optical flow sensor type
     // @Description: Optical flow sensor type
+    // @SortValues: AlphabeticalZeroAtTop
     // @Values: 0:None, 1:PX4Flow, 2:Pixart, 3:Bebop, 4:CXOF, 5:MAVLink, 6:DroneCAN, 7:MSP, 8:UPFLOW
     // @User: Standard
     // @RebootRequired: True
@@ -140,8 +135,8 @@ void AP_OpticalFlow::init(uint32_t log_bit)
 #endif
         break;
     case Type::BEBOP:
-#if CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_BEBOP
-        backend = new AP_OpticalFlow_Onboard(*this);
+#if AP_OPTICALFLOW_ONBOARD_ENABLED
+        backend = NEW_NOTHROW AP_OpticalFlow_Onboard(*this);
 #endif
         break;
     case Type::CXOF:
@@ -156,7 +151,7 @@ void AP_OpticalFlow::init(uint32_t log_bit)
         break;
     case Type::UAVCAN:
 #if AP_OPTICALFLOW_HEREFLOW_ENABLED
-        backend = new AP_OpticalFlow_HereFlow(*this);
+        backend = NEW_NOTHROW AP_OpticalFlow_HereFlow(*this);
 #endif
         break;
     case Type::MSP:
@@ -171,7 +166,7 @@ void AP_OpticalFlow::init(uint32_t log_bit)
         break;
     case Type::SITL:
 #if AP_OPTICALFLOW_SITL_ENABLED
-        backend = new AP_OpticalFlow_SITL(*this);
+        backend = NEW_NOTHROW AP_OpticalFlow_SITL(*this);
 #endif
         break;
     }
@@ -243,7 +238,7 @@ void AP_OpticalFlow::handle_msp(const MSP::msp_opflow_data_message_t &pkt)
 void AP_OpticalFlow::start_calibration()
 {
     if (_calibrator == nullptr) {
-        _calibrator = new AP_OpticalFlow_Calibrator();
+        _calibrator = NEW_NOTHROW AP_OpticalFlow_Calibrator();
         if (_calibrator == nullptr) {
             GCS_SEND_TEXT(MAV_SEVERITY_CRITICAL, "FlowCal: failed to start");
             return;

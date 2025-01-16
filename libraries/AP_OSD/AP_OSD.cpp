@@ -230,6 +230,22 @@ const AP_Param::GroupInfo AP_OSD::var_info[] = {
     AP_GROUPINFO("_W_SNR", 34, AP_OSD, warn_snr, 0),
 #endif
 
+#if HAL_OSD_SIDEBAR_ENABLE
+    // @Param: _SB_H_OFS
+    // @DisplayName: Sidebar horizontal offset
+    // @Description: Extends the spacing between the sidebar elements by this amount of columns. Positive values increases the width to the right of the screen.
+    // @Range: 0 20
+    // @User: Standard
+    AP_GROUPINFO("_SB_H_OFS", 35, AP_OSD, sidebar_h_offset, 0),
+
+    // @Param: _SB_V_EXT
+    // @DisplayName: Sidebar vertical extension
+    // @Description: Increase of vertical length of the sidebar itens by this amount of lines. Applied equally both above and below the default setting.
+    // @Range: 0 10
+    // @User: Standard
+    AP_GROUPINFO("_SB_V_EXT", 36, AP_OSD, sidebar_v_ext, 0),
+#endif // HAL_OSD_SIDEBAR_ENABLE
+
 #endif //osd enabled
 #if OSD_PARAM_ENABLED
     // @Group: 5_
@@ -272,8 +288,8 @@ AP_OSD::AP_OSD()
     }
     AP_Param::setup_object_defaults(this, var_info);
 #if OSD_ENABLED
-    // default first screen enabled
-    screen[0].enabled.set(1);
+    // force first screen enabled
+    screen[0].enabled.set_and_default(1);
     previous_pwm_screen = -1;
 #endif
 #ifdef WITH_SITL_OSD
@@ -462,6 +478,7 @@ void AP_OSD::update_stats()
     // maximum altitude
     alt = -alt;
     _stats.max_alt_m = fmaxf(_stats.max_alt_m, alt);
+#if AP_BATTERY_ENABLED
     // maximum current
     AP_BattMonitor &battery = AP::battery();
     float amps;
@@ -473,6 +490,7 @@ void AP_OSD::update_stats()
     if (voltage > 0) {
         _stats.min_voltage_v = fminf(_stats.min_voltage_v, voltage);
     }
+#endif
 #if AP_RSSI_ENABLED
     // minimum rssi
     AP_RSSI *ap_rssi = AP_RSSI::get_singleton();

@@ -63,6 +63,18 @@ protected:
     // reset the update gain variables for multi
     void reset_update_gain_variables() override {};
 
+    float target_angle_max_rp_cd() const override;
+
+    float target_angle_max_y_cd() const override;
+
+    float target_angle_min_rp_cd() const override;
+
+    float target_angle_min_y_cd() const override;
+
+    float angle_lim_max_rp_cd() const override;
+
+    float angle_lim_neg_rpy_cd() const override;
+
     void test_init() override;
     void test_run(AxisType test_axis, const float dir_sign) override;
 
@@ -115,7 +127,7 @@ protected:
         // this should never happen
         INTERNAL_ERROR(AP_InternalError::error_t::flow_of_control);
     }
-    void Log_Write_AutoTune(uint8_t axis, uint8_t tune_step, float meas_target, float meas_min, float meas_max, float new_gain_rp, float new_gain_rd, float new_gain_sp, float new_ddt);
+    void Log_Write_AutoTune(AxisType axis, uint8_t tune_step, float meas_target, float meas_min, float meas_max, float new_gain_rp, float new_gain_rd, float new_gain_sp, float new_ddt);
     void Log_Write_AutoTuneDetails(float angle_cd, float rate_cds);
 #endif
 
@@ -139,12 +151,12 @@ private:
     void twitch_test_init();
     void twitch_test_run(AxisType test_axis, const float dir_sign);
 
-    void twitching_test_rate(float rate, float rate_target, float &meas_rate_min, float &meas_rate_max);
-    void twitching_abort_rate(float angle, float rate, float angle_max, float meas_rate_min);
+    void twitching_test_rate(float angle, float rate, float rate_target, float &meas_rate_min, float &meas_rate_max, float &meas_angle_min);
+    void twitching_abort_rate(float angle, float rate, float angle_max, float meas_rate_min, float angle_min);
     void twitching_test_angle(float angle, float rate, float angle_target, float &meas_angle_min, float &meas_angle_max, float &meas_rate_min, float &meas_rate_max);
 
     // measure acceleration during twitch test
-    void twitching_measure_acceleration(float &rate_of_change, float rate_measurement, float &rate_measurement_max) const;
+    void twitching_measure_acceleration(float &accel_average, float rate, float &rate_max) const;
 
     // updating_rate_d_up - increase D and adjust P to optimize the D term for a little bounce back
     // optimize D term while keeping the maximum just below the target by adjusting P
@@ -156,7 +168,7 @@ private:
 
     // updating_rate_p_up_d_down - increase P to ensure the target is reached while checking bounce back isn't increasing
     // P is increased until we achieve our target within a reasonable time while reducing D if bounce back increases above the threshold
-    void updating_rate_p_up_d_down(float &tune_d, float tune_d_min, float tune_d_step_ratio, float &tune_p, float tune_p_min, float tune_p_max, float tune_p_step_ratio, float rate_target, float meas_rate_min, float meas_rate_max);
+    void updating_rate_p_up_d_down(float &tune_d, float tune_d_min, float tune_d_step_ratio, float &tune_p, float tune_p_min, float tune_p_max, float tune_p_step_ratio, float rate_target, float meas_rate_min, float meas_rate_max, bool fail_min_d = true);
 
     // updating_angle_p_down - decrease P until we don't reach the target before time out
     // P is decreased to ensure we are not overshooting the target
@@ -170,9 +182,18 @@ private:
     void report_axis_gains(const char* axis_string, float rate_P, float rate_I, float rate_D, float angle_P, float max_accel) const;
 
     // parameters
-    AP_Int8  axis_bitmask;        // axes to be tuned
-    AP_Float aggressiveness;      // aircraft response aggressiveness to be tuned
-    AP_Float min_d;               // minimum rate d gain allowed during tuning
+    AP_Int8  axis_bitmask;      // axes to be tuned
+    AP_Float aggressiveness;    // aircraft response aggressiveness to be tuned
+    AP_Float min_d;             // minimum rate d gain allowed during tuning
+    bool     ignore_next;       // ignore the results of the next test when true
+    float    target_angle;      // target angle for the test
+    float    target_rate;       // target rate for the test
+    float    angle_abort;       // Angle that test is aborted
+    float    test_rate_min;     // the minimum angular rate achieved during TESTING_RATE
+    float    test_rate_max;     // the maximum angular rate achieved during TESTING_RATE
+    float    test_angle_min;    // the minimum angle achieved during TESTING_ANGLE
+    float    test_angle_max;    // the maximum angle achieved during TESTING_ANGLE
+    float    accel_measure_rate_max; // the maximum rate used to measure average acceleration during twitch
 };
 
 #endif  // AC_AUTOTUNE_ENABLED

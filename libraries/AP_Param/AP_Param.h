@@ -36,7 +36,9 @@
 #define AP_MAX_NAME_SIZE 16
 
 // optionally enable debug code for dumping keys
+#ifndef AP_PARAM_KEY_DUMP
 #define AP_PARAM_KEY_DUMP 0
+#endif
 
 #if defined(HAL_GCS_ENABLED)
     #define AP_PARAM_DEFAULTS_ENABLED HAL_GCS_ENABLED
@@ -171,7 +173,7 @@
 #define GOBJECTN(v, pname, name, class)      { name, (const void *)&AP_PARAM_VEHICLE_NAME.v,       {group_info : class::var_info},      0,                                                  Parameters::k_param_ ## pname,      AP_PARAM_GROUP }
 #define PARAM_VEHICLE_INFO                   { "",   (const void *)&AP_PARAM_VEHICLE_NAME,         {group_info : AP_Vehicle::var_info}, 0,                                                  Parameters::k_param_vehicle,        AP_PARAM_GROUP }
 #define AP_VAREND                            { "",   nullptr,                                      {group_info : nullptr },             0,                                                  0,                                  AP_PARAM_NONE }
-
+#define AP_GROUP_ELEM_IDX(subgrp_idx, grp_idx) (grp_idx << 6 | subgrp_idx)
 
 enum ap_var_type {
     AP_PARAM_NONE    = 0,
@@ -475,6 +477,24 @@ public:
     // convert old vehicle parameters to new object parameters with scaling - assumes we use the same scaling factor for all values in the table
     static void         convert_old_parameters_scaled(const ConversionInfo *conversion_table, uint8_t table_size, float scaler, uint8_t flags);
 
+    // convert an object which was stored in a vehicle's G2 into a new
+    // object in AP_Vehicle.cpp:
+    struct G2ObjectConversion {
+        void *object_pointer;
+        const struct AP_Param::GroupInfo *var_info;
+        uint16_t old_index;  // Old parameter index in g2
+    };
+    static void         convert_g2_objects(const void *g2, const G2ObjectConversion g2_conversions[], uint8_t num_conversions);
+
+    // convert an object which was stored in a vehicle's top-level
+    // Parameters object into a new object in AP_Vehicle.cpp:
+    struct TopLevelObjectConversion {
+        void *object_pointer;
+        const struct AP_Param::GroupInfo *var_info;
+        uint16_t old_index;  // Old parameter index in g
+    };
+    static void         convert_toplevel_objects(const TopLevelObjectConversion g2_conversions[], uint8_t num_conversions);
+
     /*
       convert width of a parameter, allowing update to wider scalar
       values without changing the parameter indexes. This will return
@@ -502,7 +522,7 @@ public:
     // is_top_level: Is true if the class had its own top level key, param_key. It is false if the class was a subgroup
     static void         convert_class(uint16_t param_key, void *object_pointer,
                                         const struct AP_Param::GroupInfo *group_info,
-                                        uint16_t old_index, uint16_t old_top_element, bool is_top_level);
+                                        uint16_t old_index, bool is_top_level);
 
     /*
       fetch a parameter value based on the index within a group. This

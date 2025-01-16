@@ -1,13 +1,15 @@
-#include "AP_Mount_Viewpro.h"
+#include "AP_Mount_config.h"
 
 #if HAL_MOUNT_VIEWPRO_ENABLED
+
+#include "AP_Mount_Viewpro.h"
+
 #include <AP_HAL/AP_HAL.h>
 #include <AP_AHRS/AP_AHRS.h>
 #include <AP_GPS/AP_GPS.h>
 #include <AP_RTC/AP_RTC.h>
 #include <GCS_MAVLink/GCS.h>
 #include <GCS_MAVLink/include/mavlink/v2.0/checksum.h>
-#include <AP_SerialManager/AP_SerialManager.h>
 
 extern const AP_HAL::HAL& hal;
 
@@ -27,19 +29,6 @@ extern const AP_HAL::HAL& hal;
 #define debug(fmt, args ...) do { if (AP_MOUNT_VIEWPRO_DEBUG) { GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Viewpro: " fmt, ## args); } } while (0)
 
 const char* AP_Mount_Viewpro::send_text_prefix = "Viewpro:";
-
-// init - performs any required initialisation for this instance
-void AP_Mount_Viewpro::init()
-{
-    const AP_SerialManager& serial_manager = AP::serialmanager();
-
-    _uart = serial_manager.find_serial(AP_SerialManager::SerialProtocol_Gimbal, 0);
-    if (_uart != nullptr) {
-        _initialised = true;
-    }
-
-    AP_Mount_Backend::init();
-}
 
 // update mount position - should be called periodically
 void AP_Mount_Viewpro::update()
@@ -108,20 +97,9 @@ void AP_Mount_Viewpro::update()
             break;
 
         // RC radio manual angle control, but with stabilization from the AHRS
-        case MAV_MOUNT_MODE_RC_TARGETING: {
-            // update targets using pilot's RC inputs
-            MountTarget rc_target;
-            get_rc_target(mnt_target.target_type, rc_target);
-            switch (mnt_target.target_type) {
-            case MountTargetType::ANGLE:
-                mnt_target.angle_rad = rc_target;
-                break;
-            case MountTargetType::RATE:
-                mnt_target.rate_rads = rc_target;
-                break;
-            }
+        case MAV_MOUNT_MODE_RC_TARGETING:
+            update_mnt_target_from_rc_target();
             break;
-        }
 
         // point mount to a GPS point given by the mission planner
         case MAV_MOUNT_MODE_GPS_POINT:
@@ -313,14 +291,14 @@ void AP_Mount_Viewpro::process_packet()
             const uint8_t patch_ver = atoi((const char*)fw_patch_str) & 0xFF;
             _firmware_version = (patch_ver << 16) | (minor_ver << 8) | major_ver;
             _got_firmware_version = true;
-            gcs().send_text(MAV_SEVERITY_INFO, "%s fw:%u.%u.%u", send_text_prefix, (unsigned)major_ver, (unsigned)minor_ver, (unsigned)patch_ver);
+            GCS_SEND_TEXT(MAV_SEVERITY_INFO, "%s fw:%u.%u.%u", send_text_prefix, (unsigned)major_ver, (unsigned)minor_ver, (unsigned)patch_ver);
             break;
         }
         case CommConfigCmd::QUERY_MODEL:
             // gimbal model, length is 10 bytes
             strncpy((char *)_model_name, (const char *)&_msg_buff[_msg_buff_data_start+1], sizeof(_model_name)-1);
             _got_model_name = true;
-            gcs().send_text(MAV_SEVERITY_INFO, "%s %s", send_text_prefix, (const char*)_model_name);
+            GCS_SEND_TEXT(MAV_SEVERITY_INFO, "%s %s", send_text_prefix, (const char*)_model_name);
             break;
         default:
             // unsupported control command
@@ -340,16 +318,16 @@ void AP_Mount_Viewpro::process_packet()
             _last_tracking_status = tracking_status;
             switch (tracking_status) {
             case TrackingStatus::STOPPED:
-                gcs().send_text(MAV_SEVERITY_INFO, "%s tracking OFF", send_text_prefix);
+                GCS_SEND_TEXT(MAV_SEVERITY_INFO, "%s tracking OFF", send_text_prefix);
                 break;
             case TrackingStatus::SEARCHING:
-                gcs().send_text(MAV_SEVERITY_INFO, "%s tracking searching", send_text_prefix);
+                GCS_SEND_TEXT(MAV_SEVERITY_INFO, "%s tracking searching", send_text_prefix);
                 break;
             case TrackingStatus::TRACKING:
-                gcs().send_text(MAV_SEVERITY_INFO, "%s tracking ON", send_text_prefix);
+                GCS_SEND_TEXT(MAV_SEVERITY_INFO, "%s tracking ON", send_text_prefix);
                 break;
             case TrackingStatus::LOST:
-                gcs().send_text(MAV_SEVERITY_INFO, "%s tracking Lost", send_text_prefix);
+                GCS_SEND_TEXT(MAV_SEVERITY_INFO, "%s tracking Lost", send_text_prefix);
                 break;
             }
         }
@@ -368,7 +346,7 @@ void AP_Mount_Viewpro::process_packet()
         const bool recording = (recording_status == RecordingStatus::RECORDING);
         if (recording != _recording) {
             _recording = recording;
-            gcs().send_text(MAV_SEVERITY_INFO,  "%s recording %s", send_text_prefix, _recording ? "ON" : "OFF");
+            GCS_SEND_TEXT(MAV_SEVERITY_INFO,  "%s recording %s", send_text_prefix, _recording ? "ON" : "OFF");
         }
 
         // get optical zoom times
@@ -934,8 +912,8 @@ void AP_Mount_Viewpro::send_camera_information(mavlink_channel_t chan) const
         vendor_name,            // vendor_name uint8_t[32]
         _model_name,            // model_name uint8_t[32]
         _firmware_version,      // firmware version uint32_t
-        0,                      // focal_length float (mm)
-        0,                      // sensor_size_h float (mm)
+        NaNf,                   // sensor_size_h float (mm)
+        NaNf,                   // sensor_size_v float (mm)
         0,                      // sensor_size_v float (mm)
         0,                      // resolution_h uint16_t (pix)
         0,                      // resolution_v uint16_t (pix)
@@ -954,8 +932,6 @@ void AP_Mount_Viewpro::send_camera_settings(mavlink_channel_t chan) const
         return;
     }
 
-    const float NaN = nanf("0x4152");
-
     // convert zoom times (e.g. 1x ~ 20x) to target zoom level (e.g. 0 to 100)
     const float zoom_level = linear_interpolate(0, 100, _zoom_times, 1, AP_MOUNT_VIEWPRO_ZOOM_MAX);
 
@@ -965,7 +941,7 @@ void AP_Mount_Viewpro::send_camera_settings(mavlink_channel_t chan) const
         AP_HAL::millis(),   // time_boot_ms
         _recording ? CAMERA_MODE_VIDEO : CAMERA_MODE_IMAGE, // camera mode (0:image, 1:video, 2:image survey)
         zoom_level,         // zoomLevel float, percentage from 0 to 100, NaN if unknown
-        NaN);               // focusLevel float, percentage from 0 to 100, NaN if unknown
+        NaNf);              // focusLevel float, percentage from 0 to 100, NaN if unknown
 }
 
 // get rangefinder distance.  Returns true on success

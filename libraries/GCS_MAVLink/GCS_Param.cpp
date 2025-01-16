@@ -75,7 +75,7 @@ GCS_MAVLINK::queued_param_send()
     }
     count -= async_replies_sent_count;
 
-    while (count && _queued_parameter != nullptr && get_last_txbuf() > 50) {
+    while (count && _queued_parameter != nullptr && last_txbuf_is_greater(33)) {
         char param_name[AP_MAX_NAME_SIZE];
         _queued_parameter->copy_name_token(_queued_parameter_token, param_name, sizeof(param_name), true);
 
@@ -108,7 +108,7 @@ bool GCS_MAVLINK::have_flow_control(void)
         return false;
     }
 
-    if (_port->get_flow_control() != AP_HAL::UARTDriver::FLOW_CONTROL_DISABLE) {
+    if (_port->flow_control_enabled()) {
         return true;
     }
 
@@ -290,7 +290,7 @@ void GCS_MAVLINK::handle_param_set(const mavlink_message_t &msg)
     }
 
     if ((parameter_flags & AP_PARAM_FLAG_INTERNAL_USE_ONLY) || vp->is_read_only()) {
-        gcs().send_text(MAV_SEVERITY_WARNING, "Param write denied (%s)", key);
+        GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Param write denied (%s)", key);
         // send the readonly value
         send_parameter_value(key, var_type, old_value);
         return;

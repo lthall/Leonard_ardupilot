@@ -1,7 +1,7 @@
 #pragma once
 
 #include <GCS_MAVLink/GCS.h>
-#include "GCS_Mavlink.h"
+#include "GCS_MAVLink_Sub.h"
 
 class GCS_Sub : public GCS
 {
@@ -37,7 +37,7 @@ protected:
 
     GCS_MAVLINK_Sub *new_gcs_mavlink_backend(GCS_MAVLINK_Parameters &params,
                                              AP_HAL::UARTDriver &uart) override {
-        return new GCS_MAVLINK_Sub(params, uart);
+        return NEW_NOTHROW GCS_MAVLINK_Sub(params, uart);
     }
 
 };

@@ -116,6 +116,7 @@ void AP_LTM_Telem::send_Gframe(void)
 // Sensors frame
 void AP_LTM_Telem::send_Sframe(void)
 {
+#if AP_BATTERY_ENABLED
     const AP_BattMonitor &battery = AP::battery();
     const uint16_t volt = (uint16_t) roundf(battery.voltage() * 1000.0f);              // battery voltage (expects value in mV)
     float current;
@@ -124,6 +125,10 @@ void AP_LTM_Telem::send_Sframe(void)
     }
     // note: max. current value we can send is 65.536 A
     const uint16_t amp = (uint16_t) roundf(current * 100.0f);                          // current sensor (expects value in hundredth of A)
+#else
+    const uint16_t volt = 0;
+    const uint16_t amp = 0;
+#endif
 
     // airspeed in m/s if available and enabled - even if not used - otherwise send 0
     uint8_t airspeed = 0; // airspeed sensor (m/s)
@@ -137,10 +142,12 @@ void AP_LTM_Telem::send_Sframe(void)
     const uint8_t flightmode = AP_Notify::flags.flight_mode; // flight mode
 
     uint8_t rssi = 0; // radio RSSI (%a)
+#if AP_RSSI_ENABLED
     AP_RSSI *ap_rssi = AP_RSSI::get_singleton();
     if (ap_rssi) {
         rssi = ap_rssi->read_receiver_rssi_uint8();
     }
+#endif
 
     const uint8_t armstat = AP_Notify::flags.armed;                                     // 0: disarmed, 1: armed
     const uint8_t failsafe = AP_Notify::flags.failsafe_radio;                           // 0: normal,   1: failsafe

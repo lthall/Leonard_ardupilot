@@ -12,6 +12,7 @@
 #include <SITL/SIM_Helicopter.h>
 #include <SITL/SIM_SingleCopter.h>
 #include <SITL/SIM_Plane.h>
+#include <SITL/SIM_Glider.h>
 #include <SITL/SIM_QuadPlane.h>
 #include <SITL/SIM_Rover.h>
 #include <SITL/SIM_BalanceBot.h>
@@ -20,6 +21,7 @@
 #include <SITL/SIM_Tracker.h>
 #include <SITL/SIM_Submarine.h>
 #include <SITL/SIM_Blimp.h>
+#include <SITL/SIM_NoVehicle.h>
 #include <AP_Vehicle/AP_Vehicle_Type.h>
 
 #include <AP_Baro/AP_Baro.h>
@@ -45,6 +47,8 @@ using namespace AP_HAL;
 #define AP_SIM_FRAME_CLASS Blimp
 #elif APM_BUILD_TYPE(APM_BUILD_ArduSub)
 #define AP_SIM_FRAME_CLASS Submarine
+#else
+#define AP_SIM_FRAME_CLASS NoVehicle
 #endif
 #endif
 
@@ -63,6 +67,8 @@ using namespace AP_HAL;
 #define AP_SIM_FRAME_STRING "blimp"
 #elif APM_BUILD_TYPE(APM_BUILD_ArduSub)
 #define AP_SIM_FRAME_STRING "sub"
+#else
+#define AP_SIM_FRAME_STRING ""
 #endif
 #endif
 
@@ -120,18 +126,12 @@ void SIMState::fdm_input_local(void)
     }
     if (_sitl) {
         sitl_model->fill_fdm(_sitl->state);
-
-        if (_sitl->rc_fail == SITL::SIM::SITL_RCFail_None) {
-            for (uint8_t i=0; i< _sitl->state.rcin_chan_count; i++) {
-                pwm_input[i] = 1000 + _sitl->state.rcin[i]*1000;
-            }
-        }
     }
 
     // output JSON state to ride along flight controllers
     // ride_along.send(_sitl->state,sitl_model->get_position_relhome());
 
-#if HAL_SIM_GIMBAL_ENABLED
+#if AP_SIM_SOLOGIMBAL_ENABLED
     if (gimbal != nullptr) {
         gimbal->update();
     }
@@ -266,7 +266,6 @@ void SIMState::fdm_input_local(void)
 
     set_height_agl();
 
-    _synthetic_clock_mode = true;
     _update_count++;
 }
 
@@ -345,6 +344,19 @@ void SIMState::_simulator_servos(struct sitl_input &input)
             }
         }
     }
+
+#if AP_SIM_VOLZ_ENABLED
+    // update simulation input based on data received via "serial" to
+    // Volz servos:
+    if (_sitl->volz_sim.enabled()) {
+        _sitl->volz_sim.update_sitl_input_pwm(input);
+        for (uint8_t i=0; i<ARRAY_SIZE(input.servos); i++) {
+            if (input.servos[i] != 0 && input.servos[i] < 1000) {
+                AP_HAL::panic("Bad input servo value (%u)", input.servos[i]);
+            }
+        }
+    }
+#endif
 
     float voltage = 0;
     _current = 0;

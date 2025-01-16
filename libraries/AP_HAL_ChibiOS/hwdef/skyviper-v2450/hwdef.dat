@@ -31,7 +31,10 @@ define CHIBIOS_SHORT_BOARD_NAME "skyviper-v245"
 SERIAL_ORDER OTG1 USART2 EMPTY UART4
 
 # enable AP_Radio support
-define HAL_RCINPUT_WITH_AP_RADIO 1
+define AP_RADIO_ENABLED 1
+define AP_RADIO_BACKEND_DEFAULT_ENABLED 0
+define AP_RADIO_CC2500_ENABLED 1
+define AP_RADIO_CYRF6936_ENABLED 1
 
 define HAL_GPIO_RADIO_RESET      1 // PB0 GPIO from FMU3
 
@@ -41,7 +44,7 @@ PD15 MPU_DRDY INPUT GPIO(100)
 define HAL_GPIO_RADIO_IRQ       100
 
 # setup defines for ArduCopter config
-define TOY_MODE_ENABLED ENABLED
+define TOY_MODE_ENABLED 1
 define ARMING_DELAY_SEC 0
 define LAND_START_ALT 700
 define LAND_DETECTOR_ACCEL_MAX 2.0f
@@ -65,13 +68,11 @@ STORAGE_FLASH_PAGE 22
 env BUILD_ABIN True
 
 # Disable un-needed hardware drivers
-define AP_AIRSPEED_ENABLED 0
+include ../include/skyviper.inc
 define AP_BEACON_ENABLED 0
 define AP_OPTICALFLOW_ENABLED 0
 define AP_FRSKY_TELEM_ENABLED 0
-define AP_BEACON_ENABLED 0
-define HAL_ADSB_SAGETECH_ENABLED 0
-define HAL_ADSB_UAVIONIX_MAVLINK_ENABLED 0
+define HAL_ADSB_ENABLED 0
 define AP_AIS_ENABLED 0
 define AP_BATTERY_BACKEND_DEFAULT_ENABLED 0
 define AP_BATTERY_ANALOG_ENABLED 1
@@ -101,6 +102,7 @@ define AP_ROBOTISSERVO_ENABLED 0
 define AP_VOLZ_ENABLED 0
 define HAL_SUPPORT_RCOUT_SERIAL 0
 define HAL_TORQEEDO_ENABLED 0
+define AP_SBUSOUTPUT_ENABLED 0
 
 # the SkyViper only has a single Baro:
 define AP_BARO_BACKEND_DEFAULT_ENABLED 0
@@ -129,8 +131,9 @@ define BARO_MAX_INSTANCES 1
 define INS_MAX_INSTANCES 1
 
 # SkyViper doesn't have any rangefinder, but might get mavlink?
+define AP_RANGEFINDER_ENABLED 1
 define AP_RANGEFINDER_BACKEND_DEFAULT_ENABLED 0
-define AP_RANGEFINDER_MAVLINK_ENABLED 1
+define AP_RANGEFINDER_MAVLINK_ENABLED AP_RANGEFINDER_ENABLED
 
 # SkyViper doesn't have RPM sensors:
 define AP_RPM_ENABLED 0
@@ -168,7 +171,9 @@ define AP_CAMERA_BACKEND_DEFAULT_ENABLED 0
 define AP_CAMERA_MAVLINK_ENABLED 1
 
 # SkyViper uses AP_Radio, which does its own RC protocol decoding:
-define AP_RCPROTOCOL_ENABLED 0
+define AP_RCPROTOCOL_ENABLED 1
+define AP_RCPROTOCOL_BACKEND_DEFAULT_ENABLED 0
+define AP_RCPROTOCOL_RADIO_ENABLED 1
 
 // few prelcnad backends are applicable
 define AC_PRECLAND_BACKEND_DEFAULT_ENABLED 0
@@ -190,9 +195,6 @@ define OSD_PARAM_ENABLED 0
 define HAL_WITH_MSP_DISPLAYPORT 0
 define HAL_MSP_ENABLED 0
 
-// no UCP ADSB sensors:
-define HAL_ADSB_UCP_ENABLED 0
-
 // no auxiliary temperature sensors:
 define AP_TEMPERATURE_SENSOR_ENABLED 0
 
@@ -207,12 +209,18 @@ define AP_SCRIPTING_ENABLED 0
 
 // SkyViper does not have a second battery....
 define AP_BATT_MONITOR_MAX_INSTANCES 1
-define AP_MAVLINK_BATTERY2_ENABLED 0
 
 # SkyViper doesn't use the Plane landing library:
 define HAL_LANDING_DEEPSTALL_ENABLED 0
 
 # bootloader embedding / bootloader flashing not available
 define AP_BOOTLOADER_FLASHING_ENABLED 0
+
+# no payload place support.  It's lucky to lift itself:
+define AC_PAYLOAD_PLACE_ENABLED 0
+define AP_MISSION_NAV_PAYLOAD_PLACE_ENABLED 0
+
+# don't need so many servo outputs (~850 bytes!)
+define NUM_SERVO_CHANNELS 15
 
 AUTOBUILD_TARGETS Copter
