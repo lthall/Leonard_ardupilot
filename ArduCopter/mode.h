@@ -1501,9 +1501,9 @@ public:
     // SHIP_OPS states
     enum class SubMode : uint8_t {
         CLIMB_TO_RTL,
-        RETURN_TO_PERCH,
-        PERCH,
-        OVER_SPOT,
+        RETURN_TO_HOTEL,
+        HOTEL,
+        HIGH_HOVER,
         LAUNCH_RECOVERY,
         PAYLOAD_PLACE
     };
@@ -1565,11 +1565,11 @@ private:
     } ship;
 
     // Ship Operations parameters
-    AP_Float perch_angle;
-    AP_Float perch_radius;
-    AP_Float perch_altitude;
-    AP_Float perch_max_vel_xy;
-    AP_Float perch_max_accel_xy;
+    AP_Float hotel_angle;
+    AP_Float hotel_radius;
+    AP_Float hotel_altitude;
+    AP_Float hotel_max_vel_xy;
+    AP_Float hotel_max_accel_xy;
     AP_Float ship_max_accel_xy;
     AP_Float ship_max_jerk_xy;
     AP_Float ship_max_accel_z;
