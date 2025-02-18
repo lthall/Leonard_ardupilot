@@ -1,0 +1,5 @@
+include ../Callisto/hwdef.inc
+
+USE_BOOTLOADER_FROM_BOARD Durandal
+
+define AP_CUSTOM_FIRMWARE_STRING "Callisto-2.5"
