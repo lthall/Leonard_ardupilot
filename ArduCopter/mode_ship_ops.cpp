@@ -162,7 +162,7 @@ bool ModeShipOperation::init(const bool ignore_checks)
     float keep_out_CW_rad = keep_out_angle_rad + keep_out_CCW_rad;
     float keep_out_center_rad = (keep_out_CW_rad + keep_out_CCW_rad) / 2.0;
     bool deck_radius_valid = is_positive(deck_radius);
-    bool approach_arc_valid = fabs(wrap_PI(radians(perch_angle) - keep_out_center_rad)) >=  keep_out_angle_rad / 2.0;
+    bool approach_arc_valid = fabsf(wrap_PI(radians(perch_angle) - keep_out_center_rad)) >=  keep_out_angle_rad / 2.0;
     if (is_positive(keep_out_radius)) {
         if (!deck_radius_valid) {
             GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "KOZ_DKR must be positive");
