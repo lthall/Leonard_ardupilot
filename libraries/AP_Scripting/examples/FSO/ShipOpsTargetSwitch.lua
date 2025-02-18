@@ -2,9 +2,9 @@
 -- Select bank with RCx_OPTION 300
 
 local bank_target = {
-   { name = "PCH_ANG", value = Parameter('SHIP_PCH_ANG'), bank_defualt = 180 },
-   { name = "PCH_RAD", value = Parameter('SHIP_PCH_RAD'), bank_defualt = 25 },
-   { name = "PCH_ALT", value = Parameter('SHIP_PCH_ALT'), bank_defualt = 25 },
+   { name = "HTL_ANG", value = Parameter('SHIP_HTL_ANG'), bank_defualt = 180 },
+   { name = "HTL_RAD", value = Parameter('SHIP_HTL_RAD'), bank_defualt = 25 },
+   { name = "HTL_ALT", value = Parameter('SHIP_HTL_ALT'), bank_defualt = 25 },
    { name = "KOZ_CW", value = Parameter('SHIP_KOZ_CW'), bank_defualt = 90 },
    { name = "KOZ_CCW", value = Parameter('SHIP_KOZ_CCW'), bank_defualt = -90 },
    { name = "KOZ_RAD", value = Parameter('SHIP_KOZ_RAD'), bank_defualt = 250 },
@@ -117,8 +117,8 @@ local banks = {
 
 -- Use RCx_OPTION 300: Scripting1
 -- local AuxFunChOption = 300
--- Use RCx_OPTION 175: SHIP_OPS_MODE
-local AuxFunChOption = 175
+-- Use RCx_OPTION 180: SHIP_OPS_MODE
+local AuxFunChOption = 180
 local AuxSwitchPos = { LOW = 0, MIDDLE = 1, HIGH = 2 }
 
 local interval_ms = 1000     -- update at 1hz
