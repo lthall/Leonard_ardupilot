@@ -7,29 +7,29 @@
 // parameters for ship operation
 const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
 
-    // @Param: PCH_ANG
-    // @DisplayName: Angle from the bow of the ship of the perch position
-    // @Description: Angle from the bow of the ship of the perch position where the aircraft will wait until it is commanded to land.
+    // @Param: HTL_ANG
+    // @DisplayName: Angle from the bow of the ship of the Hotel position
+    // @Description: Angle from the bow of the ship of the Hotel position where the aircraft will wait until it is commanded to land.
     // @Range: -180 360
     // @Units: deg
     // @User: Advanced
-    AP_GROUPINFO("PCH_ANG", 1, ModeShipOperation, perch_angle, 180.0),
+    AP_GROUPINFO("HTL_ANG", 1, ModeShipOperation, hotel_angle, 180.0),
 
-    // @Param: PCH_RAD
-    // @DisplayName: Distance of the perch position from the ship
-    // @Description: Distance in m of the perch position from the ship where the aircraft will wait until it is commanded to land.
+    // @Param: HTL_RAD
+    // @DisplayName: Distance of the Hotel position from the ship
+    // @Description: Distance in m of the Hotel position from the ship where the aircraft will wait until it is commanded to land.
     // @Range: 0 100
     // @Units: m
     // @User: Advanced
-    AP_GROUPINFO("PCH_RAD", 2, ModeShipOperation, perch_radius, 25.0),
+    AP_GROUPINFO("HTL_RAD", 2, ModeShipOperation, hotel_radius, 25.0),
 
-    // @Param: PCH_ALT
-    // @DisplayName: Altitude of the perch position from the ship
-    // @Description: Altitude in m of the perch position relative to the ship where the aircraft will wait until it is commanded to land.
+    // @Param: HTL_ALT
+    // @DisplayName: Altitude of the Hotel position from the ship
+    // @Description: Altitude in m of the Hotel position relative to the ship where the aircraft will wait until it is commanded to land.
     // @Range: 0 100
     // @Units: m
     // @User: Advanced
-    AP_GROUPINFO("PCH_ALT", 3, ModeShipOperation, perch_altitude, 25.0),
+    AP_GROUPINFO("HTL_ALT", 3, ModeShipOperation, hotel_altitude, 25.0),
 
     // @Param: ACCELXY
     // @DisplayName: Acceleration limit for the horizontal kinematic input shaping
@@ -80,24 +80,24 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     AP_GROUPINFO("JERKH", 9, ModeShipOperation, ship_max_jerk_h, 360.0),
 
     // @Param: KOZ_CW
-    // @DisplayName: CW angular offset in degrees from ship heading for keep out zone
-    // @Description: CW angular offset in degrees from ship heading for keep out zone
+    // @DisplayName: CW angular offset in degrees from ship heading for Keep Out Zone
+    // @Description: CW angular offset in degrees from ship heading for Keep Out Zone
     // @Range: -180 360
     // @Units: deg
     // @User: Advanced
     AP_GROUPINFO("KOZ_CW", 10, ModeShipOperation, keep_out_CW, 90.0),
 
     // @Param: KOZ_CCW
-    // @DisplayName: CCW angular offset in degrees from ship heading for keep out zone
-    // @Description: CCW angular offset in degrees from ship heading for keep out zone
+    // @DisplayName: CCW angular offset in degrees from ship heading for Keep Out Zone
+    // @Description: CCW angular offset in degrees from ship heading for Keep Out Zone
     // @Range: -180 360
     // @Units: deg
     // @User: Advanced
     AP_GROUPINFO("KOZ_CCW", 11, ModeShipOperation, keep_out_CCW, -90.0),
 
     // @Param: KOZ_RAD
-    // @DisplayName: Radius in meters of the keep out zone
-    // @Description: Radius in meters of the keep out zone
+    // @DisplayName: Radius in meters of the Keep Out Zone
+    // @Description: Radius in meters of the Keep Out Zone
     // @Range: 0 5000
     // @Units: m
     // @User: Advanced
@@ -105,27 +105,27 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
 
     // @Param: KOZ_DKR
     // @DisplayName: Radius in meters of the deck
-    // @Description: Radius in meters of the deck before the keep out zone becomes effective
+    // @Description: Radius in meters of the deck before the Keep Out Zone becomes effective
     // @Range: 0 100
     // @Units: m
     // @User: Advanced
     AP_GROUPINFO("KOZ_DKR", 13, ModeShipOperation, deck_radius, 10.0),
 
-    // @Param: PCH_VXY
-    // @DisplayName: Velocity limit of the aircraft during movement between perch and spot
-    // @Description: Velocity limit of the aircraft during movement between perch and spot
+    // @Param: HTL_VXY
+    // @DisplayName: Velocity limit of the aircraft during movement between Hotel and High Hover
+    // @Description: Velocity limit of the aircraft during movement between Hotel and High Hover
     // @Range: 0 5
     // @Units: m/s/s
     // @User: Advanced
-    AP_GROUPINFO("PCH_VXY", 14, ModeShipOperation, perch_max_vel_xy, 5.0),
+    AP_GROUPINFO("HTL_VXY", 14, ModeShipOperation, hotel_max_vel_xy, 5.0),
 
-    // @Param: PCH_AXY
-    // @DisplayName: Acceleration limit of the aircraft during movement between perch and spot
-    // @Description: Acceleration limit of the aircraft during movement between perch and spot
+    // @Param: HTL_AXY
+    // @DisplayName: Acceleration limit of the aircraft during movement between Hotel and High Hover
+    // @Description: Acceleration limit of the aircraft during movement between Hotel and High Hover
     // @Range: 0 5
     // @Units: m/s/s
     // @User: Advanced
-    AP_GROUPINFO("PCH_AXY", 15, ModeShipOperation, perch_max_accel_xy, 2.0),
+    AP_GROUPINFO("HTL_AXY", 15, ModeShipOperation, hotel_max_accel_xy, 2.0),
 
     AP_GROUPEND
 };
@@ -162,19 +162,19 @@ bool ModeShipOperation::init(const bool ignore_checks)
     float keep_out_CW_rad = keep_out_angle_rad + keep_out_CCW_rad;
     float keep_out_center_rad = (keep_out_CW_rad + keep_out_CCW_rad) / 2.0;
     bool deck_radius_valid = is_positive(deck_radius);
-    bool approach_arc_valid = fabsf(wrap_PI(radians(perch_angle) - keep_out_center_rad)) >=  keep_out_angle_rad / 2.0;
+    bool approach_arc_valid = fabsf(wrap_PI(radians(hotel_angle) - keep_out_center_rad)) >=  keep_out_angle_rad / 2.0;
     if (is_positive(keep_out_radius)) {
         if (!deck_radius_valid) {
             GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "KOZ_DKR must be positive");
             return false;
         }
         if (!approach_arc_valid) {
-            GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Perch in KOZ");
+            GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Hotel in KOZ");
             return false;
         }
     }
 
-    // TODO: Must check perch angle is in approach cone.
+    // TODO: Must check Hotel angle is in approach cone.
     
     // if (!g2.follow.offsets_are_set()) {
     //     // follow does not have a target
@@ -243,12 +243,12 @@ const char *ModeShipOperation::state_name(SubMode mode) const
     switch (mode) {
     case SubMode::CLIMB_TO_RTL:
         return "ClimbToRTL";
-    case SubMode::RETURN_TO_PERCH:
-        return "ReturnToPerch";
-    case SubMode::PERCH:
-        return "Perch";
-    case SubMode::OVER_SPOT:
-        return "OverSpot";
+    case SubMode::RETURN_TO_HOTEL:
+        return "ReturnToHotel";
+    case SubMode::HOTEL:
+        return "Hotel";
+    case SubMode::HIGH_HOVER:
+        return "HighHover";
     case SubMode::LAUNCH_RECOVERY:
         return "LaunchRecovery";
     case SubMode::PAYLOAD_PLACE:
@@ -268,17 +268,17 @@ void ModeShipOperation::set_state(SubMode mode)
     switch (_state) {
     case SubMode::CLIMB_TO_RTL:
         FALLTHROUGH;
-    case SubMode::RETURN_TO_PERCH:
+    case SubMode::RETURN_TO_HOTEL:
         pos_control->set_max_speed_accel_xy(wp_nav->get_default_speed_xy(), wp_nav->get_wp_acceleration());
         break;
-    case SubMode::PERCH:
+    case SubMode::HOTEL:
         FALLTHROUGH;
-    case SubMode::OVER_SPOT:
+    case SubMode::HIGH_HOVER:
         FALLTHROUGH;
     case SubMode::LAUNCH_RECOVERY:
         FALLTHROUGH;
     case SubMode::PAYLOAD_PLACE:
-        pos_control->set_max_speed_accel_xy(perch_max_vel_xy * 100.0, perch_max_accel_xy * 100.0);
+        pos_control->set_max_speed_accel_xy(hotel_max_vel_xy * 100.0, hotel_max_accel_xy * 100.0);
         break;
     }
 }
@@ -339,9 +339,9 @@ void ModeShipOperation::run()
     float yaw_cd = attitude_control->get_att_target_euler_cd().z;
     float yaw_rate_cds = 0.0f;
 
-    Vector2f perch_offset = { perch_radius * 100.0f, 0.0f };
-    perch_offset.rotate(radians(perch_angle));
-    const float perch_height = perch_altitude * 100.0;
+    Vector2f hotel_offset = { hotel_radius * 100.0f, 0.0f };
+    hotel_offset.rotate(radians(hotel_angle));
+    const float hotel_height = hotel_altitude * 100.0;
 
     // get pilot desired climb rate if enabled
     bool valid_pilot_input = rc().has_valid_input() && g.land_repositioning;
@@ -350,7 +350,7 @@ void ModeShipOperation::run()
         target_climb_rate = get_pilot_desired_climb_rate(channel_throttle->get_control_in());
         target_climb_rate = constrain_float(target_climb_rate, -get_pilot_speed_dn(), g.pilot_speed_up);
     } else {
-        // return to perch and continue to landing
+        // return to Hotel and continue to landing
         // set_approach_mode(ApproachMode::LAUNCH_RECOVERY);
         target_climb_rate = -get_pilot_speed_dn();
     }
@@ -360,7 +360,7 @@ void ModeShipOperation::run()
         alt_home_above_origin_cm = 0;
     }
 
-    // check that keep out zone is valid
+    // check that Keep Out Zone is valid
     // if not then don't take-off or approach ship
     float keep_out_CCW_rad = wrap_2PI(radians(keep_out_CCW));
     float keep_out_angle_rad = wrap_2PI(radians(keep_out_CW) - keep_out_CCW_rad);
@@ -378,7 +378,7 @@ void ModeShipOperation::run()
                     GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Invalid KOZ: KOZ_DKR must be positive");
                 }
                 if (!approach_arc_valid) {
-                    GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Invalid KOZ: Perch in KOZ");
+                    GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Invalid KOZ: Hotel in KOZ");
                 }
             }
             if (copter.ap.land_complete) {
@@ -441,8 +441,8 @@ void ModeShipOperation::run()
         update_pos_vel_accel(ship_heading_p, ship.heading_rate, ship.heading_accel, G_Dt, 0.0, 0.0, 0.0);
         ship.heading = wrap_PI(ship_heading_p);
 
-        // transform offset and perch to earth frame
-        perch_offset.rotate(ship.heading);
+        // transform offset and Hotel to earth frame
+        hotel_offset.rotate(ship.heading);
     } else {
         if (ship.available) {
             GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Beacon %i not detected", g2.follow.get_target_sysid() );
@@ -538,8 +538,8 @@ void ModeShipOperation::run()
             // climb to RTL altitude
             offset.z = MIN(-pos_control->get_pos_target_z_cm(),  -(float)(alt_home_above_origin_cm + g.rtl_altitude)) - ship.pos_ned.tofloat().z;
             break;
-        case SubMode::RETURN_TO_PERCH: {
-            // move to Perch location at RTL altitude while avoiding ship   
+        case SubMode::RETURN_TO_HOTEL: {
+            // move to Hotel location at RTL altitude while avoiding ship   
             offset.zero();
             offset.z = MIN(-pos_control->get_pos_target_z_cm(),  -(float)(alt_home_above_origin_cm + g.rtl_altitude)) - ship.pos_ned.tofloat().z;
 
@@ -549,8 +549,8 @@ void ModeShipOperation::run()
             float extension_distance_cm = stopping_distance(wp_nav->get_default_speed_xy() + vel_ned_ms.xy().length(), 0.5 * pos_control->get_shaping_jerk_xy_cmsss() / wp_nav->get_wp_acceleration(), 0.5 * wp_nav->get_wp_acceleration());
             // We don't want the length to be greater than the gap in the approach zone.
             extension_distance_cm = MIN(extension_distance_cm, keep_out_radius * 100.0 * 0.5 * (2 * M_PI - keep_out_angle_rad));
-            // We go to purch at 10% perch radius so we must make sure our extension is always more than that.
-            extension_distance_cm = MAX(extension_distance_cm, perch_radius * 12.5 );
+            // We go to purch at 10% Hotel radius so we must make sure our extension is always more than that.
+            extension_distance_cm = MAX(extension_distance_cm, hotel_radius * 12.5 );
             Vector2f extension_cm = { extension_distance_cm, 0.0 };
 
             if (!is_positive(keep_out_radius) || aircraft_vector_cm.length() < deck_radius * 100.0) {
@@ -566,11 +566,11 @@ void ModeShipOperation::run()
 
             switch (keep_out_zone_mode) {
             case KeepOutZoneMode::NO_ACTION:
-                // direct line of sight to the perch point
-                offset.xy() = perch_offset;
+                // direct line of sight to the Hotel point
+                offset.xy() = hotel_offset;
                 break;
             case KeepOutZoneMode::AVOID_KOZ: {
-                // avoiding keep out zone
+                // avoiding Keep Out Zone
                 float aircraft_tangent_angle = acosf(keep_out_radius * 100.0 / aircraft_vector_cm.length());
                 float intercept_point_angle = 0.0;
                 // this needs to account for forward facing purch should also use 
@@ -590,7 +590,7 @@ void ModeShipOperation::run()
                 break;
             }
             case KeepOutZoneMode::EXIT_KOZ: {
-                // exiting keep out zone
+                // exiting Keep Out Zone
                 Vector2f ship_heading_unit = { 1.0, 0.0 };
                 ship_heading_unit.rotate(ship.heading);
                 float exit_angle_avoid = acosf((aircraft_vector_cm * ship_heading_unit) / (keep_out_radius * 100.0));
@@ -620,23 +620,23 @@ void ModeShipOperation::run()
             }
             break;
         }
-        case SubMode::PERCH:
-            // move to Perch location and altitude
-            offset.x = perch_offset.x;
-            offset.y = perch_offset.y;
-            offset.z = -perch_height;
+        case SubMode::HOTEL:
+            // move to Hotel location and altitude
+            offset.x = hotel_offset.x;
+            offset.y = hotel_offset.y;
+            offset.z = -hotel_height;
             break;
-        case SubMode::OVER_SPOT:
+        case SubMode::HIGH_HOVER:
             FALLTHROUGH;
         case SubMode::PAYLOAD_PLACE:
-            // move over landing Spot at Perch altitude
+            // move to High Hover
             offset.zero();
-            offset.z = -perch_height;
+            offset.z = -hotel_height;
             break;
         case SubMode::LAUNCH_RECOVERY:
             // rotate offset with ship
             offset.xy().rotate(ship.heading_rate * G_Dt);
-            // ascend to Perch altitude when throttle high
+            // ascend to Hotel altitude when throttle high
             // descend to deck when throttle is low
             if( is_zero(target_climb_rate) && valid_pilot_input) {
                 // convert pilot input to reposition velocity
@@ -648,7 +648,7 @@ void ModeShipOperation::run()
                 // this should use direct velocity control with shaped follow input to remove integration errors.
                 offset.xy() += vel_correction * G_Dt;
             }
-            offset.z = -perch_height;
+            offset.z = -hotel_height;
             break;
         }
 
@@ -660,11 +660,11 @@ void ModeShipOperation::run()
             accel_ned.zero();
             pos_control->input_vel_accel_xy(vel_ned_ms.xy(), accel_ned.xy());
             break;
-        case SubMode::RETURN_TO_PERCH:
+        case SubMode::RETURN_TO_HOTEL:
             FALLTHROUGH;
-        case SubMode::PERCH:
+        case SubMode::HOTEL:
             FALLTHROUGH;
-        case SubMode::OVER_SPOT:
+        case SubMode::HIGH_HOVER:
             FALLTHROUGH;
         case SubMode::LAUNCH_RECOVERY:
             // relax horizontal position target if we might be landed
@@ -686,18 +686,18 @@ void ModeShipOperation::run()
         switch (_state) {
         case SubMode::CLIMB_TO_RTL:
             FALLTHROUGH;
-        case SubMode::RETURN_TO_PERCH:
+        case SubMode::RETURN_TO_HOTEL:
             FALLTHROUGH;
-        case SubMode::PERCH:
+        case SubMode::HOTEL:
             FALLTHROUGH;
-        case SubMode::OVER_SPOT:
+        case SubMode::HIGH_HOVER:
 // include vertical offset
             pos_control->set_alt_target_with_slew(-(ship.pos_ned.z + offset.z));
             break;
         case SubMode::LAUNCH_RECOVERY:
             bool enforce_descent_limit;
             if( is_positive(target_climb_rate) ) {
-                // move to perch altitude
+                // move to Hotel altitude
                 // reduce decent rate to land_speed when below land_alt_low
                 float cmb_rate = constrain_float(sqrt_controller(-(ship.pos_ned.z + offset.z) - pos_control->get_pos_target_cm().z, pos_control->get_pos_z_p().kP(), pos_control->get_max_accel_z_cmss(), G_Dt), 0.0, g.pilot_speed_up);
                 target_climb_rate = constrain_float(target_climb_rate, 0.0, cmb_rate);
@@ -735,13 +735,13 @@ void ModeShipOperation::run()
         case SubMode::CLIMB_TO_RTL:
             // Do Nothing
             break;
-        case SubMode::RETURN_TO_PERCH:
+        case SubMode::RETURN_TO_HOTEL:
             yaw_cd = pos_control->get_yaw_cd();
             yaw_rate_cds = pos_control->get_yaw_rate_cds();
             break;
-        case SubMode::PERCH:
+        case SubMode::HOTEL:
             FALLTHROUGH;
-        case SubMode::OVER_SPOT:
+        case SubMode::HIGH_HOVER:
             FALLTHROUGH;
         case SubMode::PAYLOAD_PLACE:
             switch (g2.follow.get_yaw_behave()) {
@@ -786,33 +786,33 @@ void ModeShipOperation::run()
         Vector3f pos_error = ship.pos_ned.tofloat() + offset - pos_control->get_pos_target_cm().tofloat();
         bool pos_check;
         // altitude is less than 5% of the Perch height
-        bool alt_check = fabsf(-(ship.pos_ned.z + offset.z) - pos_control->get_pos_target_cm().z) < perch_height * 0.05f;
+        bool alt_check = fabsf(-(ship.pos_ned.z + offset.z) - pos_control->get_pos_target_cm().z) < hotel_height * 0.05f;
         switch (_state) {
         case SubMode::CLIMB_TO_RTL:
-            // check altitude is within 5% of perch_height from RTL altitude
+            // check altitude is within 5% of hotel_height from RTL altitude
             if (ship.available && alt_check && keep_out_zone_valid) {
-                set_state(SubMode::RETURN_TO_PERCH);
+                set_state(SubMode::RETURN_TO_HOTEL);
             }
             break;
-        case SubMode::RETURN_TO_PERCH:
-            // check that position is within 10% of the Perch radius in x and y
-            // if throttle is low then reduce altitude to Perch altitude
-            pos_check = pos_error.xy().length() < perch_radius * 10.0f;
+        case SubMode::RETURN_TO_HOTEL:
+            // check that position is within 10% of the Hotel radius in x and y
+            // if throttle is low then reduce altitude to Hotel altitude
+            pos_check = pos_error.xy().length() < hotel_radius * 10.0f;
             if (pos_check) {
-                set_state(SubMode::PERCH);
+                set_state(SubMode::HOTEL);
             }
             break;
-        case SubMode::PERCH:
+        case SubMode::HOTEL:
             // if altitude is correct and throttle is low then continue landing
             if (alt_check && is_negative(target_climb_rate)) {
-                set_state(SubMode::OVER_SPOT);
+                set_state(SubMode::HIGH_HOVER);
             }
             break;
-        case SubMode::OVER_SPOT:
-            // check position is within 10 percent of the Perch height
-            // if accent requested then move back to Perch location
+        case SubMode::HIGH_HOVER:
+            // check position is within 10 percent of the Hotel height
+            // if accent requested then move back to Hotel location
             // if decent requested then continue recovery
-            pos_check = pos_error.xy().length() < perch_height * 0.1f;
+            pos_check = pos_error.xy().length() < hotel_height * 0.1f;
             if (pos_check && is_negative(target_climb_rate)) {
                 switch (approach_mode) {
                 case ApproachMode::LAUNCH_RECOVERY:
@@ -835,13 +835,13 @@ void ModeShipOperation::run()
                     break;
                 }
             } else if (alt_check && is_positive(target_climb_rate)) {
-                set_state(SubMode::PERCH);
+                set_state(SubMode::HOTEL);
             }
             break;
         case SubMode::LAUNCH_RECOVERY:
-            // if accent requested and altitude has reached or exceeded the perch altitude then move to Perch
+            // if accent requested and altitude has reached or exceeded the Hotel altitude then move to Hotel
             if (alt_check && is_positive(target_climb_rate)) {
-                set_state(SubMode::PERCH);
+                set_state(SubMode::HOTEL);
 #if AP_LANDINGGEAR_ENABLED
                 // optionally retract landing gear
                 copter.landinggear.retract_after_takeoff();
@@ -850,7 +850,7 @@ void ModeShipOperation::run()
             break;
         case SubMode::PAYLOAD_PLACE:
              if(payload_place.verify() || is_positive(target_climb_rate) || approach_mode != ApproachMode::PAYLOAD_PLACE) {
-                set_state(SubMode::OVER_SPOT);
+                set_state(SubMode::HIGH_HOVER);
             }
             break;
         }
