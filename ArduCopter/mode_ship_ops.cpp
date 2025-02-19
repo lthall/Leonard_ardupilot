@@ -2,7 +2,7 @@
 
 #if MODE_SHIP_OPS_ENABLED == ENABLED
 
-#define MESSAGE_PERIOD 2500
+#define MESSAGE_PERIOD 5000
 
 // parameters for ship operation
 const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
@@ -147,30 +147,39 @@ bool ModeShipOperation::init(const bool ignore_checks)
 
     if (!g2.follow.enabled()) {
         // follow not enabled
-        GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Set FOLL_ENABLE = 1");
-        return false;
+        GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "ShipOps: Set FOLL_ENABLE = 1");
+        if (!ignore_checks) {
+            return false;
+        }
     }
 
     if (!g2.follow.have_target()) {
         // follow does not have a target
-        GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "No Valid Beacon");
-        return false;
+        GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "ShipOps: No Valid Beacon");
+        if (!ignore_checks) {
+            return false;
+        }
     }
 
     float keep_out_CCW_rad = wrap_2PI(radians(keep_out_CCW));
     float keep_out_angle_rad = wrap_2PI(radians(keep_out_CW) - keep_out_CCW_rad);
     float keep_out_CW_rad = keep_out_angle_rad + keep_out_CCW_rad;
     float keep_out_center_rad = (keep_out_CW_rad + keep_out_CCW_rad) / 2.0;
-    bool deck_radius_valid = is_positive(deck_radius);
-    bool approach_arc_valid = fabsf(wrap_PI(radians(hotel_angle) - keep_out_center_rad)) >=  keep_out_angle_rad / 2.0;
     if (is_positive(keep_out_radius)) {
+        // KOZ is being used if keep_out_radius is positive
+        bool deck_radius_valid = is_positive(deck_radius);
+        bool approach_arc_valid = fabsf(wrap_PI(radians(hotel_angle) - keep_out_center_rad)) >=  keep_out_angle_rad / 2.0;
         if (!deck_radius_valid) {
-            GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "KOZ_DKR must be positive");
-            return false;
+            GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "ShipOps: KOZ_DKR must be positive");
+            if (!ignore_checks) {
+                return false;
+            }
         }
         if (!approach_arc_valid) {
-            GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Hotel in KOZ");
-            return false;
+            GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "ShipOps: Hotel in KOZ");
+            if (!ignore_checks) {
+                return false;
+            }
         }
     }
 
@@ -189,7 +198,9 @@ bool ModeShipOperation::init(const bool ignore_checks)
     if (!g2.follow.get_target_dist_and_vel_ned(pos_delta_ned_m, pos_delta_with_ofs_ned_m, vel_ned_ms)) {
         // follow does not have a target
         GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "ShipOps: No valid beacon");
-        return false;
+        if (!ignore_checks) {
+            return false;
+        }
     }
 
     const Vector3f &curr_pos_neu_cm = inertial_nav.get_position_neu_cm();
@@ -344,7 +355,7 @@ void ModeShipOperation::run()
     const float hotel_height = hotel_altitude * 100.0;
 
     // get pilot desired climb rate if enabled
-    bool valid_pilot_input = rc().has_valid_input() && g.land_repositioning;
+    bool valid_pilot_input = rc().has_valid_input();
     if (valid_pilot_input) {
         // get pilot desired climb rate
         target_climb_rate = get_pilot_desired_climb_rate(channel_throttle->get_control_in());
@@ -366,30 +377,11 @@ void ModeShipOperation::run()
     float keep_out_angle_rad = wrap_2PI(radians(keep_out_CW) - keep_out_CCW_rad);
     float keep_out_CW_rad = keep_out_angle_rad + keep_out_CCW_rad;
     float keep_out_center_rad = (keep_out_CW_rad + keep_out_CCW_rad) / 2.0;
-    float koz_center_heading_rad = wrap_2PI(ship.heading + keep_out_center_rad);
     bool keep_out_zone_valid = true; // true if the KOZ is valid
     bool deck_radius_valid = is_positive(deck_radius);
+    bool approach_arc_valid = fabsf(wrap_PI(radians(hotel_angle) - keep_out_center_rad)) >=  keep_out_angle_rad / 2.0;
     if (is_positive(keep_out_radius)) {
-        bool approach_arc_valid = fabsf(wrap_PI(radians(perch_angle) - keep_out_center_rad)) >=  keep_out_angle_rad / 2.0;
-        if (keep_out_zone_valid != deck_radius_valid && approach_arc_valid) {
-            if (now_ms - last_msg_ms > MESSAGE_PERIOD) {
-                last_msg_ms = now_ms;
-                if (!deck_radius_valid) {
-                    GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Invalid KOZ: KOZ_DKR must be positive");
-                }
-                if (!approach_arc_valid) {
-                    GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Invalid KOZ: Hotel in KOZ");
-                }
-            }
-            if (copter.ap.land_complete) {
-                // prevent takeoff being triggered
-                target_climb_rate = -get_pilot_speed_dn();
-                set_state(SubMode::LAUNCH_RECOVERY);
-            } else {
-                target_climb_rate = 0.0;
-                set_state(SubMode::CLIMB_TO_RTL);
-            }
-        }
+        // KOZ is being used if keep_out_radius is positive
         keep_out_zone_valid = deck_radius_valid && approach_arc_valid;
     }
     
@@ -444,10 +436,10 @@ void ModeShipOperation::run()
         // transform offset and Hotel to earth frame
         hotel_offset.rotate(ship.heading);
     } else {
-        if (ship.available) {
-            GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Beacon %i not detected", g2.follow.get_target_sysid() );
-            ship.available = false;
-        }
+        ship.available = false;
+    }
+    
+    if (!keep_out_zone_valid || !ship.available) {
         if (copter.ap.land_complete) {
             // prevent takeoff being triggered
             target_climb_rate = -get_pilot_speed_dn();
@@ -455,6 +447,21 @@ void ModeShipOperation::run()
         } else {
             target_climb_rate = 0.0;
             set_state(SubMode::CLIMB_TO_RTL);
+        }
+        if (now_ms - last_msg_ms > MESSAGE_PERIOD) {
+            last_msg_ms = now_ms;
+            if (!ship.available) {
+                GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Beacon %i not detected", g2.follow.get_target_sysid() );
+            }
+            if (is_positive(keep_out_radius)) {
+                // KOZ is being used if keep_out_radius is positive
+                if (!deck_radius_valid) {
+                    GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Invalid KOZ: KOZ_DKR must be positive");
+                }
+                if (!approach_arc_valid) {
+                    GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Invalid KOZ: Hotel in KOZ");
+                }
+            }
         }
     }
 
@@ -545,7 +552,7 @@ void ModeShipOperation::run()
 
             Vector2f aircraft_vector_cm = curr_pos_neu_cm.xy() - ship.pos_ned.xy().tofloat();
             float aircraft_bearing_rad = aircraft_vector_cm.angle();
-
+            float koz_center_heading_rad = wrap_2PI(ship.heading + keep_out_center_rad);
             float extension_distance_cm = stopping_distance(wp_nav->get_default_speed_xy() + vel_ned_ms.xy().length(), 0.5 * pos_control->get_shaping_jerk_xy_cmsss() / wp_nav->get_wp_acceleration(), 0.5 * wp_nav->get_wp_acceleration());
             // We don't want the length to be greater than the gap in the approach zone.
             extension_distance_cm = MIN(extension_distance_cm, keep_out_radius * 100.0 * 0.5 * (2 * M_PI - keep_out_angle_rad));
