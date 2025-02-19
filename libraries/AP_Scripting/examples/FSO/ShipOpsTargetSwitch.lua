@@ -118,7 +118,7 @@ local banks = {
 -- Use RCx_OPTION 300: Scripting1
 -- local AuxFunChOption = 300
 -- Use RCx_OPTION 180: SHIP_OPS_MODE
-local AuxFunChOption = 180
+local AuxFunChOption = 300
 local AuxSwitchPos = { LOW = 0, MIDDLE = 1, HIGH = 2 }
 
 local interval_ms = 1000     -- update at 1hz
