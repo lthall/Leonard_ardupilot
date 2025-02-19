@@ -8546,7 +8546,7 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
         # ship will have moved on, so we land on the water which isn't moving
         self.wait_groundspeed(0, 2)
 
-    def ShipOps_wait_perch_distance(self, distance):
+    def ShipOps_wait_hotel_distance(self, distance):
         self.context_push()
         self.context_collect('GLOBAL_POSITION_INT')
         positions = {}
@@ -8564,7 +8564,7 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
             return distance
 
         self.wait_and_maintain(
-            value_name="PerchOffset",
+            value_name="HotelOffset",
             target=distance,
             current_value_getter=current_value_getter,
             accuracy=2,
@@ -8573,7 +8573,7 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
         )
         self.context_pop()
 
-    def ShipOps_wait_perch_angle(self, angle):
+    def ShipOps_wait_hotel_angle(self, angle):
         self.context_push()
         self.context_collect('GLOBAL_POSITION_INT')
         positions = {}
@@ -8593,7 +8593,7 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
             return mavextra.wrap_180(xangle - ship_gpi.hdg * 0.01)
 
         self.wait_and_maintain(
-            value_name="PerchAngle",
+            value_name="HotelAngle",
             target=mavextra.wrap_180(angle),
             current_value_getter=current_value_getter,
             accuracy=5,
@@ -8623,7 +8623,7 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
         self.arm_vehicle()
         self.wait_groundspeed(ship_speed-0.1, ship_speed+0.1, minimum_duration=2)
 
-        perch_alt = self.get_parameter('SHIP_PCH_ALT')
+        hotel_alt = self.get_parameter('SHIP_HTL_ALT')
 
         abs_alt = self.get_altitude(relative=False)
 
@@ -8631,7 +8631,7 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
         self.set_rc(3, 2000)
 
         self.start_subtest('Ensure we get to perch altitude')
-        self.wait_altitude(perch_alt-2.5, perch_alt+2.5, minimum_duration=5, relative=True, timeout=30)
+        self.wait_altitude(hotel_alt-2.5, hotel_alt+2.5, minimum_duration=5, relative=True, timeout=30)
 
         self.start_subtest('Ensure we are matching ship speed')
         self.wait_groundspeed(ship_speed-0.1, ship_speed+0.1, minimum_duration=10)
@@ -8640,16 +8640,16 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
 
         self.start_subtest('Check various perch distances')
         self.context_push()
-        for perch_distance in 20, 25, 15, 0:
-            self.set_parameter('SHIP_PCH_RAD', perch_distance)
-            self.ShipOps_wait_perch_distance(perch_distance)
+        for hotel_distance in 20, 25, 15, 0:
+            self.set_parameter('SHIP_HTL_RAD', hotel_distance)
+            self.ShipOps_wait_hotel_distance(hotel_distance)
         self.context_pop()
 
         self.start_subtest('Check various perch angles')
         self.context_push()
-        for perch_angle in 180, 90, 270, 0, 300:
-            self.set_parameter('SHIP_PCH_ANG', perch_angle)
-            self.ShipOps_wait_perch_angle(perch_angle)
+        for hotel_angle in 180, 90, 270, 0, 300:
+            self.set_parameter('SHIP_HTL_ANG', hotel_angle)
+            self.ShipOps_wait_hotel_angle(hotel_angle)
         self.context_pop()
 
         self.progress("trigger recovery")
@@ -8689,7 +8689,7 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
         self.arm_vehicle()
         self.wait_groundspeed(ship_speed-0.1, ship_speed+0.1, minimum_duration=2)
 
-        perch_alt = self.get_parameter('SHIP_PCH_ALT')
+        hotel_alt = self.get_parameter('SHIP_HTL_ALT')
 
         # abs_alt = self.get_altitude(relative=False)
 
@@ -8698,7 +8698,7 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
 
         self.start_subtest('Ensure we get to perch altitude')
         # this should be measured against the ship
-        self.wait_altitude(perch_alt-2.5, perch_alt+2.5, minimum_duration=5, relative=True, timeout=30)
+        self.wait_altitude(hotel_alt-2.5, hotel_alt+2.5, minimum_duration=5, relative=True, timeout=30)
 
         self.start_subtest('Ensure we are matching ship speed')
         self.wait_groundspeed(ship_speed-0.1, ship_speed+0.1, minimum_duration=10)
@@ -8707,16 +8707,16 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
 
         self.start_subtest('Check various perch distances')
         self.context_push()
-        for perch_distance in 20, 25, 15, 0:
-            self.set_parameter('SHIP_PCH_RAD', perch_distance)
-            self.ShipOps_wait_perch_distance(perch_distance)
+        for hotel_distance in 20, 25, 15, 0:
+            self.set_parameter('SHIP_HTL_RAD', hotel_distance)
+            self.ShipOps_wait_hotel_distance(hotel_distance)
         self.context_pop()
 
         self.start_subtest('Check various perch angles')
         self.context_push()
-        for perch_angle in 180, 90, 270, 0, 300:
-            self.set_parameter('SHIP_PCH_ANG', perch_angle)
-            self.ShipOps_wait_perch_angle(perch_angle)
+        for hotel_angle in 180, 90, 270, 0, 300:
+            self.set_parameter('SHIP_HTL_ANG', hotel_angle)
+            self.ShipOps_wait_hotel_angle(hotel_angle)
         self.context_pop()
 
         self.progress("Change to RTL mode")
@@ -8731,7 +8731,7 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
 
 # I don't know what this is actually measruing.
 # I would like this to check that we are back to the perch
-        self.ShipOps_wait_perch_distance(perch_distance)
+        self.ShipOps_wait_hotel_distance(hotel_distance)
         self.wait_disarmed()
 
         self.reboot_sitl(startup_location_dist_max=1000)
@@ -8762,24 +8762,24 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
         self.set_rc(3, 2000)
 
         self.start_subtest('Ensure we get to perch altitude and distance')
-        perch_alt = self.get_parameter('SHIP_PCH_ALT')
-        perch_distance = self.get_parameter('SHIP_PCH_RAD')
-        self.wait_altitude(perch_alt-2, perch_alt+2, minimum_duration=5, relative=True, timeout=60)
-        self.ShipOps_wait_perch_distance(perch_distance)
+        hotel_alt = self.get_parameter('SHIP_HTL_ALT')
+        hotel_distance = self.get_parameter('SHIP_HTL_RAD')
+        self.wait_altitude(hotel_alt-2, hotel_alt+2, minimum_duration=5, relative=True, timeout=60)
+        self.ShipOps_wait_hotel_distance(hotel_distance)
 
         self.start_subtest("Ensure shippos reconnects with ship")
         ship_speed = self.get_parameter('SIM_SHIP_SPEED')
         self.progress("Moving to front of ship")
-        perch_angle = 0
-        self.set_parameter('SHIP_PCH_ANG', perch_angle)
-        self.ShipOps_wait_perch_angle(perch_angle)
+        hotel_angle = 0
+        self.set_parameter('SHIP_HTL_ANG', hotel_angle)
+        self.ShipOps_wait_hotel_angle(hotel_angle)
 
         self.progress("Changing mode out of shipops")
         self.change_mode('LOITER')
         self.delay_sim_time(2)
         self.change_mode(29)  # 29 is ship ops
 
-        self.ShipOps_wait_perch_angle(perch_angle)
+        self.ShipOps_wait_hotel_angle(hotel_angle)
 
         self.start_subtest('Ensure we are matching ship speed')
         self.wait_groundspeed(ship_speed-0.1, ship_speed+0.1, minimum_duration=10)
@@ -8800,9 +8800,9 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
         self.set_rc(3, 1500)
 
         self.progress("Waiting for climb-out after releasing load")
-        self.wait_altitude(perch_alt-5, perch_alt+5, minimum_duration=5, timeout=60, relative=True)
+        self.wait_altitude(hotel_alt-5, hotel_alt+5, minimum_duration=5, timeout=60, relative=True)
         self.set_rc(3, 2000)
-        self.ShipOps_wait_perch_distance(perch_distance)
+        self.ShipOps_wait_hotel_distance(hotel_distance)
 
         self.run_auxfunc(aux_func_ship_ops, 2)
         self.progress("triggering land with RC")
