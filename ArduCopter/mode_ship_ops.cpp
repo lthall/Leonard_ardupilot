@@ -148,14 +148,7 @@ bool ModeShipOperation::init(const bool ignore_checks)
     if (!g2.follow.enabled()) {
         // follow not enabled
         GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "ShipOps: Set FOLL_ENABLE = 1");
-        if (!ignore_checks) {
-            return false;
-        }
-    }
-
-    if (!g2.follow.have_target()) {
-        // follow does not have a target
-        GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "ShipOps: No Valid Beacon");
+        ship.available = false;
         if (!ignore_checks) {
             return false;
         }
@@ -194,29 +187,42 @@ bool ModeShipOperation::init(const bool ignore_checks)
     Vector3f pos_delta_ned_m;  // vector to lead vehicle + offset
     Vector3f pos_delta_with_ofs_ned_m;  // vector to lead vehicle + offset
     Vector3f vel_ned_ms;  // velocity of lead vehicle
+    offset.zero();
     
-    if (!g2.follow.get_target_dist_and_vel_ned(pos_delta_ned_m, pos_delta_with_ofs_ned_m, vel_ned_ms)) {
-        // follow does not have a target
-        GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "ShipOps: No valid beacon");
+    if (!AP::ahrs().home_is_set()) {
+        ship.available = false;
         if (!ignore_checks) {
             return false;
         }
+    } else if (!g2.follow.have_target()) {
+        // follow does not have a target
+        ship.available = false;
+        GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "ShipOps: No Valid Beacon");
+        if (!ignore_checks) {
+            return false;
+        }
+    } else if (!g2.follow.get_target_dist_and_vel_ned(pos_delta_ned_m, pos_delta_with_ofs_ned_m, vel_ned_ms)) {
+        // follow does not have a target
+        GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "ShipOps: No valid beacon");
+        ship.available = false;
+        if (!ignore_checks) {
+            return false;
+        }
+    } else {
+        const Vector3f &curr_pos_neu_cm = inertial_nav.get_position_neu_cm();
+
+        Vector3f pos_with_ofs_ned;  // vector to lead vehicle + offset
+        pos_with_ofs_ned.xy() = curr_pos_neu_cm.xy() + pos_delta_with_ofs_ned_m.xy() * 100.0;
+        pos_with_ofs_ned.z = -curr_pos_neu_cm.z + pos_delta_with_ofs_ned_m.z * 100.0;
+        vel_ned_ms *= 100.0f;
+        
+        float target_heading_deg = 0.0f;
+        g2.follow.get_target_heading_deg(target_heading_deg);
+
+        ship.reset(g2.follow.get_target_sysid(), pos_with_ofs_ned, vel_ned_ms, target_heading_deg);
+
+        offset.xy() = curr_pos_neu_cm.xy() - ship.pos_ned.xy().tofloat();
     }
-
-    const Vector3f &curr_pos_neu_cm = inertial_nav.get_position_neu_cm();
-
-    Vector3f pos_with_ofs_ned;  // vector to lead vehicle + offset
-    pos_with_ofs_ned.xy() = curr_pos_neu_cm.xy() + pos_delta_with_ofs_ned_m.xy() * 100.0;
-    pos_with_ofs_ned.z = -curr_pos_neu_cm.z + pos_delta_with_ofs_ned_m.z * 100.0;
-    vel_ned_ms *= 100.0f;
-    
-    float target_heading_deg = 0.0f;
-    g2.follow.get_target_heading_deg(target_heading_deg);
-
-    ship.reset(g2.follow.get_target_sysid(), pos_with_ofs_ned, vel_ned_ms, target_heading_deg);
-
-    offset.zero();
-    offset.xy() = curr_pos_neu_cm.xy() - ship.pos_ned.xy().tofloat();
 
     // do not permit horizontal movement until we have met an altitude
     // threshold:
@@ -365,11 +371,6 @@ void ModeShipOperation::run()
         // set_approach_mode(ApproachMode::LAUNCH_RECOVERY);
         target_climb_rate = -get_pilot_speed_dn();
     }
-    
-    int32_t alt_home_above_origin_cm;
-    if (!AP::ahrs().get_home().get_alt_cm(Location::AltFrame::ABOVE_ORIGIN, alt_home_above_origin_cm)) {
-        alt_home_above_origin_cm = 0;
-    }
 
     // check that Keep Out Zone is valid
     // if not then don't take-off or approach ship
@@ -385,58 +386,78 @@ void ModeShipOperation::run()
         keep_out_zone_valid = deck_radius_valid && approach_arc_valid;
     }
     
-    // define target location
+    bool deck_takeoff_check = true; // To ensure we are on the deck before taking off
+    int32_t alt_home_above_origin_cm = 0; // To calculate RTL altitude
     const Vector3f &curr_pos_neu_cm = inertial_nav.get_position_neu_cm();
-    Vector3f pos_delta_ned_m;  // vector to lead vehicle + offset
-    Vector3f pos_delta_with_ofs_ned_m;  // vector to lead vehicle + offset
-    Vector3f vel_ned_ms;  // velocity of lead vehicle
-    Vector3f accel_ned;  // accel of lead vehicle
-    if (g2.follow.get_target_dist_and_vel_ned(pos_delta_ned_m, pos_delta_with_ofs_ned_m, vel_ned_ms)) {
-        vel_ned_ms *= 100.0f;
-        accel_ned.zero(); // follow me should include acceleration so it is kept here for future functionality.
-        // vel_ned_ms does not include the change in heading + offset radius
-        Vector3f pos_with_ofs_ned;  // vector to lead vehicle + offset
-        pos_with_ofs_ned.xy() = curr_pos_neu_cm.xy() + pos_delta_with_ofs_ned_m.xy() * 100.0;
-        pos_with_ofs_ned.z = -curr_pos_neu_cm.z + pos_delta_with_ofs_ned_m.z * 100.0;
-
-        float target_heading_deg = 0.0f;
-        g2.follow.get_target_heading_deg(target_heading_deg);
-
-        if (!ship.available || ship.sysid != g2.follow.get_target_sysid()) {
-            // reset ship pos, vel, accel to current value when detected.
-            ship.reset(g2.follow.get_target_sysid(), pos_with_ofs_ned, vel_ned_ms, target_heading_deg);
-            GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Beacon %i detected", g2.follow.get_target_sysid() );
-            if (copter.ap.land_complete) {
-                set_state(SubMode::LAUNCH_RECOVERY);
-            } else {
-                set_state(SubMode::CLIMB_TO_RTL);
+    if (!AP::ahrs().home_is_set()) {
+        alt_home_above_origin_cm = 0;
+        ship.available = false;
+    } else {
+        if (!AP::ahrs().get_home().get_alt_cm(Location::AltFrame::ABOVE_ORIGIN, alt_home_above_origin_cm)) {
+            alt_home_above_origin_cm = 0;
+        }
+        // define target location
+        Vector3f pos_delta_ned_m;  // vector to lead vehicle + offset
+        Vector3f pos_delta_with_ofs_ned_m;  // vector to lead vehicle + offset
+        Vector3f vel_ned_ms;  // velocity of lead vehicle
+        Vector3f accel_ned_mss;  // accel of lead vehicle
+        if (g2.follow.get_target_dist_and_vel_ned(pos_delta_ned_m, pos_delta_with_ofs_ned_m, vel_ned_ms)) {
+            vel_ned_ms *= 100.0f;
+            accel_ned_mss.zero(); // follow me should include acceleration so it is kept here for future functionality.
+            // vel_ned_ms does not include the change in heading + offset radius
+            Vector3f pos_with_ofs_ned;  // vector to lead vehicle + offset
+            pos_with_ofs_ned.xy() = curr_pos_neu_cm.xy() + pos_delta_with_ofs_ned_m.xy() * 100.0;
+            pos_with_ofs_ned.z = -curr_pos_neu_cm.z + pos_delta_with_ofs_ned_m.z * 100.0;
+    
+            float target_heading_deg = 0.0f;
+            g2.follow.get_target_heading_deg(target_heading_deg);
+    
+            if (!ship.available || ship.sysid != g2.follow.get_target_sysid()) {
+                // reset ship pos, vel, accel to current value when detected.
+                ship.reset(g2.follow.get_target_sysid(), pos_with_ofs_ned, vel_ned_ms, target_heading_deg);
+                GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Beacon %i detected", g2.follow.get_target_sysid() );
+                if (copter.ap.land_complete) {
+                    set_state(SubMode::LAUNCH_RECOVERY);
+                } else {
+                    set_state(SubMode::CLIMB_TO_RTL);
+                }
             }
+    
+            shape_pos_vel_accel_xy(pos_with_ofs_ned.xy().topostype(), vel_ned_ms.xy(), accel_ned_mss.xy(),
+                ship.pos_ned.xy(), ship.vel_ned.xy(), ship.accel_ned.xy(),
+                0.0, ship_max_accel_xy * 100.0,
+                ship_max_jerk_xy * 100.0, G_Dt, false);
+            shape_pos_vel_accel(pos_with_ofs_ned.z, vel_ned_ms.z, accel_ned_mss.z,
+                ship.pos_ned.z, ship.vel_ned.z, ship.accel_ned.z,
+                0.0, 0.0, 
+                -ship_max_accel_z * 100.0, ship_max_accel_z * 100.0,
+                ship_max_jerk_z * 100.0, G_Dt, false);
+            update_pos_vel_accel_xy(ship.pos_ned.xy(), ship.vel_ned.xy(), ship.accel_ned.xy(), G_Dt, Vector2f(), Vector2f(), Vector2f());
+            update_pos_vel_accel(ship.pos_ned.z, ship.vel_ned.z, ship.accel_ned.z, G_Dt, 0.0, 0.0, 0.0);
+    
+            shape_angle_vel_accel(radians(target_heading_deg), 0.0, 0.0,
+                ship.heading, ship.heading_rate, ship.heading_accel,
+                0.0, radians(ship_max_accel_h),
+                radians(ship_max_jerk_h), G_Dt, false);
+            postype_t ship_heading_p = ship.heading;
+            update_pos_vel_accel(ship_heading_p, ship.heading_rate, ship.heading_accel, G_Dt, 0.0, 0.0, 0.0);
+            ship.heading = wrap_PI(ship_heading_p);
+    
+            // transform offset and Hotel to earth frame
+            hotel_offset.rotate(ship.heading);
+        } else {
+            ship.available = false;
         }
 
-        shape_pos_vel_accel_xy(pos_with_ofs_ned.xy().topostype(), vel_ned_ms.xy(), accel_ned.xy(),
-            ship.pos_ned.xy(), ship.vel_ned.xy(), ship.accel_ned.xy(),
-            0.0, ship_max_accel_xy * 100.0,
-            ship_max_jerk_xy * 100.0, G_Dt, false);
-        shape_pos_vel_accel(pos_with_ofs_ned.z, vel_ned_ms.z, accel_ned.z,
-            ship.pos_ned.z, ship.vel_ned.z, ship.accel_ned.z,
-            0.0, 0.0, 
-            -ship_max_accel_z * 100.0, ship_max_accel_z * 100.0,
-            ship_max_jerk_z * 100.0, G_Dt, false);
-        update_pos_vel_accel_xy(ship.pos_ned.xy(), ship.vel_ned.xy(), ship.accel_ned.xy(), G_Dt, Vector2f(), Vector2f(), Vector2f());
-        update_pos_vel_accel(ship.pos_ned.z, ship.vel_ned.z, ship.accel_ned.z, G_Dt, 0.0, 0.0, 0.0);
-
-        shape_angle_vel_accel(radians(target_heading_deg), 0.0, 0.0,
-            ship.heading, ship.heading_rate, ship.heading_accel,
-            0.0, radians(ship_max_accel_h),
-            radians(ship_max_jerk_h), G_Dt, false);
-        postype_t ship_heading_p = ship.heading;
-        update_pos_vel_accel(ship_heading_p, ship.heading_rate, ship.heading_accel, G_Dt, 0.0, 0.0, 0.0);
-        ship.heading = wrap_PI(ship_heading_p);
-
-        // transform offset and Hotel to earth frame
-        hotel_offset.rotate(ship.heading);
-    } else {
-        ship.available = false;
+        // Don't allow take-off if outside of deck radius
+        if (ship.available && copter.ap.land_complete && deck_radius_valid && is_positive(target_climb_rate)) {
+            Vector2f offset_xy = curr_pos_neu_cm.xy() - ship.pos_ned.xy().tofloat();
+            if (offset_xy.length() > deck_radius * 100.0) {
+                deck_takeoff_check = false;
+                // prevent takeoff being triggered
+                target_climb_rate = -get_pilot_speed_dn();
+            }
+        }
     }
     
     if (!keep_out_zone_valid || !ship.available) {
@@ -448,10 +469,17 @@ void ModeShipOperation::run()
             target_climb_rate = 0.0;
             set_state(SubMode::CLIMB_TO_RTL);
         }
+    }
+
+    // Handle error messages
+    if (!keep_out_zone_valid || !ship.available || !deck_takeoff_check) {
         if (now_ms - last_msg_ms > MESSAGE_PERIOD) {
             last_msg_ms = now_ms;
             if (!ship.available) {
-                GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Beacon %i not detected", g2.follow.get_target_sysid() );
+                GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Beacon %i not available", g2.follow.get_target_sysid() );
+            }
+            if (!deck_takeoff_check) {
+                GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Take-off refused - off deck");
             }
             if (is_positive(keep_out_radius)) {
                 // KOZ is being used if keep_out_radius is positive
@@ -462,19 +490,6 @@ void ModeShipOperation::run()
                     GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Invalid KOZ: Hotel in KOZ");
                 }
             }
-        }
-    }
-
-    // Don't allow take-off if outside of deck radius
-    if (ship.available && copter.ap.land_complete && deck_radius_valid && is_positive(target_climb_rate)) {
-        Vector2f offset_xy = curr_pos_neu_cm.xy() - ship.pos_ned.xy().tofloat();
-        if (offset_xy.length() > deck_radius * 100.0) {
-            if (now_ms - last_msg_ms > MESSAGE_PERIOD) {
-                last_msg_ms = now_ms;
-                GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Take-off restricted off deck");
-            }
-            // prevent takeoff being triggered
-            target_climb_rate = -get_pilot_speed_dn();
         }
     }
 
@@ -553,7 +568,7 @@ void ModeShipOperation::run()
             Vector2f aircraft_vector_cm = curr_pos_neu_cm.xy() - ship.pos_ned.xy().tofloat();
             float aircraft_bearing_rad = aircraft_vector_cm.angle();
             float koz_center_heading_rad = wrap_2PI(ship.heading + keep_out_center_rad);
-            float extension_distance_cm = stopping_distance(wp_nav->get_default_speed_xy() + vel_ned_ms.xy().length(), 0.5 * pos_control->get_shaping_jerk_xy_cmsss() / wp_nav->get_wp_acceleration(), 0.5 * wp_nav->get_wp_acceleration());
+            float extension_distance_cm = stopping_distance(wp_nav->get_default_speed_xy() + ship.vel_ned.xy().length(), 0.5 * pos_control->get_shaping_jerk_xy_cmsss() / wp_nav->get_wp_acceleration(), 0.5 * wp_nav->get_wp_acceleration());
             // We don't want the length to be greater than the gap in the approach zone.
             extension_distance_cm = MIN(extension_distance_cm, keep_out_radius * 100.0 * 0.5 * (2 * M_PI - keep_out_angle_rad));
             // We go to purch at 10% Hotel radius so we must make sure our extension is always more than that.
@@ -661,12 +676,13 @@ void ModeShipOperation::run()
 
         // horizontal navigation
         switch (_state) {
-        case SubMode::CLIMB_TO_RTL:
+        case SubMode::CLIMB_TO_RTL:{
             // slow to zero velocity and climb to RTL altitude using velocity control
-            vel_ned_ms.zero();
-            accel_ned.zero();
-            pos_control->input_vel_accel_xy(vel_ned_ms.xy(), accel_ned.xy());
+            Vector2f vel_ned;
+            Vector2f accel_ned;
+            pos_control->input_vel_accel_xy(vel_ned, accel_ned);
             break;
+        }
         case SubMode::RETURN_TO_HOTEL:
             FALLTHROUGH;
         case SubMode::HOTEL:
