@@ -508,9 +508,6 @@ void Copter::do_failsafe_action(FailsafeAction action, ModeReason reason){
         case FailsafeAction::SMARTRTL:
             set_mode_SmartRTL_or_RTL(reason);
             break;
-        case FailsafeAction::SHIP_OPERATION:
-            set_mode_Ship_Op_or_RTL_or_land_with_pause(reason);
-            break;
         case FailsafeAction::SMARTRTL_LAND:
             set_mode_SmartRTL_or_land_with_pause(reason);
             break;
@@ -527,6 +524,9 @@ void Copter::do_failsafe_action(FailsafeAction action, ModeReason reason){
             break;
         case FailsafeAction::BRAKE_LAND:
             set_mode_brake_or_land_with_pause(reason);
+            break;
+        case FailsafeAction::SHIP_OPERATION:
+            set_mode_Ship_Op_or_RTL_or_land_with_pause(reason);
             break;
     }
 
