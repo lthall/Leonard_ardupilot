@@ -523,6 +523,7 @@ void ModeShipOperation::run()
         pos_control->relax_z_controller(0.0f);   // forces throttle output to decay to zero
         offset.zero();
         offset.xy() = curr_pos_neu_cm.xy() - ship.pos_ned.xy().tofloat();
+        xy_position_control_permitted = false;
         break;
 
     case AltHold_Takeoff:
