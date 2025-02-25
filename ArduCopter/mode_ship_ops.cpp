@@ -523,16 +523,17 @@ void ModeShipOperation::run()
         pos_control->relax_z_controller(0.0f);   // forces throttle output to decay to zero
         offset.zero();
         offset.xy() = curr_pos_neu_cm.xy() - ship.pos_ned.xy().tofloat();
-        xy_position_control_permitted = false;
         break;
 
     case AltHold_Takeoff:
         // initiate take-off
         if (!takeoff.running()) {
             // initialise takeoff variables
-            takeoff.start(constrain_float(g.pilot_takeoff_alt, 0.0f, 1000.0f));
+            // takeoff is between 110% of wp_navalt_min and 50% hotel_height
+            takeoff.start(constrain_float(g.pilot_takeoff_alt, g2.wp_navalt_min * 110, hotel_height * 0.5));
             offset.zero();
             offset.xy() = curr_pos_neu_cm.xy() - ship.pos_ned.xy().tofloat();
+            xy_position_control_permitted = false;
         }
 
         // set position controller targets adjusted for pilot input
@@ -543,9 +544,10 @@ void ModeShipOperation::run()
             // check if vehicle has reached no_nav_alt threshold.
             // Note we are e-using this WP parameter when we possibly
             // should not.
-            if (inertial_nav.get_position_z_up_cm() >= takeoff.take_off_start_alt + g2.wp_navalt_min) {
+            if (inertial_nav.get_position_z_up_cm() >= takeoff.take_off_start_alt + g2.wp_navalt_min * 100) {
                 xy_position_control_permitted = true;
             }
+            offset.xy() = curr_pos_neu_cm.xy() - ship.pos_ned.xy().tofloat();
             pos_control->relax_velocity_controller_xy();
         } else {
             Vector2f accel;
@@ -913,6 +915,9 @@ int32_t ModeShipOperation::wp_bearing() const
  */
 bool ModeShipOperation::get_wp(Location &loc) const
 {
+    if (!AP::ahrs().home_is_set()) {
+        return false;
+    }
     float dist = g2.follow.get_distance_to_target();
     float bearing = g2.follow.get_bearing_to_target();
     loc = copter.current_loc;
