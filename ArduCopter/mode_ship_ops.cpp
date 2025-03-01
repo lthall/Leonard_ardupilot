@@ -9,7 +9,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
 
     // @Param: HTL_ANG
     // @DisplayName: Angle from the bow of the ship of the Hotel position
-    // @Description: Angle from the bow of the ship of the Hotel position where the aircraft will wait until it is commanded to land.
+    // @Description: Angle from the bow of the ship of the Hotel position where the aircraft will wait until it is commanded to move to High Hover.
     // @Range: -180 360
     // @Units: deg
     // @User: Advanced
@@ -17,7 +17,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
 
     // @Param: HTL_RAD
     // @DisplayName: Distance of the Hotel position from the ship
-    // @Description: Distance in m of the Hotel position from the ship where the aircraft will wait until it is commanded to land.
+    // @Description: Distance in m of the Hotel position from the ship where the aircraft will wait until it is commanded to move to High Hover.
     // @Range: 0 100
     // @Units: m
     // @User: Advanced
@@ -25,7 +25,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
 
     // @Param: HTL_ALT
     // @DisplayName: Altitude of the Hotel position from the ship
-    // @Description: Altitude in m of the Hotel position relative to the ship where the aircraft will wait until it is commanded to land.
+    // @Description: Altitude in m of the Hotel position relative to the ship where the aircraft will wait until it is commanded to move to High Hover.
     // @Range: 0 100
     // @Units: m
     // @User: Advanced
@@ -126,6 +126,14 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @Units: m/s/s
     // @User: Advanced
     AP_GROUPINFO("HTL_AXY", 15, ModeShipOperation, hotel_max_accel_xy, 2.0),
+
+    // @Param: HHV_ALT
+    // @DisplayName: Altitude of the High Hover position from the ship
+    // @Description: Altitude in m of the High Hover position relative to the ship where the aircraft will wait until it is commanded to land.
+    // @Range: 0 100
+    // @Units: m
+    // @User: Advanced
+    AP_GROUPINFO("HHV_ALT", 16, ModeShipOperation, highhover_altitude, 20.0),
 
     AP_GROUPEND
 };
@@ -359,6 +367,7 @@ void ModeShipOperation::run()
     Vector2f hotel_offset = { hotel_radius * 100.0f, 0.0f };
     hotel_offset.rotate(radians(hotel_angle));
     const float hotel_height = hotel_altitude * 100.0;
+    const float highhover_height = highhover_altitude * 100.0;
 
     // get pilot desired climb rate if enabled
     bool valid_pilot_input = rc().has_valid_input();
@@ -530,7 +539,7 @@ void ModeShipOperation::run()
         if (!takeoff.running()) {
             // initialise takeoff variables
             // takeoff is between 110% of wp_navalt_min and 50% hotel_height
-            takeoff.start(constrain_float(g.pilot_takeoff_alt, g2.wp_navalt_min * 110, hotel_height * 0.5));
+            takeoff.start(constrain_float(g.pilot_takeoff_alt, g2.wp_navalt_min * 110, highhover_height * 0.5));
             offset.zero();
             offset.xy() = curr_pos_neu_cm.xy() - ship.pos_ned.xy().tofloat();
             xy_position_control_permitted = false;
@@ -656,7 +665,7 @@ void ModeShipOperation::run()
         case SubMode::PAYLOAD_PLACE:
             // move to High Hover
             offset.zero();
-            offset.z = -hotel_height;
+            offset.z = -highhover_height;
             break;
         case SubMode::LAUNCH_RECOVERY:
             // rotate offset with ship
@@ -673,7 +682,7 @@ void ModeShipOperation::run()
                 // this should use direct velocity control with shaped follow input to remove integration errors.
                 offset.xy() += vel_correction * G_Dt;
             }
-            offset.z = -hotel_height;
+            offset.z = -highhover_height;
             break;
         }
 
@@ -811,8 +820,8 @@ void ModeShipOperation::run()
 
         Vector3f pos_error = ship.pos_ned.tofloat() + offset - pos_control->get_pos_target_cm().tofloat();
         bool pos_check;
-        // altitude is less than 5% of the Perch height
-        bool alt_check = fabsf(-(ship.pos_ned.z + offset.z) - pos_control->get_pos_target_cm().z) < hotel_height * 0.05f;
+        // altitude is less than 5% of the High Hover height
+        bool alt_check = fabsf(-(ship.pos_ned.z + offset.z) - pos_control->get_pos_target_cm().z) < highhover_height * 0.05f;
         switch (_state) {
         case SubMode::CLIMB_TO_RTL:
             // check altitude is within 5% of hotel_height from RTL altitude
@@ -838,7 +847,7 @@ void ModeShipOperation::run()
             // check position is within 10 percent of the Hotel height
             // if accent requested then move back to Hotel location
             // if decent requested then continue recovery
-            pos_check = pos_error.xy().length() < hotel_height * 0.1f;
+            pos_check = pos_error.xy().length() < highhover_height * 0.1f;
             if (pos_check && is_negative(target_climb_rate)) {
                 switch (approach_mode) {
                 case ApproachMode::LAUNCH_RECOVERY:
