@@ -26,7 +26,7 @@ private:
     // auto takeoff variables
     float complete_alt_cm;  // completion altitude expressed in cm above ekf origin or above terrain (depending upon auto_takeoff_terrain_alt)
     bool terrain_alt;       // true if altitudes are above terrain
-    Vector3p complete_pos;  // target takeoff position as offset from ekf origin in cm
+    Vector3p complete_pos;  // target takeoff position as offset_cm from ekf origin in cm
 };
 
 #if AC_PAYLOAD_PLACE_ENABLED
@@ -1549,38 +1549,38 @@ private:
     int32_t wp_bearing() const override;
 
     uint32_t last_msg_ms;   // system time of last time error message was sent
-    float target_climb_rate;   // climb rate in cm/s
-    Vector3f offset; // position relative to the ship in cm
+    float target_climb_rate_cms;   // climb rate in cm/s
+    Vector3f offset_ned_cm; // position relative to the ship in cm
     class Ship {
     public:
         void reset(uint8_t sys_id, const Vector3f &pos_with_ofs_ned, const Vector3f &vel_ned_ms, float target_heading_deg);
         uint8_t sysid;
-        Vector3p pos_ned;
-        Vector3f vel_ned;
-        Vector3f accel_ned;
-        float heading;
-        float heading_rate;
-        float heading_accel;
+        Vector3p pos_ned_cm;
+        Vector3f vel_ned_cms;
+        Vector3f accel_ned_cmss;
+        float heading_rad;
+        float heading_rate_rads;
+        float heading_accel_radss;
         bool available;
     } ship;
 
     // Ship Operations parameters
-    AP_Float hotel_angle;
-    AP_Float hotel_radius;
-    AP_Float hotel_altitude;
-    AP_Float hotel_max_vel_xy;
-    AP_Float hotel_max_accel_xy;
-    AP_Float highhover_altitude;
-    AP_Float ship_max_accel_xy;
-    AP_Float ship_max_jerk_xy;
-    AP_Float ship_max_accel_z;
-    AP_Float ship_max_jerk_z;
-    AP_Float ship_max_accel_h;
-    AP_Float ship_max_jerk_h;
-    AP_Float keep_out_CW;
-    AP_Float keep_out_CCW;
-    AP_Float keep_out_radius;
-    AP_Float deck_radius;
+    AP_Float hotel_angle_deg;
+    AP_Float hotel_radius_m;
+    AP_Float hotel_altitude_m;
+    AP_Float hotel_max_vel_xy_ms;
+    AP_Float hotel_max_accel_xy_mss;
+    AP_Float high_hover_altitude_m;
+    AP_Float ship_max_accel_xy_mss;
+    AP_Float ship_max_jerk_xy_msss;
+    AP_Float ship_max_accel_z_mss;
+    AP_Float ship_max_jerk_z_msss;
+    AP_Float ship_max_accel_h_mss;
+    AP_Float ship_max_jerk_h_msss;
+    AP_Float keep_out_CW_deg;
+    AP_Float keep_out_CCW_deg;
+    AP_Float keep_out_radius_m;
+    AP_Float deck_radius_m;
 
     bool xy_position_control_permitted;
 };
