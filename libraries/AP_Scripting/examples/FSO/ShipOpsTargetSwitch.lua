@@ -2,13 +2,14 @@
 -- Select bank with RCx_OPTION 300
 
 local bank_target = {
+   { name = "HHV_ALT", value = Parameter('SHIP_HHV_ALT'), bank_defualt = 20 },
+   { name = "HTL_ALT", value = Parameter('SHIP_HTL_ALT'), bank_defualt = 25 },
    { name = "HTL_ANG", value = Parameter('SHIP_HTL_ANG'), bank_defualt = 180 },
    { name = "HTL_RAD", value = Parameter('SHIP_HTL_RAD'), bank_defualt = 25 },
-   { name = "HTL_ALT", value = Parameter('SHIP_HTL_ALT'), bank_defualt = 25 },
-   { name = "KOZ_CW", value = Parameter('SHIP_KOZ_CW'), bank_defualt = 90 },
    { name = "KOZ_CCW", value = Parameter('SHIP_KOZ_CCW'), bank_defualt = -90 },
-   { name = "KOZ_RAD", value = Parameter('SHIP_KOZ_RAD'), bank_defualt = 250 },
+   { name = "KOZ_CW", value = Parameter('SHIP_KOZ_CW'), bank_defualt = 90 },
    { name = "KOZ_DKR", value = Parameter('SHIP_KOZ_DKR'), bank_defualt = 10 },
+   { name = "KOZ_RAD", value = Parameter('SHIP_KOZ_RAD'), bank_defualt = 250 },
 
    { name = "OFS_X", value = Parameter('FOLL_OFS_X'), bank_defualt = 0 },
    { name = "OFS_Y", value = Parameter('FOLL_OFS_Y'), bank_defualt = 0 },
