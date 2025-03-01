@@ -811,11 +811,11 @@ void ModeShipOperation::run()
 
         // update state of Ship Operations
         Vector2f pos_error_ne_cm = ship.pos_ned_cm.xy().tofloat() + offset_ned_cm.xy() - pos_control->get_pos_target_cm().xy().tofloat();
-        float pos_error_d_cm = fabsf(-(ship.pos_ned_cm.z + offset_ned_cm.z) - pos_control->get_pos_target_cm().z);
+        float altitude_error_cm = fabsf(-(ship.pos_ned_cm.z + offset_ned_cm.z) - pos_control->get_pos_target_cm().z);
         switch (_state) {
         case SubMode::CLIMB_TO_RTL: {
             // check altitude is within 5% of hotel_altitude_cm from RTL altitude
-            bool alt_check = pos_error_d_cm < hotel_altitude_cm * 0.05f;
+            bool alt_check = altitude_error_cm < hotel_altitude_cm * 0.05f;
             if (ship.available && alt_check && keep_out_zone_valid) {
                 set_state(SubMode::RETURN_TO_HOTEL);
             }
@@ -832,7 +832,7 @@ void ModeShipOperation::run()
         }
         case SubMode::HOTEL: {
             // if altitude is correct and throttle is low then continue landing
-            bool alt_check = pos_error_d_cm < hotel_altitude_cm * 0.05f;
+            bool alt_check = altitude_error_cm < hotel_altitude_cm * 0.05f;
             if (alt_check && is_negative(target_climb_rate_cms)) {
                 set_state(SubMode::HIGH_HOVER);
             }
@@ -843,7 +843,7 @@ void ModeShipOperation::run()
             // if accent requested then move back to Hotel location
             // if decent requested then continue recovery
             bool pos_check = pos_error_ne_cm.length() < high_hover_altitude_cm * 0.1f;
-            bool alt_check = pos_error_d_cm < high_hover_altitude_cm * 0.05f;
+            bool alt_check = altitude_error_cm < high_hover_altitude_cm * 0.05f;
             if (pos_check && is_negative(target_climb_rate_cms)) {
                 switch (approach_mode) {
                 case ApproachMode::LAUNCH_RECOVERY:
@@ -872,7 +872,7 @@ void ModeShipOperation::run()
         }
         case SubMode::LAUNCH_RECOVERY: {
             // if accent requested and altitude has reached or exceeded the Hotel altitude then move to Hotel
-            bool alt_check = pos_error_d_cm < high_hover_altitude_cm * 0.05f;
+            bool alt_check = altitude_error_cm < high_hover_altitude_cm * 0.05f;
             if (alt_check && is_positive(target_climb_rate_cms)) {
                 set_state(SubMode::HOTEL);
 #if AP_LANDINGGEAR_ENABLED
