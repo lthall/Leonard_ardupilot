@@ -1570,6 +1570,7 @@ private:
     AP_Float hotel_altitude;
     AP_Float hotel_max_vel_xy;
     AP_Float hotel_max_accel_xy;
+    AP_Float highhover_altitude;
     AP_Float ship_max_accel_xy;
     AP_Float ship_max_jerk_xy;
     AP_Float ship_max_accel_z;
