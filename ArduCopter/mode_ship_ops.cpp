@@ -379,7 +379,7 @@ void ModeShipOperation::run()
     float keep_out_CW_rad = keep_out_angle_rad + keep_out_CCW_rad;
     float keep_out_center_rad = (keep_out_CW_rad + keep_out_CCW_rad) / 2.0;
     bool keep_out_zone_valid = true; // true if the KOZ is valid
-    bool deck_radius_valid = is_positive(deck_radius);
+    bool deck_radius_valid = !is_negative(deck_radius);
     bool approach_arc_valid = fabsf(wrap_PI(radians(hotel_angle) - keep_out_center_rad)) >=  keep_out_angle_rad / 2.0;
     if (is_positive(keep_out_radius)) {
         // KOZ is being used if keep_out_radius is positive
@@ -484,7 +484,7 @@ void ModeShipOperation::run()
             if (is_positive(keep_out_radius)) {
                 // KOZ is being used if keep_out_radius is positive
                 if (!deck_radius_valid) {
-                    GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Invalid KOZ: KOZ_DKR must be positive");
+                    GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Invalid KOZ: KOZ_DKR must be zero or positive");
                 }
                 if (!approach_arc_valid) {
                     GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Invalid KOZ: Hotel in KOZ");
@@ -737,7 +737,7 @@ void ModeShipOperation::run()
                 } else {
                     max_land_descent_velocity = pos_control->get_max_speed_down_cms();
                 }
-                float alt_above_deck = MAX(0.0f, pos_control->get_pos_target_cm().z - ship.pos_ned.z);
+                float alt_above_deck = MAX(0.0f, pos_control->get_pos_target_cm().z + ship.pos_ned.z);
                 if (copter.rangefinder_alt_ok()) {
                     // check if range finder detects the deck is closer than expected
                     alt_above_deck = MIN(alt_above_deck, copter.rangefinder_state.alt_cm_filt.get());
