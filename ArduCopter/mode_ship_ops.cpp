@@ -66,7 +66,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @Param: ACCELH
     // @DisplayName: Angular acceleration limit for the heading kinematic input shaping
     // @Description: Angular acceleration limit of the heading kinematic path generation used to determine how quickly the ship varies in angular velocity
-    // @Range: 0 45
+    // @Range: 0 90
     // @Units: deg/s/s
     // @User: Advanced
     AP_GROUPINFO("ACCELH", 8, ModeShipOperation, ship_max_accel_h_mss, 90.0),
@@ -74,7 +74,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @Param: JERKH
     // @DisplayName: Angular jerk limit for the heading kinematic input shaping
     // @Description: Angular jerk limit of the heading kinematic path generation used to determine how quickly the ship varies in angular acceleration
-    // @Range: 0 180
+    // @Range: 0 360
     // @Units: deg/s/s/s
     // @User: Advanced
     AP_GROUPINFO("JERKH", 9, ModeShipOperation, ship_max_jerk_h_msss, 360.0),
@@ -106,7 +106,7 @@ const AP_Param::GroupInfo ModeShipOperation::var_info[] = {
     // @Param: KOZ_DKR
     // @DisplayName: Radius in meters of the deck
     // @Description: Radius in meters of the deck before the Keep Out Zone becomes effective
-    // @Range: 0 100
+    // @Range: 0 50
     // @Units: m
     // @User: Advanced
     AP_GROUPINFO("KOZ_DKR", 13, ModeShipOperation, deck_radius_m, 10.0),
