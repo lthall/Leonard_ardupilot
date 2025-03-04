@@ -216,6 +216,8 @@ bool ModeShipOperation::init(const bool ignore_checks)
 
         offset_ned_cm.xy() = curr_pos_neu_cm.xy() - ship.pos_ned_cm.xy().tofloat();
         offset_ned_cm.z = -curr_pos_neu_cm.z - ship.pos_ned_cm.tofloat().z;
+        GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "ShipOps: Using beacon %i", g2.follow.get_target_sysid() );
+        approach_mode_message();
     } else {
         // follow does not have a target
         GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "ShipOps: No valid beacon");
@@ -327,6 +329,11 @@ void ModeShipOperation::set_approach_mode(ApproachMode new_approach_mode)
         return;
     }
     approach_mode = new_approach_mode;
+    approach_mode_message();
+}
+
+void ModeShipOperation::approach_mode_message()
+{
     switch (approach_mode) {
     case ApproachMode::LAUNCH_RECOVERY:
         GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "ShipOps: Mode Launch/Recovery");
@@ -335,7 +342,6 @@ void ModeShipOperation::set_approach_mode(ApproachMode new_approach_mode)
         GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "ShipOps: Mode Payload Place");
         break;
     }
-
 }
 
 void ModeShipOperation::Ship::reset(uint8_t sys_id, const Vector3f &pos_with_ofs_ned_cm, const Vector3f &vel_ned_ms, float target_heading_deg)
@@ -802,7 +808,7 @@ void ModeShipOperation::run()
             break;
         case SubMode::LAUNCH_RECOVERY:
             // pilot has yaw control during landing.
-            if (valid_pilot_input) {
+            if (is_zero(target_climb_rate_cms) && valid_pilot_input) {
                 yaw_rate_cds = get_pilot_desired_yaw_rate(channel_yaw->norm_input_dz());
                 yaw_rate_cds += degrees(ship.heading_rate_rads) * 100.0;
             }
