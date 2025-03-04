@@ -1528,6 +1528,7 @@ public:
     };
 
     void set_approach_mode(ApproachMode approach_mode);
+    void approach_mode_message();
     //ApproachMode approach_mode() const { return new_approach_mode; }
 
     virtual bool is_landing() const override;
