@@ -54,7 +54,7 @@
 #define FSO_SWITCH_OFF_TIME_MS              1000    // Minimum press time to turn off
 #define FSO_LOOP_TIME_MS                    100     // Loop time in ms, must be the same as battery read period
 
-#define FSO_ERROR_MSG_INTERVAL              5000    // Interval of current and temperature error messages
+#define FSO_ERROR_MSG_INTERVAL              10000    // Interval of current and temperature error messages
 #define FSO_ERROR_FAN_MSG_INTERVAL          300000  // Interval of fan RPM error messages
 
 extern const AP_HAL::HAL &hal;
@@ -299,17 +299,17 @@ void FSOPowerStack::update_fans(void)
     }
 }
 
-void FSOPowerStack::report(void)
+void FSOPowerStack::debug_msg(void)
 {
     if (!option_is_set(Option::DEBUG)) {
         return;
     }
 
     uint32_t now_ms = AP_HAL::millis();
-    if (now_ms - last_report_ms < 5000) {
+    if (now_ms - last_debug_msg_ms < 5000) {
         return;
     }
-    last_report_ms = now_ms;
+    last_debug_msg_ms = now_ms;
 
     auto &batt = AP::battery();
 
@@ -354,7 +354,6 @@ void FSOPowerStack::report_errors(void)
     if (now_ms - last_report_errors_ms < FSO_ERROR_MSG_INTERVAL) {
         return;
     }
-    last_report_errors_ms = now_ms;
 
     auto &batt = AP::battery();
 
@@ -362,6 +361,25 @@ void FSOPowerStack::report_errors(void)
     if (batt.get_temperature(main_temp, 3)) {
         if (main_temp > FSO_MAIN_TEMPERATURE_MAX) {
             GCS_SEND_TEXT(MAV_SEVERITY_CRITICAL, "POWER STACK OVER TEMPERATURE: %.2f deg", main_temp);
+            last_report_errors_ms = now_ms;
+        }
+    }
+
+    float   payload_1_temp;
+    if (batt.get_temperature(payload_1_temp, 3)) {
+        if ((payload_1_temp > MIN(bec_temperature_max, FSO_BEC_HC_TEMPERATURE_MAX) - 5.0)
+                && payload_BEC_1_on == true) {
+            GCS_SEND_TEXT(MAV_SEVERITY_CRITICAL, "BEC 1 temp warning: %.2f deg", payload_1_temp);
+            last_report_errors_ms = now_ms;
+        }
+    }
+
+    float   payload_2_temp;
+    if (batt.get_temperature(payload_2_temp, 4)) {
+        if ((payload_2_temp > MIN(bec_temperature_max, FSO_BEC_HC_TEMPERATURE_MAX) - 5.0)
+                && payload_BEC_2_on == true) {
+            GCS_SEND_TEXT(MAV_SEVERITY_CRITICAL, "BEC 2 temp warning: %.2f deg", payload_2_temp);
+            last_report_errors_ms = now_ms;
         }
     }
 
@@ -369,6 +387,7 @@ void FSOPowerStack::report_errors(void)
     if (batt.get_temperature(internal_HC_temp, 5)) {
         if (internal_HC_temp > FSO_BEC_HC_TEMPERATURE_MAX) {
             GCS_SEND_TEXT(MAV_SEVERITY_CRITICAL, "Internal BEC HC over temp: %.2f deg", internal_HC_temp);
+            last_report_errors_ms = now_ms;
         }
     }
 
@@ -376,6 +395,7 @@ void FSOPowerStack::report_errors(void)
     if (batt.get_temperature(internal_1_temp, 6)) {
         if (internal_1_temp > FSO_INTERNAL_BEC_TEMPERATURE_MAX) {
             GCS_SEND_TEXT(MAV_SEVERITY_CRITICAL, "Internal BEC 1 over temp: %.2f deg", internal_1_temp);
+            last_report_errors_ms = now_ms;
         }
     }
 
@@ -383,6 +403,7 @@ void FSOPowerStack::report_errors(void)
     if (batt.get_temperature(internal_2_temp, 7)) {
         if (internal_2_temp > FSO_INTERNAL_BEC_TEMPERATURE_MAX) {
             GCS_SEND_TEXT(MAV_SEVERITY_CRITICAL, "Internal BEC 2 over temp: %.2f deg", internal_2_temp);
+            last_report_errors_ms = now_ms;
         }
     }
 
@@ -391,6 +412,7 @@ void FSOPowerStack::report_errors(void)
         internal_HC_current_filter.apply(internal_HC_current, 0.001 * FSO_LOOP_TIME_MS);
         if (internal_HC_current_filter.get() > FSO_INTERNAL_BEC_HC_CURRENT_MAX) {
             GCS_SEND_TEXT(MAV_SEVERITY_CRITICAL, "Internal BEC HC over current fault: %.2f A", internal_HC_current_filter.get());
+            last_report_errors_ms = now_ms;
         }
     }
     
@@ -399,6 +421,7 @@ void FSOPowerStack::report_errors(void)
         internal_1_current_filter.apply(internal_1_current, 0.001 * FSO_LOOP_TIME_MS);
         if (internal_1_current_filter.get() > FSO_INTERNAL_BEC_CURRENT_MAX) {
             GCS_SEND_TEXT(MAV_SEVERITY_CRITICAL, "Internal BEC 1 over current fault: %.2f A", internal_1_current_filter.get());
+            last_report_errors_ms = now_ms;
         }
     }
     
@@ -407,11 +430,13 @@ void FSOPowerStack::report_errors(void)
         internal_2_current_filter.apply(internal_2_current, 0.001 * FSO_LOOP_TIME_MS);
         if (internal_2_current_filter.get() > FSO_INTERNAL_BEC_CURRENT_MAX) {
             GCS_SEND_TEXT(MAV_SEVERITY_CRITICAL, "Internal BEC 2 over current fault: %.2f A", internal_2_current_filter.get());
+            last_report_errors_ms = now_ms;
         }
     }
 
     if (!h16pro_fault()){
         GCS_SEND_TEXT(MAV_SEVERITY_INFO, "H16 Pro power fault");
+        last_report_errors_ms = now_ms;
     }
 
     if (now_ms - last_fan_error_ms < FSO_ERROR_FAN_MSG_INTERVAL) {
@@ -1620,7 +1645,7 @@ void FSOPowerStack::update(bool battery_read)
 
     update_payload_BEC();
 
-    report();
+    debug_msg();
     report_errors();
 }
 

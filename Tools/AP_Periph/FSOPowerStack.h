@@ -203,8 +203,8 @@ private:
     bool switch_1_pressed(){return hal.gpio->read(FSO_SWITCH_MAIN_PIN);}
     bool switch_2_pressed(){return hal.gpio->read(FSO_SWITCH_PAYLOAD_PIN);}
 
-    uint32_t last_report_ms;
-    void report();
+    uint32_t last_debug_msg_ms;
+    void debug_msg();
     uint32_t last_report_errors_ms;
     void report_errors();
 
