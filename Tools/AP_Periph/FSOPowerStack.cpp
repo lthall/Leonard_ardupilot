@@ -410,6 +410,10 @@ void FSOPowerStack::report_errors(void)
         }
     }
 
+    if (!h16pro_fault()){
+        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "H16 Pro power fault");
+    }
+
     if (now_ms - last_fan_error_ms < FSO_ERROR_FAN_MSG_INTERVAL) {
         return;
     }
@@ -1617,10 +1621,7 @@ void FSOPowerStack::update(bool battery_read)
     update_payload_BEC();
 
     report();
-
-    if (!h16pro_fault()){
-        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "H16 Pro power fault");
-    }
+    report_errors();
 }
 
 #endif  // HAL_PERIPH_ENABLE_FSO_POWER_STACK
