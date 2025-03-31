@@ -1,0 +1,186 @@
+1# hw definition file for processing by chibios_pins.py
+
+# MCU class and specific type
+MCU STM32G4xx STM32G474xx
+
+FLASH_RESERVE_START_KB 36
+
+STORAGE_FLASH_PAGE 16
+define HAL_STORAGE_SIZE 800
+
+# board ID for firmware load
+APJ_BOARD_ID AP_HW_FSO_POWER_STACK
+
+# setup build for a peripheral firmware
+env AP_PERIPH 1
+
+# crystal frequency
+OSCILLATOR_HZ 16000000
+
+define CH_CFG_ST_FREQUENCY 1000000
+
+# assume 512k flash part
+FLASH_SIZE_KB 512
+
+# Enable Options
+define AP_PERIPH_RC_OUT_ENABLED 1
+define AP_PERIPH_NOTIFY_ENABLED 1
+
+# Enable Battery Options
+define AP_PERIPH_BATTERY_ENABLED 1
+define AP_BATTERY_BACKEND_DEFAULT_ENABLED 0
+define AP_BATTERY_ANALOG_ENABLED 1
+
+# Disable Options
+define HAL_NO_RCIN_THREAD
+define HAL_USE_RTC FALSE
+define DISABLE_SERIAL_ESC_COMM TRUE
+define HAL_NO_GPIO_IRQ
+define HAL_DISABLE_LOOP_DELAY
+
+# enable serial LED
+define AP_NOTIFY_NEOPIXEL_ENABLED 1
+define AP_SERIALLED_ENABLED 1
+
+# Set Options
+define DMA_RESERVE_SIZE 0
+
+env DISABLE_SCRIPTING 1
+
+define HAL_DEVICE_THREAD_STACK 768
+
+# we setup a small defaults.parm
+define AP_PARAM_MAX_EMBEDDED_PARAM 256
+
+# keep ROMFS uncompressed as we don't have enough RAM
+# to uncompress the bootloader at runtime
+env ROMFS_UNCOMPRESSED True
+
+
+# ---------------------- UARTs ---------------------------
+
+define AP_PERIPH_SERIAL_OPTIONS_ENABLED 1
+
+PC4     USART1_TX   USART1
+PC5     USART1_RX   USART1
+PA11    USART1_CTS  USART1
+PA12    USART1_RTS  USART1
+
+PB3     USART2_TX   USART2
+PB4     USART2_RX   USART2
+
+PB10    USART3_TX   USART3
+PB11    USART3_RX   USART3
+PB13    USART3_CTS  USART3
+PB14    USART3_RTS  USART3
+
+PC10    UART4_TX   UART4
+PC11    UART4_RX   UART4
+PB7     UART4_CTS  UART4
+PA15    UART4_RTS  UART4
+
+PC12    UART5_TX   UART5
+PD2     UART5_RX   UART5
+
+# order of UARTs
+SERIAL_ORDER USART1 USART2 USART3 UART4 UART5
+
+define HAL_USE_SERIAL TRUE
+
+define STM32_SERIAL_USE_USART1 TRUE
+define STM32_SERIAL_USE_USART2 TRUE
+define STM32_SERIAL_USE_USART3 TRUE
+define STM32_SERIAL_USE_UART4 TRUE
+define STM32_SERIAL_USE_UART5 TRUE
+
+# ------------------- SWD debugging ----------------------
+
+# SWD debugging
+PA13 JTMS-SWDIO SWD
+PA14 JTCK-SWCLK SWD
+
+# ---------------------- CAN bus -------------------------
+
+# enable CAN support
+PB5 CAN2_RX CAN2
+PB6 CAN2_TX CAN2
+PB9 GPIO_CAN2_SILENT OUTPUT PUSHPULL SPEED_LOW LOW
+
+# ---------------------- I2C bus ------------------------
+
+PA8 I2C2_SDA I2C2
+PA9 I2C2_SCL I2C2
+
+PC8 I2C3_SCL I2C3
+PC9 I2C3_SDA I2C3
+
+PC6 I2C4_SCL I2C4
+PC7 I2C4_SDA I2C4
+
+# order of I2C buses
+I2C_ORDER I2C2 I2C3 I2C4
+
+# ----------------------- PWM's ------------------------
+
+PA0 TIM5_CH1 TIM5 PWM(1) GPIO(50)
+PA1 TIM5_CH2 TIM5 PWM(2) GPIO(51)
+PA2 TIM5_CH3 TIM5 PWM(3) GPIO(52)
+PA3 TIM5_CH4 TIM5 PWM(4) GPIO(53)
+
+# PC0 TIM1_CH1 TIM1 PWM(5) GPIO(54)
+# PC1 TIM1_CH2 TIM1 PWM(6) GPIO(55)
+# PC2 TIM1_CH3 TIM1 PWM(7) GPIO(56)
+# PC3 TIM1_CH4 TIM1 PWM(8) GPIO(57)
+
+# enable PWM
+define AP_PERIPH_RC_OUT_ENABLED 1
+
+# --------------- Fan Tachometer Inputs ----------------
+
+PB1     TACH_1  INPUT   OPENDRAIN   GPIO(60) # Input Fan1 Tach
+PB0     TACH_2  INPUT   OPENDRAIN   GPIO(61) # Input Fan2 Tach
+PA4     TACH_3  INPUT   OPENDRAIN   GPIO(62) # Input Fan3 Tach
+PA6     TACH_4  INPUT   OPENDRAIN   GPIO(63) # Input Fan4 Tach
+
+define FSO_FAN_TACH1_PIN 60
+define FSO_FAN_TACH2_PIN 61
+define FSO_FAN_TACH3_PIN 62
+define FSO_FAN_TACH4_PIN 63
+
+# ----------------------- GPIO's ------------------------
+
+# PDB input switches
+PA5     SWITCH_MAIN     INPUT   OPENDRAIN   GPIO(65)
+
+# PDB controls
+PA7     SW_LED          OUTPUT  PULLDOWN    GPIO(70)    LOW
+
+# LEDs
+PC15    LED_RED     OUTPUT  PULLDOWN    GPIO(80)    LOW
+PC14    LED_GREEN   OUTPUT  PULLDOWN    GPIO(81)    LOW
+PC13    LED_BLUE    OUTPUT  PULLDOWN    GPIO(82)    LOW
+PA10    LED_BOOT    OUTPUT  PULLDOWN    GPIO(83)    LOW
+# PB2     TIM20_CH1    TIM20    PWM(9)      GPIO(84)    LOW # Status NTF_LED LED
+
+# setup for "pixracer" RGB LEDs
+define AP_NOTIFY_GPIO_LED_RGB_ENABLED 1
+define AP_NOTIFY_GPIO_LED_RGB_RED_PIN 80 
+define AP_NOTIFY_GPIO_LED_RGB_GREEN_PIN 81 
+define AP_NOTIFY_GPIO_LED_RGB_BLUE_PIN 82 
+define DEFAULT_NTF_LED_TYPES 257
+define HAL_GPIO_LED_ON 1
+
+# ----------------------- ADC's ------------------------
+
+define HAL_USE_ADC TRUE
+define STM32_ADC_USE_ADC1 TRUE
+
+# PA0     ADC_1       ADC1    SCALE(0.9091)    ANALOG(91)
+# PA1     ADC_2       ADC1    SCALE(0.9091)    ANALOG(92)
+# PA2     ADC_3       ADC1    SCALE(0.9091)    ANALOG(93)
+# PA3     ADC_4       ADC1    SCALE(0.9091)    ANALOG(94)
+
+PC0     ADC_5       ADC1    SCALE(0.9091)    ANALOG(95)
+PC1     ADC_6       ADC1    SCALE(0.9091)    ANALOG(96)
+PC2     ADC_7       ADC1    SCALE(0.9091)    ANALOG(97)
+PC3     ADC_8       ADC1    SCALE(0.9091)    ANALOG(98)
