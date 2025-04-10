@@ -44,6 +44,7 @@ enum ap_message : uint8_t {
     MSG_AHRS2,
     MSG_HWSTATUS,
     MSG_WIND,
+    MSG_FOLLOW_TARGET,
     MSG_RANGEFINDER,
     MSG_DISTANCE_SENSOR,
     MSG_TERRAIN,

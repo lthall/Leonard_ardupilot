@@ -358,6 +358,13 @@ bool GCS_MAVLINK_Copter::try_send_message(enum ap_message id)
         send_wind();
         break;
 
+#if AP_MAVLINK_SEND_FOLLOW_TARGET_ENABLED
+    case MSG_FOLLOW_TARGET:
+        CHECK_PAYLOAD_SIZE(FOLLOW_TARGET);
+        send_follow_target();
+        break;
+#endif  // AP_MAVLINK_SEND_FOLLOW_TARGET_ENABLED
+
     case MSG_SERVO_OUT:
     case MSG_AOA_SSA:
     case MSG_LANDING:
@@ -531,6 +538,7 @@ static const ap_message STREAM_RC_CHANNELS_msgs[] = {
 };
 static const ap_message STREAM_EXTRA1_msgs[] = {
     MSG_ATTITUDE,
+    MSG_FOLLOW_TARGET,
 #if AP_SIM_ENABLED
     MSG_SIMSTATE,
 #endif
@@ -1586,6 +1594,74 @@ void GCS_MAVLINK_Copter::send_wind() const
         wind.length(),
         wind.z);
 }
+
+#if AP_MAVLINK_SEND_FOLLOW_TARGET_ENABLED
+void GCS_MAVLINK_Copter::send_follow_target() const
+{
+
+    const auto &ahrs = AP::ahrs();
+    Location loc;
+    float alt;
+    Vector3f vel_NED;
+    Vector3f acc_NED;
+    const bool use_pos_control_targets = true;
+    if (use_pos_control_targets) {
+        // we need the home altitude to convert position controller altitude to absolute altitude
+        if (!ahrs.get_origin(loc)) {
+            return;
+        }
+        float alt_origin_cm = loc.alt;
+        loc = Location(copter.pos_control->get_pos_target_cm().tofloat(), Location::AltFrame::ABOVE_ORIGIN);
+        alt = (alt_origin_cm + copter.pos_control->get_pos_target_cm().tofloat().z) * 0.01;  // cm -> m
+        vel_NED = copter.pos_control->get_vel_desired_cms();
+        vel_NED.z *= -1.0;  // NEU -> NED
+        vel_NED *= 0.01;  // cm/s -> m/s
+        acc_NED = copter.pos_control->get_accel_desired_cmss();
+        acc_NED.z *= -1.0;  // NEU -> NED
+        acc_NED *= 0.01;  // cm/s/s/ -> m/s/s
+    } else {
+        if (!ahrs.get_location(loc)) {
+            return;
+        }
+        int32_t alt_cm;
+        if (!loc.get_alt_cm(Location::AltFrame::ABSOLUTE, alt_cm)) {
+            return;
+        }
+        alt = alt_cm * 0.01;  // cm -> m
+        if (!ahrs.get_velocity_NED(vel_NED)) {
+            return;
+        }
+        acc_NED = ahrs.get_accel_ef();
+    }
+
+    const uint8_t est_capabilities {
+        (1U << 0) |  // we do position
+        (1U << 1) |  // we do velocity
+        (1U << 2) |  // we do acceleration
+        (1U << 3) |  // we do attitude and rates
+        0
+    };
+
+    // get the attitude and angular velocity from the attitude controller targets
+    const Quaternion quat  = copter.attitude_control->get_attitude_target_quat();
+    const Vector3f ang_vel = copter.attitude_control->get_attitude_target_ang_vel();
+
+    const mavlink_follow_target_t msg{
+        uint64_t(AP_HAL::millis()),       // time since boot (ms) (32-bits converted to 64 here)
+        0,  // 64 bits of custom state
+        loc.lat,
+        loc.lng,
+        alt,
+        { vel_NED[0], vel_NED[1], vel_NED[2] },
+        { acc_NED[0], acc_NED[1], acc_NED[2] },
+        { quat[0], quat[1], quat[2], quat[3] },
+        { ang_vel[0], ang_vel[1], ang_vel[2] },
+        { 0, 0, 0 },  // position_cov
+        est_capabilities
+    };
+    mavlink_msg_follow_target_send_struct(chan, &msg);
+}
+#endif  // AP_MAVLINK_SEND_FOLLOW_TARGET_ENABLED
 
 #if HAL_HIGH_LATENCY2_ENABLED
 int16_t GCS_MAVLINK_Copter::high_latency_target_altitude() const

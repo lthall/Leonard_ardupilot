@@ -88,6 +88,9 @@ private:
 #endif
 
     void send_wind() const;
+#if AP_MAVLINK_SEND_FOLLOW_TARGET_ENABLED
+    void send_follow_target() const;
+#endif  // AP_MAVLINK_SEND_FOLLOW_TARGET_ENABLED
 
 #if HAL_HIGH_LATENCY2_ENABLED
     int16_t high_latency_target_altitude() const override;
