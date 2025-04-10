@@ -1554,7 +1554,7 @@ private:
     Vector3f offset_ned_cm; // position relative to the ship in cm
     class Ship {
     public:
-        void reset(uint8_t sys_id, const Vector3f &pos_with_ofs_ned, const Vector3f &vel_ned_ms, float target_heading_deg);
+        void reset(uint8_t sys_id, const Vector3f &target_pos_ned_cm, const Vector3f &target_vel_ned_cms, float target_heading_deg);
         uint8_t sysid;
         Vector3p pos_ned_cm;
         Vector3f vel_ned_cms;
@@ -1576,8 +1576,8 @@ private:
     AP_Float ship_max_jerk_xy_msss;
     AP_Float ship_max_accel_z_mss;
     AP_Float ship_max_jerk_z_msss;
-    AP_Float ship_max_accel_h_mss;
-    AP_Float ship_max_jerk_h_msss;
+    AP_Float ship_max_accel_h_degss;
+    AP_Float ship_max_jerk_h_degsss;
     AP_Float keep_out_CW_deg;
     AP_Float keep_out_CCW_deg;
     AP_Float keep_out_radius_m;
