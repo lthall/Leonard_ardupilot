@@ -33,7 +33,8 @@ public:
 
     // enum for FOLLOW_OPTIONS parameter
     enum class Option {
-        MOUNT_FOLLOW_ON_ENTER = 1
+        MOUNT_FOLLOW_ON_ENTER = 1<<0,
+        USE_FOLLOW_TARGET_MESSAGE_ONLY = 1<<1
     };
 
     // enum for YAW_BEHAVE parameter
@@ -95,6 +96,7 @@ public:
 
     // get target's heading in degrees (0 = north, 90 = east)
     bool get_target_heading_deg(float &heading) const;
+    bool get_target_heading_rate_degs(float &heading_rate) const;
 
     // parse mavlink messages which may hold target's position, velocity and attitude
     void handle_msg(const mavlink_message_t &msg);
@@ -154,6 +156,7 @@ private:
     Vector3f _target_accel_ned;     // last known acceleration of target in NED frame in m/s/s
     uint32_t _last_heading_update_ms;   // system time of last heading update
     float _target_heading;          // heading in degrees
+    float _target_heading_rate;     // heading in degrees per second
     bool _automatic_sysid;          // did we lock onto a sysid automatically?
     float _dist_to_target;          // latest distance to target in meters (for reporting purposes)
     float _bearing_to_target;       // latest bearing to target in degrees (for reporting purposes)
