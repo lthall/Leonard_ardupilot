@@ -210,10 +210,10 @@ void ShipSim::send_report(void)
     }
 
     int32_t alt_mm = home.alt * 10;  // assume home altitude
+    float height = home.alt / 100.0f;
 
 #if AP_TERRAIN_AVAILABLE
     auto terrain = AP::terrain();
-    float height;
     if (terrain != nullptr && terrain->enabled() && terrain->height_amsl(loc, height, false)) {
         alt_mm = height * 1000;
     }
@@ -261,6 +261,46 @@ void ShipSim::send_report(void)
             &mav_status,
             &msg,
             &attitude);
+        uint8_t buf[300];
+        const uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
+        if (len > 0) {
+            mav_socket.send(buf, len);
+        }
+    }
+
+    { // send follow target
+        Vector2f vel(ship.speed, 0);
+        vel.rotate(radians(ship.heading_deg));
+    
+        // Convert heading (yaw) to radians
+        float yaw = radians(ship.heading_deg);
+        float pitch = 0.0f; // Assume no pitch
+        float roll = 0.0f;  // Assume no roll
+    
+        // Calculate quaternion from yaw, pitch, and roll
+        Quaternion quat;
+        quat.from_euler(roll, pitch, yaw);
+    
+        const mavlink_follow_target_t follow_target{
+            now,
+            0,
+            loc.lat,
+            loc.lng,
+            height,
+            {vel.x, vel.y, 0.0f},
+            {0.0f, 0.0f, 0.0f},
+            {quat.q1, quat.q2, quat.q3, quat.q4}, // Quaternion {w, x, y, z}
+            {0.0f, 0.0f, ship.yaw_rate},
+            {0.0f, 0.0f, 0.0f},
+            15
+        };
+        mavlink_message_t msg;
+        mavlink_msg_follow_target_encode_status(
+            sys_id,
+            component_id,
+            &mav_status,
+            &msg,
+            &follow_target);
         uint8_t buf[300];
         const uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
         if (len > 0) {
