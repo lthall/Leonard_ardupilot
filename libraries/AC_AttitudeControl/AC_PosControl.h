@@ -85,6 +85,9 @@ public:
     /// get_max_accel_xy_cmss - get the maximum horizontal acceleration in cm/s/s
     float get_max_accel_xy_cmss() const { return _accel_max_xy_cmss; }
 
+    /// get_max_accel_xy_cmsss - get the maximum horizontal jerk in cm/s/s/s
+    float get_max_jerk_xy_cmsss() const { return _jerk_max_xy_cmsss; }
+
     // set the maximum horizontal position error that will be allowed in the horizontal plane
     void set_pos_error_max_xy_cm(float error_max) { _p_pos_xy.set_error_max(error_max); }
     float get_pos_error_max_xy_cm() { return _p_pos_xy.get_error_max(); }
@@ -159,6 +162,9 @@ public:
 
     /// get_max_accel_z_cmss - get the maximum vertical acceleration in cm/s/s
     float get_max_accel_z_cmss() const { return _accel_max_z_cmss; }
+
+    /// get_max_jerk_z_cmsss - get the maximum vertical jerk in cm/s/s/s
+    float get_max_jerk_z_cmsss() const { return _jerk_max_z_cmsss; }
 
     // get_pos_error_z_up_cm - get the maximum vertical position error up that will be allowed
     float get_pos_error_z_up_cm() { return _p_pos_z.get_error_max(); }
