@@ -11,6 +11,7 @@ import os
 import shutil
 import time
 import numpy
+import pathlib
 
 from pymavlink import quaternion
 from pymavlink import mavutil
@@ -11140,6 +11141,100 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
         self.context_pop()
         self.reboot_sitl()
 
+    def ShipOpsTwoShipSim(self):
+        '''set up a test for testing ship operations'''
+
+        '''the concept here is that you have a repeatable test setup.
+        A command such as "./Tools/autotest/autotest.py build.Copter
+        test.Copter.ShipOpsTwoShipSim will build Rover and Copter
+        simulations, start two boat simulations and a Rover simulation
+        such that they can see each other's MAVLink traffic.  You can
+        connect to the vehicles individually on their network ports
+        (5762, 5772, 5782) using (eg. mavproxy.py --master
+        tcp:localhost:5762), but you can command any of them from any
+        other link if you change target (eg. the "vehicle" MAVProxy
+        command).  There's a long timeout at the end of the "test" to
+        give time for playing with various scenarios (eg. follow-me)
+        with the vehicles.
+        '''
+
+        speedup = 1
+
+        def build_ship():
+            self.progress("Building Ship")
+            builddir = util.reltopdir('build-ship')
+            util.build_SITL(
+                'bin/ardurover',
+                clean=False,
+                configure=True,
+                debug=True,
+                extra_configure_args=[
+                    '--out', builddir,
+                ],
+                # extra_defines={
+                # },
+            )
+
+        def start_ship_simulations(binary_path, count=2, sysid_base=100):
+            ret = []
+            for ship_num in 1, 2:
+                ship_rundir = util.reltopdir(f'run-ship{ship_num}')
+                if not os.path.exists(ship_rundir):
+                    os.mkdir(ship_rundir)
+                ship_exp = util.start_SITL(
+                    binary_path,
+                    cwd=ship_rundir,
+                    model='motorboat',
+                    stdout_prefix=f"ship{ship_num}",
+                    gdb=True,
+                    valgrind=self.valgrind,
+                    customisations=[
+                        '-I', str(ship_num),
+                        '--serial0', 'mcast:',
+                    ],
+                    param_defaults={
+                        "SYSID_THISMAV": sysid_base + ship_num,
+                        "SIM_SPEEDUP": speedup,
+                    },
+                    defaults_filepath=self.model_defaults_filepath('motorboat', vehicleinfo_key='Rover'),
+                )
+                ret.append(ship_exp)
+            return ret
+
+        self.progress("Build Ship")
+        ship_builddir = util.reltopdir('build-ship')
+        build_ship()
+
+        self.progress("Starting Ship Simulations")
+        board = 'sitl'
+        ship_binary_path = pathlib.Path(ship_builddir, board, 'bin', 'ardurover')
+        ships = start_ship_simulations(ship_binary_path)
+
+        for ship in ships:
+            self.expect_list_add(ship)
+
+        self.progress("Reconfiguring as Callisto")
+        self.customise_SITL_commandline(
+            ["--defaults", ','.join(self.model_defaults_filepath('Callisto')),
+             "--serial5=mcast:",
+             ],
+            model="octa-quad:@ROMFS/models/Callisto.json",
+            wipe=True,
+        )
+
+        self.set_parameters({
+            'SERIAL5_PROTOCOL': 2,
+        })
+
+        self.reboot_sitl()
+
+        # must be done after the reboot:
+        self.set_parameters({
+            'SIM_SPEEDUP': speedup,
+        })
+
+        self.delay_sim_time(100000)
+
     def tests2b(self):  # this block currently around 9.5mins here
         '''return list of all tests'''
         ret = ([
@@ -11218,6 +11313,7 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
             self.ShipOps,
             self.ShipOps_PayloadPlace,
             self.ShipOps_WeirdOrigin,
+            self.ShipOpsTwoShipSim,
         ])
         return ret
 
@@ -11247,6 +11343,7 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
             "GroundEffectCompensation_takeOffExpected": "Flapping",
             "GroundEffectCompensation_touchDownExpected": "Flapping",
             "FlyMissionTwice": "See https://github.com/ArduPilot/ardupilot/pull/18561",
+            "self.ShipOpsTwoShipSim": "A test setup, not an actual test",
         }
 
 
