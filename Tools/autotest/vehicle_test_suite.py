@@ -8502,6 +8502,17 @@ Also, ignores heartbeats not from our target system'''
         util.pexpect_close(mavproxy)
         self._mavproxy = None
 
+    def sitl_home_string_from_location(self, location, yaw=0):
+        '''return a string of the form "lat,lng,yaw,alt" from the supplied location and yaw'''
+        return ",".join([
+            str(x) for x in [
+                location.lat,
+                location.lng,
+                location.alt,
+                yaw
+            ]
+        ])
+
     def start_SITL(self, binary=None, sitl_home=None, **sitl_args):
         if sitl_home is None:
             sitl_home = self.sitl_home()
