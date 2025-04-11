@@ -11151,9 +11151,9 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
         be present.
         '''
 
-        speedup = 1
+        speedup = 10
 
-        def start_callisto_simulations(binary_path, count=4, sysid_base=100):
+        def start_callisto_simulations(binary_path, count=2, sysid_base=100):
             ret = []
             for callisto_num in range(count):
                 callisto_rundir = util.reltopdir(f'run-callisto{callisto_num}')
@@ -11200,11 +11200,45 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
         })
 
         self.reboot_sitl()
+        self.change_mode('ACRO')
 
         # must be done after the reboot:
         self.set_parameters({
             'SIM_SPEEDUP': speedup,
         })
+
+        # address the 1st Callisto:
+        for callisto in [100, 101]:
+            self.mav.target_system = callisto
+            seen = False
+            for i in range(1000):
+                m = self.mav.recv_match(type='SYSTEM_TIME', blocking=True, timeout=1)
+                if m is None:
+                    continue
+                if m.get_srcSystem() == callisto:
+                    seen = True
+                    break
+            if not seen:
+                raise NotAchievedException(f"Expected from {callisto}")
+            self.progress(f"Received SYSTEM_TIME from vehicle {callisto}")
+
+        self.mav.target_system = 100
+        self.set_parameters({
+            'SIM_SPEEDUP': speedup,
+        })
+        self.takeoff(30, mode='GUIDED')
+        self.fly_guided_move_local(10, 10, 30)
+
+        # address the 2nd Callisto:
+        self.mav.target_system = 101
+        self.set_parameters({
+            'SIM_SPEEDUP': speedup,
+        })
+        self.set_parameters({
+            "DISARM_DELAY": 27,
+        })
+        self.takeoff(30, mode='GUIDED')
+        self.fly_guided_move_local(-10, -10, 10)
 
         self.delay_sim_time(100000)
 
