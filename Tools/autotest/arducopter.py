@@ -11141,6 +11141,73 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
         self.context_pop()
         self.reboot_sitl()
 
+    def Callistos(self):
+        '''set up a test for testing ship operations'''
+
+        '''the concept here is that you have a repeatable test setup.
+
+        Multiple extra Callisto vehicles will be started (Copter is
+        assumed to have been built).  The original vehicle will also
+        be present.
+        '''
+
+        speedup = 1
+
+        def start_callisto_simulations(binary_path, count=4, sysid_base=100):
+            ret = []
+            for callisto_num in range(count):
+                callisto_rundir = util.reltopdir(f'run-callisto{callisto_num}')
+                if not os.path.exists(callisto_rundir):
+                    os.mkdir(callisto_rundir)
+                home = self.offset_location_ne(SITL_START_LOCATION, 10, 5*callisto_num)
+                home_str = self.sitl_home_string_from_location(home)
+                callisto_exp = util.start_SITL(
+                    binary_path,
+                    cwd=callisto_rundir,
+                    model="octa-quad:@ROMFS/models/Callisto.json",
+                    stdout_prefix=f"callisto{callisto_num}",
+                    gdb=True,
+                    valgrind=self.valgrind,
+                    customisations=[
+                        '-I', str(callisto_num+1),
+                        '--serial0', 'mcast:',
+                        '--home', home_str,
+                    ],
+                    param_defaults={
+                        "SYSID_THISMAV": sysid_base + callisto_num,
+                        "SIM_SPEEDUP": speedup,
+                    },
+                    defaults_filepath=','.join(self.model_defaults_filepath('Callisto')),
+                )
+                ret.append(callisto_exp)
+            return ret
+
+        self.progress("Starting Callisto Simulations")
+        callistos = start_callisto_simulations(self.binary)
+
+        for callisto in callistos:
+            self.expect_list_add(callisto)
+
+        self.progress("Adding base Copter (not-a-Callist) to mcast group")
+        self.customise_SITL_commandline(
+            ["--serial5=mcast:",
+             ],
+            wipe=True,
+        )
+
+        self.set_parameters({
+            'SERIAL5_PROTOCOL': 2,
+        })
+
+        self.reboot_sitl()
+
+        # must be done after the reboot:
+        self.set_parameters({
+            'SIM_SPEEDUP': speedup,
+        })
+
+        self.delay_sim_time(100000)
+
     def ShipOpsTwoShipSim(self):
         '''set up a test for testing ship operations'''
 
@@ -11314,6 +11381,7 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
             self.ShipOps_PayloadPlace,
             self.ShipOps_WeirdOrigin,
             self.ShipOpsTwoShipSim,
+            self.Callistos,
         ])
         return ret
 
@@ -11344,6 +11412,7 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
             "GroundEffectCompensation_touchDownExpected": "Flapping",
             "FlyMissionTwice": "See https://github.com/ArduPilot/ardupilot/pull/18561",
             "self.ShipOpsTwoShipSim": "A test setup, not an actual test",
+            "self.Callistos": "A test setup, not an actual test",
         }
 
 
