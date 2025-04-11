@@ -137,14 +137,14 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
         self.change_mode(mode)
         if not self.armed():
             self.wait_ready_to_arm(require_absolute=require_absolute, timeout=timeout)
-            self.zero_throttle()
+            # self.zero_throttle()
             self.arm_vehicle()
         if mode == 'GUIDED':
             self.user_takeoff(alt_min=alt_min, timeout=timeout, max_err=max_err)
         else:
             self.set_rc(3, takeoff_throttle)
         self.wait_altitude(alt_min-1, alt_min+max_err, relative=True, timeout=timeout)
-        self.hover()
+        # self.hover()
         self.progress("TAKEOFF COMPLETE")
 
     def land_and_disarm(self, timeout=60):
