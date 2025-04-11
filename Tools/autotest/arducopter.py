@@ -4544,14 +4544,14 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
 
     def fly_guided_move_local(self, x, y, z_up, timeout=100):
         """move the vehicle using MAVLINK_MSG_ID_SET_POSITION_TARGET_LOCAL_NED"""
-        startpos = self.mav.recv_match(type='LOCAL_POSITION_NED', blocking=True)
+        startpos = self.assert_receive_message('LOCAL_POSITION_NED')
         self.progress("startpos=%s" % str(startpos))
 
         tstart = self.get_sim_time()
         # send a position-control command
         self.mav.mav.set_position_target_local_ned_send(
             0, # timestamp
-            1, # target system_id
+            self.mav.target_system, # target system_id
             1, # target component id
             mavutil.mavlink.MAV_FRAME_LOCAL_NED,
             MAV_POS_TARGET_TYPE_MASK.POS_ONLY | MAV_POS_TARGET_TYPE_MASK.LAST_BYTE, # mask specifying use-only-x-y-z

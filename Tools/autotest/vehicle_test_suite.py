@@ -3781,6 +3781,8 @@ class TestSuite(ABC):
             m = self.mav.recv_match(type='SYSTEM_TIME', blocking=True, timeout=0.1)
             if m is None:
                 continue
+            if m.get_srcSystem() != self.mav.target_system:
+                continue
 
             return m.time_boot_ms * 1.0e-3
 
@@ -4606,6 +4608,8 @@ class TestSuite(ABC):
                 if getattr(m, m._instance_field) != instance:
                     continue
             if m is not None:
+                if m.get_srcSystem() != self.mav.target_system:
+                    continue
                 break
             elapsed_time = time.time() - tstart
             if elapsed_time > timeout:
@@ -5117,6 +5121,8 @@ class TestSuite(ABC):
                 raise NotAchievedException("Failed to set RC values")
             m = self.mav.recv_match(type='RC_CHANNELS', blocking=True, timeout=1)
             if m is None:
+                continue
+            if m.get_srcSystem() != self.sysid_thismav():
                 continue
             bad_channels = ""
             for chan in map_copy:
@@ -5665,7 +5671,7 @@ class TestSuite(ABC):
         return False
 
     def send_set_parameter_direct(self, name, value):
-        self.mav.mav.param_set_send(self.sysid_thismav(),
+        self.mav.mav.param_set_send(self.mav.target_system,
                                     1,
                                     name.encode('ascii'),
                                     value,
@@ -5764,7 +5770,7 @@ class TestSuite(ABC):
         encname = name
         if sys.version_info.major >= 3 and not isinstance(encname, bytes):
             encname = bytes(encname, 'ascii')
-        self.mav.mav.param_request_read_send(self.sysid_thismav(),
+        self.mav.mav.param_request_read_send(self.mav.target_system,
                                              1,
                                              encname,
                                              -1)
@@ -5798,6 +5804,8 @@ class TestSuite(ABC):
                 if verbose:
                     self.progress("get_parameter(%s): %s" % (name, str(m), ))
                 if m is None:
+                    continue
+                if m.get_srcSystem() != self.mav.target_system:
                     continue
                 if m.param_id == name:
                     if delta_time > 5:
@@ -5838,6 +5846,10 @@ class TestSuite(ABC):
     def context_push(self):
         """Save a copy of the parameters."""
         context = Context()
+        if self.mav is not None:
+            context.old_target_system = self.mav.target_system
+        else:
+            context.old_target_system = None
         self.contexts.append(context)
         # add a message hook so we can collect messages conveniently:
 
@@ -5907,6 +5919,9 @@ class TestSuite(ABC):
                 f.close()
             self.start_SITL(wipe=False)
             self.set_streamrate(self.sitl_streamrate())
+
+        if dead.old_target_system:
+            self.mav.old_target_system = dead.old_target_system
 
     # the following method is broken under Python2; can't **build_opts
     # def context_start_custom_binary(self, extra_defines={}):
@@ -6009,7 +6024,7 @@ class TestSuite(ABC):
             z = p7
 
         if target_sysid is None:
-            target_sysid = self.sysid_thismav()
+            target_sysid = self.mav.target_system
         if target_compid is None:
             target_compid = 1
 
@@ -6068,7 +6083,7 @@ class TestSuite(ABC):
         if mav is None:
             mav = self.mav
         if target_sysid is None:
-            target_sysid = self.sysid_thismav()
+            target_sysid = self.mav.target_system
         if target_compid is None:
             target_compid = 1
         if not quiet:
@@ -10467,7 +10482,7 @@ Also, ignores heartbeats not from our target system'''
         if mav is None:
             mav = self.mav
         if target_sysid is None:
-            target_sysid = self.sysid_thismav()
+            target_sysid = mav.target_system
         if target_compid is None:
             target_compid = 1
         if isinstance(message_id, str):
