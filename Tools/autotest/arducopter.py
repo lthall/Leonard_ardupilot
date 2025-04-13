@@ -11222,23 +11222,35 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
                 raise NotAchievedException(f"Expected from {callisto}")
             self.progress(f"Received SYSTEM_TIME from vehicle {callisto}")
 
+        self.progress("Launch first callisto")
         self.mav.target_system = 100
         self.set_parameters({
-            'SIM_SPEEDUP': speedup,
+            'SIM_SPEEDUP': 1,
         })
         self.takeoff(30, mode='GUIDED')
         self.fly_guided_move_local(10, 10, 30)
 
-        # address the 2nd Callisto:
+        self.progress("Launch second callisto")
         self.mav.target_system = 101
         self.set_parameters({
-            'SIM_SPEEDUP': speedup,
+            'SIM_SPEEDUP': 1,
         })
         self.set_parameters({
             "DISARM_DELAY": 27,
+            "FOLL_SYSID": 100,
+            "FOLL_OFS_X": 10,
+            "FOLL_OFS_Y": 10,
+            "FOLL_OFS_TYPE": 0, # earth-frame offset
         })
         self.takeoff(30, mode='GUIDED')
         self.fly_guided_move_local(-10, -10, 10)
+        self.change_mode('FOLLOW')
+
+        self.delay_sim_time(10, "let second callisto move into place")
+
+        self.progress("Moving followed vehicle")
+        self.mav.target_system = 100
+        self.fly_guided_move_local(-10, 10, 30)
 
         self.delay_sim_time(100000)
 
