@@ -11248,9 +11248,24 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
 
         self.delay_sim_time(10, "let second callisto move into place")
 
+        # install a co-routine to ensure that the follow offset
+        # remains constant; (install_message_hook_context(...) looking
+        # at POSITION_LOCAL from each vehicle)
+
         self.progress("Moving followed vehicle")
         self.mav.target_system = 100
-        self.fly_guided_move_local(-10, 10, 30)
+        self.fly_guided_move_local(-100, 100, 30)
+        self.fly_guided_move_local(-100, -100, 30)
+        self.fly_guided_move_local(100, -100, 30)
+        self.fly_guided_move_local(100, 100, 30)
+
+        # self.upload_simple_relhome_mission([
+        #     (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, -100, 100, 30),
+        #     (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 100, 100, 30),
+        #     (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 100, -100, 30),
+        #     (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, -100, -100, 30),
+        # ])
+        # self.change_mode('AUTO')
 
         self.delay_sim_time(100000)
 
