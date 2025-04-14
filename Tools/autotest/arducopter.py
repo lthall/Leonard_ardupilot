@@ -11288,6 +11288,10 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
             off_err_y = abs(got_off.y - foll_ofs_y)
             off_err_z = abs(got_off.z - foll_ofs_z)
 
+            self.send_named_value_float("OFEX", off_err_x)
+            self.send_named_value_float("OFEY", off_err_y)
+            self.send_named_value_float("OFEZ", off_err_z)
+
             # FIXME: way too big an allowed error!
             star = ""
             if (off_err_x > allowed_error_xy or
