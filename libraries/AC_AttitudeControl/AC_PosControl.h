@@ -311,6 +311,9 @@ public:
     // get_accel_target_cmss - returns the target acceleration in NEU cm/s/s
     const Vector3f& get_accel_target_cmss() const { return _accel_target; }
 
+    // get_accel_target_cmss - returns the target acceleration in NEU cm/s/s
+    const Vector3f& get_accel_desired_cmss() const { return _accel_desired; }
+
 
     /// Offset
 
