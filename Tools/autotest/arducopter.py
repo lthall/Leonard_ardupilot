@@ -11225,47 +11225,101 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
         self.progress("Launch first callisto")
         self.mav.target_system = 100
         self.set_parameters({
-            'SIM_SPEEDUP': 1,
+            'SIM_SPEEDUP': 100,
         })
         self.takeoff(30, mode='GUIDED')
         self.fly_guided_move_local(10, 10, 30)
+        self.set_parameters({
+            'SIM_SPEEDUP': speedup,
+        })
+        self.context_set_message_rate_hz("FOLLOW_TARGET", 30)
 
         self.progress("Launch second callisto")
         self.mav.target_system = 101
         self.set_parameters({
-            'SIM_SPEEDUP': 1,
+            'SIM_SPEEDUP': 100,
         })
+        foll_ofs_x = 10
+        foll_ofs_y = 10
+        foll_ofs_z = 0
         self.set_parameters({
             "DISARM_DELAY": 27,
             "FOLL_SYSID": 100,
-            "FOLL_OFS_X": 10,
-            "FOLL_OFS_Y": 10,
+            "FOLL_OFS_X": foll_ofs_x,
+            "FOLL_OFS_Y": foll_ofs_y,
+            "FOLL_OFS_Z": foll_ofs_z,
             "FOLL_OFS_TYPE": 0, # earth-frame offset
         })
         self.takeoff(30, mode='GUIDED')
         self.fly_guided_move_local(-10, -10, 10)
+        self.set_parameters({
+            'SIM_SPEEDUP': speedup,
+        })
         self.change_mode('FOLLOW')
 
-        self.delay_sim_time(10, "let second callisto move into place")
+        self.progress("Wait for following callisto to position itself")
+        self.wait_groundspeed(3, 300)
+        self.wait_groundspeed(0, 0.2)
 
-        # install a co-routine to ensure that the follow offset
-        # remains constant; (install_message_hook_context(...) looking
-        # at POSITION_LOCAL from each vehicle)
+        positions = {}
+
+        allowed_error_xy = 10
+        allowed_error_z = 1
+
+        moved_from_offset = False
+
+        def check_vehicle_offset(mav, m):
+            nonlocal moved_from_offset
+
+            if m.get_type() != "GLOBAL_POSITION_INT":
+                return
+            src_system = m.get_srcSystem()
+            if src_system == 1:
+                return
+            positions[src_system] = m
+            if len(positions) < 2:
+                return
+            loc100 = vehicle_test_suite.TestSuite.location_from_int(positions[100])
+            loc101 = vehicle_test_suite.TestSuite.location_from_int(positions[101])
+
+            got_off = vehicle_test_suite.TestSuite.location_difference(loc100, loc101)
+
+            off_err_x = abs(got_off.x - foll_ofs_x)
+            off_err_y = abs(got_off.y - foll_ofs_y)
+            off_err_z = abs(got_off.z - foll_ofs_z)
+
+            # FIXME: way too big an allowed error!
+            star = ""
+            if (off_err_x > allowed_error_xy or
+                    off_err_y > allowed_error_xy or
+                    off_err_z > allowed_error_z):
+                star = " *"
+                moved_from_offset = True
+                # raise NotAchievedException("moved from expected offset")
+
+            self.progress(f"Achieved/desired offsets x={got_off.x:.2f}/{foll_ofs_x} y={got_off.y:.2f}/{foll_ofs_y} z={got_off.z:.2f}/{foll_ofs_z}{star}")  # noqa:E501
+
+        self.install_message_hook_context(check_vehicle_offset)
 
         self.progress("Moving followed vehicle")
         self.mav.target_system = 100
-        self.fly_guided_move_local(-100, 100, 30)
-        self.fly_guided_move_local(-100, -100, 30)
-        self.fly_guided_move_local(100, -100, 30)
-        self.fly_guided_move_local(100, 100, 30)
+#        self.fly_guided_move_local(-100, 100, 30)
+#        self.fly_guided_move_local(-100, -100, 30)
+#        self.fly_guided_move_local(100, -100, 30)
+#        self.fly_guided_move_local(100, 100, 30)
 
-        # self.upload_simple_relhome_mission([
-        #     (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, -100, 100, 30),
-        #     (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 100, 100, 30),
-        #     (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 100, -100, 30),
-        #     (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, -100, -100, 30),
-        # ])
-        # self.change_mode('AUTO')
+        self.upload_simple_relhome_mission([
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, -100, 100, 30),
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 100, 100, 30),
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 100, -100, 30),
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, -100, -100, 30),
+        ])
+        self.change_mode('AUTO')
+        self.wait_waypoint(4, 4)
+        self.wait_groundspeed(0, 0.2)
+
+        if moved_from_offset:
+            raise NotAchievedException("Did not follow closely enough")
 
         self.delay_sim_time(100000)
 
