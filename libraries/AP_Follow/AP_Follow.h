@@ -80,6 +80,9 @@ public:
     
     // get distance vector to target (in meters), target plus offsets, and target's velocity all in NED frame
     bool get_target_dist_and_vel_ned(Vector3f &dist_ned, Vector3f &dist_with_ofs, Vector3f &vel_ned);
+    
+    // get distance vector to target (in meters), target plus offsets, and target's velocity all in NED frame
+    bool get_target_pos_vel_accel_ned(Vector3f &pos_ned, Vector3f &pos_with_offs_ned, Vector3f &vel_ned, Vector3f &accel_ned);
 
     // get target sysid
     uint8_t get_target_sysid() const { return _sysid.get(); }

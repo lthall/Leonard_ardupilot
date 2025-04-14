@@ -254,6 +254,78 @@ bool AP_Follow::get_target_dist_and_vel_ned(Vector3f &dist_ned, Vector3f &dist_w
     return true;
 }
 
+// get position, offset position, velocity and acceleration of target (in meters) NED frame
+bool AP_Follow::get_target_pos_vel_accel_ned(Vector3f &pos_ned, Vector3f &pos_with_offs_ned, Vector3f &vel_ned, Vector3f &accel_ned)
+{
+    // exit immediately if not enabled
+    if (!_enabled) {
+        clear_dist_and_bearing_to_target();
+        return false;
+    }
+
+    // check for timeout
+    if ((_last_location_update_ms == 0) || (AP_HAL::millis() - _last_location_update_ms > AP_FOLLOW_TIMEOUT_MS)) {
+        clear_dist_and_bearing_to_target();
+        return false;
+    }
+
+    // get our location
+    Location current_loc;
+    if (!AP::ahrs().get_location(current_loc)) {
+        clear_dist_and_bearing_to_target();
+        return false;
+    }
+
+    // calculate results
+    if (!_target_location.get_vector_from_origin_NEU(pos_ned)) {
+        clear_dist_and_bearing_to_target();
+        return false;
+    }
+    pos_ned *= 0.01;
+    pos_ned.z *= -1.0; // convert NEU to NED
+
+    // change to altitude above home if relative altitude is being used
+    if (_target_location.relative_alt == 1) {
+        current_loc.alt -= AP::ahrs().get_home().alt;
+        pos_ned.z -= AP::ahrs().get_home().alt;
+    }
+
+    // calculate difference
+    const Vector3f dist_vec = current_loc.get_distance_NED(_target_location);
+
+    // fail if too far
+    if (is_positive(_dist_max.get()) && (dist_vec.length() > _dist_max)) {
+        clear_dist_and_bearing_to_target();
+        return false;
+    }
+
+    // initialise offsets from distance vector if required
+    init_offsets_if_required(dist_vec);
+
+    // get offsets
+    Vector3f offsets;
+    if (!get_offsets_ned(offsets)) {
+        clear_dist_and_bearing_to_target();
+        return false;
+    }
+    
+    const float dt = (AP_HAL::millis() - _last_location_update_ms) * 0.001f;
+    pos_ned += _target_velocity_ned * dt + _target_accel_ned * 0.5 * sq(dt);
+    pos_with_offs_ned = pos_ned + offsets;
+    vel_ned = _target_velocity_ned + _target_accel_ned * dt;
+    accel_ned = _target_accel_ned;
+
+    // record distance and heading for reporting purposes
+    if (is_zero(dist_vec.x) && is_zero(dist_vec.y)) {
+        clear_dist_and_bearing_to_target();
+    } else {
+        _dist_to_target = safe_sqrt(sq(dist_vec.x) + sq(dist_vec.y));
+        _bearing_to_target = degrees(atan2f(dist_vec.y, dist_vec.x));
+    }
+
+    return true;
+}
+
 // get target's heading in degrees (0 = north, 90 = east)
 bool AP_Follow::get_target_heading_deg(float &heading) const
 {
@@ -453,17 +525,20 @@ void AP_Follow::handle_msg(const mavlink_message_t &msg)
         // @Field: Yaw: Vehicle heading
         // @Field: YawR: Vehicle heading rate
         AP::logger().WriteStreaming("FOLL",
-            "TimeUS,Lat,Lon,Alt,VelN,VelE,VelD,Yaw,YawR",  // labels
-            "sDUmnnnhk",    // units
-            "F--B00000",    // mults
-            "QLLifffff",    // fmt
+            "TimeUS,Lat,Lon,Alt,VN,VE,VD,AN,AE,AD,Yaw,YawR",  // labels
+            "sDUmnnnooohk",    // units
+            "F--000000000",    // mults
+            "QLLfffffffff",    // fmt
             AP_HAL::micros64(),
             _target_location.lat,
             _target_location.lng,
-            _target_location.alt,
+            (double)_target_location.alt * 0.01, // cm -> m
             (double)_target_velocity_ned.x,
             (double)_target_velocity_ned.y,
             (double)_target_velocity_ned.z,
+            (double)_target_accel_ned.x,
+            (double)_target_accel_ned.y,
+            (double)_target_accel_ned.z,
             (double)_target_heading,          // Yaw in degrees
             (double)_target_heading_rate      // Yaw rate in radians per second
         );
