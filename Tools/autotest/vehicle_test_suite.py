@@ -1688,6 +1688,30 @@ class TestSuite(ABC):
             bits.append(path)
         return os.path.join(*bits)
 
+    def location_difference(loc1, loc2):
+        '''Returns a Vector3 representing the approximate difference
+        in meters between two GPS locations.'''
+        # Earth radius in meters
+        R = 6371000
+
+        # Convert degrees to radians
+        lat1 = math.radians(loc1.lat)
+        lat2 = math.radians(loc2.lat)
+        lng1 = math.radians(loc1.lng)
+        lng2 = math.radians(loc2.lng)
+
+        # Differences
+        d_lat = lat2 - lat1
+        d_lng = lng2 - lng1
+
+        # Approximate conversion
+        avg_lat = (lat1 + lat2) / 2.0
+        x = d_lng * R * math.cos(avg_lat)  # East-West
+        y = d_lat * R                      # North-South
+        z = loc2.alt - loc1.alt            # Vertical difference
+
+        return Vector3(x, y, z)
+
     def sitl_streamrate(self):
         """Allow subclasses to override SITL streamrate."""
         return 10
@@ -6326,6 +6350,14 @@ class TestSuite(ABC):
         # dlong /= 10000000.0
         #
         # return math.sqrt((dlat*dlat) + (dlong*dlong)) * 1.113195e5
+
+    @staticmethod
+    def location_from_int(int_message):
+        '''turn a GLOBAL_POSITION_INT message into a Location'''
+        loc_lat = TestSuite.get_lat_attr(int_message)
+        loc_lon = TestSuite.get_lon_attr(int_message)
+        loc_alt = int_message.alt
+        return mavutil.location(loc_lat*1e-7, loc_lon*1e-7, loc_alt*1e-3)
 
     def bearing_to(self, loc):
         '''return bearing from here to location'''
