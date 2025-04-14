@@ -3859,11 +3859,15 @@ class TestSuite(ABC):
             item.seq = count
             count += 1
 
-    def create_simple_relhome_mission(self, items_in, target_system=1, target_component=1):
+    def create_simple_relhome_mission(self, items_in, target_system=None, target_component=None):
         '''takes a list of (type, n, e, alt) items.  Creates a mission in
         absolute frame using alt as relative-to-home and n and e as
         offsets in metres from home'''
 
+        if target_system is None:
+            target_system = self.mav.target_system
+        if target_component is None:
+            target_component = self.mav.target_component
         # add a dummy waypoint for home
         items = [(mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 0, 0, 0)]
         items.extend(items_in)
@@ -3886,12 +3890,25 @@ class TestSuite(ABC):
             frame = mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT_INT
             if not self.ardupilot_stores_frame_for_cmd(t):
                 frame = mavutil.mavlink.MAV_FRAME_GLOBAL
-            ret.append(self.create_MISSION_ITEM_INT(t, seq=seq, frame=frame, x=int(lat*1e7), y=int(lng*1e7), z=alt))
+            ret.append(self.create_MISSION_ITEM_INT(
+                t,
+                seq=seq,
+                frame=frame,
+                x=int(lat*1e7),
+                y=int(lng*1e7),
+                z=alt,
+                target_system=target_system,
+                target_component=target_component,
+            ))
             seq += 1
 
         return ret
 
-    def upload_simple_relhome_mission(self, items, target_system=1, target_component=1):
+    def upload_simple_relhome_mission(self, items, target_system=None, target_component=None):
+        if target_system is None:
+            target_system = self.mav.target_system
+        if target_component is None:
+            target_component = self.mav.target_component
         mission = self.create_simple_relhome_mission(
             items,
             target_system=target_system,
@@ -5993,11 +6010,15 @@ class TestSuite(ABC):
             frame=mavutil.mavlink.MAV_FRAME_GLOBAL,
             autocontinue=0,
             current=0,
-            target_system=1,
-            target_component=1,
+            target_system=None,
+            target_component=None,
             seq=0,
             mission_type=mavutil.mavlink.MAV_MISSION_TYPE_MISSION,
     ):
+        if target_system is None:
+            target_system = self.mav.target_system
+        if target_component is None:
+            target_component = self.mav.target_component
         return self.mav.mav.mission_item_int_encode(
                 target_system,
                 target_component,
@@ -8177,6 +8198,8 @@ Also, ignores heartbeats not from our target system'''
         # self.mav.target_system will be zero because it hasn't
         # "locked on" to a target system yet.
         self.wait_heartbeat()
+        if self.mav.target_component == 0:
+            self.mav.target_component = 1
         self.set_streamrate(self.sitl_streamrate())
 
     def show_test_timings_key_sorter(self, t):
@@ -8706,8 +8729,8 @@ Also, ignores heartbeats not from our target system'''
 
     def upload_using_mission_protocol(self, mission_type, items):
         '''mavlink2 required'''
-        target_system = 1
-        target_component = 1
+        target_system = self.mav.target_system
+        target_component = self.mav.target_component
         self.do_timesync_roundtrip()
         tstart = self.get_sim_time()
         self.mav.mav.mission_count_send(target_system,
@@ -8756,7 +8779,10 @@ Also, ignores heartbeats not from our target system'''
             if items[m.seq].target_system != target_system:
                 raise NotAchievedException("supplied item not of correct target system")
             if items[m.seq].target_component != target_component:
-                raise NotAchievedException("supplied item not of correct target component")
+                raise NotAchievedException(
+                    "supplied item not of correct target component " +
+                    f"item={items[m.seq].target_component} " +
+                    "{target_component=}")
             if items[m.seq].seq != m.seq:
                 raise NotAchievedException("supplied item has incorrect sequence number (%u vs %u)" %
                                            (items[m.seq].seq, m.seq))
@@ -8778,8 +8804,8 @@ Also, ignores heartbeats not from our target system'''
 
     def download_using_mission_protocol(self, mission_type, verbose=False, timeout=10):
         '''mavlink2 required'''
-        target_system = 1
-        target_component = 1
+        target_system = self.mav.target_system
+        target_component = self.mav.target_system
         self.progress("Sending mission_request_list")
         tstart = self.get_sim_time()
         self.mav.mav.mission_request_list_send(target_system,
@@ -10575,10 +10601,14 @@ Also, ignores heartbeats not from our target system'''
             raise PreconditionFailedException("Receiving camera feedback")
         self.poll_message("CAMERA_FEEDBACK")
 
-    def clear_mission(self, mission_type, target_system=1, target_component=1):
+    def clear_mission(self, mission_type, target_system=None, target_component=None):
         '''clear mision_type from autopilot.  Note that this does NOT actually
         send a MISSION_CLEAR_ALL message
         '''
+        if target_system is None:
+            target_system = self.mav.target_system
+        if target_component is None:
+            target_component = self.mav.target_component
         if mission_type == mavutil.mavlink.MAV_MISSION_TYPE_ALL:
             # recurse
             if not self.is_tracker() and not self.is_blimp():
