@@ -184,9 +184,10 @@ bool ModeShipOperation::init(const bool ignore_checks)
         }
     }
 
-    Vector3f pos_delta_ned_m;  // vector to lead vehicle + offset_ned_cm
-    Vector3f pos_delta_with_ofs_ned_m;  // vector to lead vehicle + offset_ned_cm
+    Vector3f pos_ned_m;  // vector to lead vehicle + offset_ned_cm
+    Vector3f pos_with_ofs_ned_m;  // vector to lead vehicle + offset_ned_cm
     Vector3f vel_ned_ms;  // velocity of lead vehicle
+    Vector3f accel_ned_mss;  // acceleration of lead vehicle (Not used yet)
     offset_ned_cm.zero();
     
     if (!AP::ahrs().home_is_set()) {
@@ -201,12 +202,12 @@ bool ModeShipOperation::init(const bool ignore_checks)
         if (!ignore_checks) {
             return false;
         }
-    } else if (g2.follow.get_target_dist_and_vel_ned(pos_delta_ned_m, pos_delta_with_ofs_ned_m, vel_ned_ms)) {
+    } else if (g2.follow.get_target_pos_vel_accel_ned(pos_ned_m, pos_with_ofs_ned_m, vel_ned_ms, accel_ned_mss)) {
         const Vector3f &curr_pos_neu_cm = inertial_nav.get_position_neu_cm();
 
         Vector3f pos_with_ofs_ned_cm;  // vector to lead vehicle + offset_ned_cm
-        pos_with_ofs_ned_cm.xy() = curr_pos_neu_cm.xy() + pos_delta_with_ofs_ned_m.xy() * 100.0;
-        pos_with_ofs_ned_cm.z = -curr_pos_neu_cm.z + pos_delta_with_ofs_ned_m.z * 100.0;
+        pos_with_ofs_ned_cm.xy() = pos_with_ofs_ned_m.xy() * 100.0;
+        pos_with_ofs_ned_cm.z = pos_with_ofs_ned_m.z * 100.0;
         Vector3f vel_ned_cms = vel_ned_ms * 100.0;
         
         float target_heading_deg = 0.0f;
@@ -405,17 +406,17 @@ void ModeShipOperation::run()
             alt_home_above_origin_cm = 0;
         }
         // define target location
-        Vector3f pos_delta_ned_m;  // vector to lead vehicle + offset_ned_cm
-        Vector3f pos_delta_with_ofs_ned_m;  // vector to lead vehicle + offset_ned_cm
+        Vector3f pos_ned_m;  // vector to lead vehicle + offset_ned_cm
+        Vector3f pos_with_ofs_ned_m;  // vector to lead vehicle + offset_ned_cm
         Vector3f vel_ned_ms;  // velocity of lead vehicle
         Vector3f accel_ned_mss;  // accel of lead vehicle
-        if (g2.follow.get_target_dist_and_vel_ned(pos_delta_ned_m, pos_delta_with_ofs_ned_m, vel_ned_ms)) {
+        if (g2.follow.get_target_pos_vel_accel_ned(pos_ned_m, pos_with_ofs_ned_m, vel_ned_ms, accel_ned_mss)) {
             Vector3f vel_ned_cms = vel_ned_ms * 100.0;
             accel_ned_mss.zero(); // follow me should include acceleration so it is kept here for future functionality.
             // vel_ned_ms does not include the change in heading_rad + offset_ned_cm radius
             Vector3f pos_with_ofs_ned_cm;  // vector to lead vehicle + offset_ned_cm
-            pos_with_ofs_ned_cm.xy() = curr_pos_neu_cm.xy() + pos_delta_with_ofs_ned_m.xy() * 100.0;
-            pos_with_ofs_ned_cm.z = -curr_pos_neu_cm.z + pos_delta_with_ofs_ned_m.z * 100.0;
+            pos_with_ofs_ned_cm.xy() = pos_with_ofs_ned_m.xy() * 100.0;
+            pos_with_ofs_ned_cm.z = pos_with_ofs_ned_m.z * 100.0;
     
             float target_heading_deg = 0.0f;
             g2.follow.get_target_heading_deg(target_heading_deg);
