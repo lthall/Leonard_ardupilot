@@ -8239,6 +8239,13 @@ Also, ignores heartbeats not from our target system'''
         if self.statustext_id > 255:
             self.statustext_id = 1
 
+    def send_named_value_float(self, name, value):
+        if sys.version_info.major >= 3 and not isinstance(name, bytes):
+            name = bytes(name, "ascii")
+        elif 'unicode' in str(type(name)):
+            name = name.encode('ascii')
+        self.mav.mav.named_value_float_send(0, name, value)
+
     def get_stacktrace(self):
         return ''.join(traceback.format_stack())
 
