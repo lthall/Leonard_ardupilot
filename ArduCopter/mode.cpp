@@ -143,6 +143,12 @@ Mode *Copter::mode_from_mode_num(const Mode::Number mode)
             break;
 #endif
 
+#if MODE_CRANE_ENABLED == ENABLED
+        case Mode::Number::CRANE:
+            ret = (Mode *)g2.mode_crane_ptr;
+            break;
+#endif
+
 #if MODE_SMARTRTL_ENABLED == ENABLED
         case Mode::Number::SMART_RTL:
             ret = &mode_smartrtl;

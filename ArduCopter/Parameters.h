@@ -594,6 +594,11 @@ public:
     // we need a pointer to the mode for the G2 table
     void *mode_shipops_ptr;
 #endif
+
+#if MODE_CRANE_ENABLED == ENABLED
+    // we need a pointer to the mode for the G2 table
+    void *mode_crane_ptr;
+#endif
     
 #if MODE_FOLLOW_ENABLED == ENABLED
     // follow

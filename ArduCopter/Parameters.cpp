@@ -1181,6 +1181,12 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     // @Path: mode_ship_ops.cpp
     AP_SUBGROUPPTR(mode_shipops_ptr, "SHIP_", 60, ParametersG2, ModeShipOperation),
 #endif
+
+#if MODE_CRANE_ENABLED == ENABLED
+    // @Group: CRANE_
+    // @Path: mode_crane.cpp
+    AP_SUBGROUPPTR(mode_crane_ptr, "CRANE_", 62, ParametersG2, ModeCrane),
+#endif
     
     // ID 62 is reserved for the SHOW_... parameters from the Skybrush fork at
     // https://github.com/skybrush-io/ardupilot
@@ -1322,6 +1328,9 @@ ParametersG2::ParametersG2(void)
 #endif
 #if MODE_SHIP_OPS_ENABLED == ENABLED
     ,mode_shipops_ptr(&copter.mode_ship_ops)
+#endif
+#if MODE_CRANE_ENABLED == ENABLED
+    ,mode_crane_ptr(&copter.mode_crane)
 #endif
 
 #if WEATHERVANE_ENABLED == ENABLED

@@ -108,6 +108,7 @@ public:
         AUTO_RTL =     27,  // Auto RTL, this is not a true mode, AUTO will report as this mode if entered to perform a DO_LAND_START Landing sequence
         TURTLE =       28,  // Flip over after crash
         SHIP_OPS =     29,  // Provides semi-autonomous landing on a moving platform
+        CRANE =        30,  // velocity controlled mode with additional features for industrial applications
 
         // Mode number 127 reserved for the "drone show mode" in the Skybrush
         // fork at https://github.com/skybrush-io/ardupilot
@@ -1586,6 +1587,64 @@ private:
     bool xy_position_control_permitted;
 };
 #endif // MODE_SHIP_OPS_ENABLED
+
+
+#if MODE_CRANE_ENABLED == ENABLED
+class ModeCrane : public Mode {
+
+public:
+    // inherit constructor
+    using Mode::Mode;
+    ModeCrane(void);
+    Number mode_number() const override { return Number::CRANE; }
+
+    bool init(bool ignore_checks) override;
+    void run() override;
+
+    bool requires_GPS() const override { return true; }
+    bool has_manual_throttle() const override { return false; }
+    bool allows_arming(AP_Arming::Method method) const override { return true; };
+    bool is_autopilot() const override { return false; }
+    bool has_user_takeoff(bool must_navigate) const override { return true; }
+
+    // SHIP_OPS states
+    enum class SpeedMode : uint8_t {
+        HIGH,
+        MEDIUM,
+        LOW
+    };
+
+    void set_speed_mode(SpeedMode new_speed_mode);
+    void speed_mode_message();
+    void get_speed_mode_vel_accel(float &vel, float &accel);
+
+    // var_info for holding Parameter information
+    static const struct AP_Param::GroupInfo var_info[];
+
+protected:
+
+    const char *name() const override { return "CRANE"; }
+    const char *name4() const override { return "CRAN"; }
+
+    uint32_t wp_distance() const override;
+    int32_t wp_bearing() const override;
+    float crosstrack_error() const override { return pos_control->crosstrack_error();}
+
+private:
+
+    SpeedMode speed_mode = SpeedMode::LOW;  // records speed mode
+
+    // Crane parameters
+    AP_Float vel_high_ms;
+    AP_Float accel_high_mss;
+    AP_Float vel_med_ms;
+    AP_Float accel_med_mss;
+    AP_Float vel_low_ms;
+    AP_Float accel_low_mss;
+
+    bool xy_position_control_permitted;
+};
+#endif // MODE_CRANE_ENABLED
 
 
 class ModeSmartRTL : public ModeRTL {

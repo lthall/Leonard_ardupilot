@@ -209,6 +209,7 @@ public:
     friend class ModeAvoidADSB;
     friend class ModeBrake;
     friend class ModeCircle;
+    friend class ModeCrane;
     friend class ModeDrift;
     friend class ModeFlip;
     friend class ModeFlowHold;
@@ -1066,6 +1067,9 @@ private:
 #endif
 #if MODE_SHIP_OPS_ENABLED == ENABLED
     ModeShipOperation mode_ship_ops;
+#endif
+#if MODE_CRANE_ENABLED == ENABLED
+    ModeCrane mode_crane;
 #endif
 
     // mode.cpp

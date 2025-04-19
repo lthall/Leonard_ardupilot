@@ -513,6 +513,22 @@ bool RC_Channel_Copter::do_aux_function(const aux_func_t ch_option, const AuxSwi
             break;
 #endif
 
+#if MODE_CRANE_ENABLED == ENABLED
+        case AUX_FUNC::CRANE_SPEED:
+            switch (ch_flag) {
+                case AuxSwitchPos::LOW:
+                    copter.mode_crane.set_speed_mode(ModeCrane::SpeedMode::LOW);
+                    break;
+                case AuxSwitchPos::MIDDLE:
+                    copter.mode_crane.set_speed_mode(ModeCrane::SpeedMode::MEDIUM);
+                    break;
+                case AuxSwitchPos::HIGH:
+                    copter.mode_crane.set_speed_mode(ModeCrane::SpeedMode::HIGH);
+                    break;
+            }
+            break;
+#endif
+
         case AUX_FUNC::STABILIZE:
             do_aux_function_change_mode(Mode::Number::STABILIZE, ch_flag);
             break;
