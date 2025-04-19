@@ -253,6 +253,7 @@ public:
 
         TIE_DOWN_RELEASE =   179, // Operate tie down release low=open, middle=auto, high=close
         SHIP_OPS_MODE =      180, // Set Ship Ops Mode low=Payload_Place, middle=Approach, high=Approach
+        CRANE_SPEED =        181, // Set Crane Speed low=setting low, middle=setting medium, high=setting high
 
         // inputs from 200 will eventually used to replace RCMAP
         ROLL =               201, // roll input
