@@ -153,6 +153,8 @@ void ModeCrane::run()
     get_speed_mode_vel_accel(vel_max_cms, accel_max_cmss);
     pos_control->set_max_speed_accel_xy(vel_max_cms, accel_max_cmss);
 
+    Vector3p pos_target_old_neu_cm = pos_control->get_pos_target_cm();
+
     // process pilot inputs unless we are in radio failsafe
     if (!copter.failsafe.radio) {
         // apply SIMPLE mode transform to pilot inputs
@@ -232,6 +234,19 @@ void ModeCrane::run()
         // Send the commanded climb rate to the position controller
         pos_control->set_pos_target_z_from_climb_rate_cm(target_climb_rate_cms);
         break;
+    }
+
+    Vector2f vel_desired_unit = pos_control->get_vel_desired_cms().xy().normalized();
+    if (!vel_desired_unit.is_zero()) {
+        // prevent position controller target from moving in front of our current position
+        Vector3p pos_target_new_neu_cm = pos_control->get_pos_target_cm();
+        Vector2f delta_pos_target = (pos_target_new_neu_cm.xy() - pos_target_old_neu_cm.xy()).tofloat();
+        Vector2f delta_pos_current = pos_target_new_neu_cm.xy().tofloat() - pos_control->get_pos_neu_cm().xy();
+        float delta_pos_target_dir = vel_desired_unit * delta_pos_target;
+        float delta_pos_current_dir = vel_desired_unit * delta_pos_current;
+        delta_pos_target_dir = constrain_float(delta_pos_target_dir-delta_pos_current_dir, 0.0, delta_pos_target_dir);
+        pos_control->set_pos_target_xy_cm(pos_target_old_neu_cm.x + delta_pos_target_dir * vel_desired_unit.x,
+                                          pos_target_old_neu_cm.y + delta_pos_target_dir * vel_desired_unit.y);
     }
 
     // update the position controller
