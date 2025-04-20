@@ -117,21 +117,25 @@ void ModeCrane::speed_mode_message()
     }
 }
 
-void ModeCrane::get_speed_mode_vel_accel(float &vel, float &accel)
+void ModeCrane::get_speed_mode_vel_accel(float &vel_cms, float &accel_cmss)
 {
+    float accel_new_cmss = accel_cmss;
     switch (speed_mode) {
     case SpeedMode::HIGH:
-        vel = vel_high_ms * 100.0;
-        accel = accel_high_mss * 100.0;
+        vel_cms = vel_high_ms * 100.0;
+        accel_new_cmss = accel_high_mss * 100.0;
         break;
     case SpeedMode::MEDIUM:
-        vel = vel_med_ms * 100.0;
-        accel = accel_med_mss * 100.0;
+        vel_cms = vel_med_ms * 100.0;
+        accel_new_cmss = accel_med_mss * 100.0;
         break;
     case SpeedMode::LOW:
-        vel = vel_low_ms * 100.0;
-        accel = accel_low_mss * 100.0;
+        vel_cms = vel_low_ms * 100.0;
+        accel_new_cmss = accel_low_mss * 100.0;
         break;
+    }
+    if (pos_control->get_vel_desired_cms().xy().length() <= vel_cms) {
+        accel_cmss = accel_new_cmss;
     }
 }
 
@@ -240,12 +244,12 @@ void ModeCrane::run()
 
 uint32_t ModeCrane::wp_distance() const
 {
-    return loiter_nav->get_distance_to_target();
+    return pos_control->get_pos_error_xy_cm();;
 }
 
 int32_t ModeCrane::wp_bearing() const
 {
-    return loiter_nav->get_bearing_to_target();
+    return pos_control->get_bearing_to_target_cd();
 }
 
 #endif
