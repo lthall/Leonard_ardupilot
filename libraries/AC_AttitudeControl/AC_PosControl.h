@@ -254,6 +254,9 @@ public:
 
     /// Position
 
+    /// get_pos_neu_cm - returns the current position of the aircraft used by the position controller, frame NEU in cm relative to the EKF origin
+    const Vector3f get_pos_neu_cm() const { return _inav.get_position_neu_cm(); }
+
     /// set_pos_target_xy_cm - sets the position target, frame NEU in cm relative to the EKF origin
     void set_pos_target_xy_cm(float pos_x, float pos_y) { _pos_target.x = pos_x; _pos_target.y = pos_y; }
 
