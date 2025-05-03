@@ -564,7 +564,7 @@ public:
     bool configured(void) const;
 
     // return true if the parameter is read-only
-    bool is_read_only(void) const;
+    bool is_writable(void) const;
 
     // return the persistent top level key for the ParamToken key
     static uint16_t get_persistent_key(uint16_t key) { return var_info(key).key; }
@@ -767,7 +767,7 @@ private:
     static float get_default_value(const AP_Param *object_ptr, const struct GroupInfo &info);
     static float get_default_value(const AP_Param *object_ptr, const struct Info &info);
 
-    static bool parse_param_line(char *line, char **vname, float &value, bool &read_only);
+    static bool parse_param_line(char *line, char **vname, float &value, bool &writable);
 
     /*
       load a parameter defaults file. This happens as part of load_all()
@@ -791,7 +791,7 @@ private:
     static void load_embedded_param_defaults(bool last_pass);
 
     // return true if the parameter is configured in the defaults file
-    bool configured_in_defaults_file(bool &read_only) const;
+    bool configured_in_defaults_file(bool &writable) const;
 
     // return true if the parameter is configured in EEPROM/FRAM
     bool configured_in_storage(void) const;
@@ -836,12 +836,12 @@ private:
     struct param_override {
         const AP_Param *object_ptr;
         float value;
-        bool read_only; // param is marked @READONLY
+        bool writable; // param is marked @WRITABLE
     };
     static struct param_override *param_overrides;
     static uint16_t num_param_overrides;
     static uint16_t param_overrides_len;
-    static uint16_t num_read_only;
+    static uint16_t num_writable;
 
     // values filled into the EEPROM header
     static const uint8_t        k_EEPROM_magic0      = 0x50;

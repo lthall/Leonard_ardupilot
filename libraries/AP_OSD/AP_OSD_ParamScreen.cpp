@@ -296,7 +296,7 @@ void AP_OSD_ParamScreen::modify_parameter(uint8_t number, Event ev)
     const AP_OSD_ParamSetting& setting = params[number-1];
     AP_Param* p = setting._param;
 
-    if (p == nullptr || p->is_read_only()) {
+    if (p == nullptr || !p->is_writable()) {
         return;
     }
 

@@ -1084,7 +1084,7 @@ void AP_DDS_Client::on_request(uxrSession* uxr_session, uxrObjectId object_id, u
                 }
             }
 
-            if ((parameter_flags & AP_PARAM_FLAG_INTERNAL_USE_ONLY) || vp->is_read_only()) {
+            if ((parameter_flags & AP_PARAM_FLAG_INTERNAL_USE_ONLY) || vp->is_writable()) {
                 set_parameter_response.results[i].successful = false;
                 strncpy(set_parameter_response.results[i].reason, "Parameter is read only",sizeof(set_parameter_response.results[i].reason));
                 continue;

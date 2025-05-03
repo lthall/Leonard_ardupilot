@@ -110,7 +110,7 @@ const AP_Param::Info *AP_Param::_var_info;
 struct AP_Param::param_override *AP_Param::param_overrides;
 uint16_t AP_Param::param_overrides_len;
 uint16_t AP_Param::num_param_overrides;
-uint16_t AP_Param::num_read_only;
+uint16_t AP_Param::num_writable;
 
 // goes true if we run out of param space
 bool AP_Param::eeprom_full;
@@ -1405,7 +1405,7 @@ bool AP_Param::configured_in_storage(void) const
     return scan(&phdr, &ofs) && (phdr.type == AP_PARAM_VECTOR3F || idx == 0);
 }
 
-bool AP_Param::configured_in_defaults_file(bool &read_only) const
+bool AP_Param::configured_in_defaults_file(bool &writable) const
 {
     if (num_param_overrides == 0) {
         return false;
@@ -1422,7 +1422,7 @@ bool AP_Param::configured_in_defaults_file(bool &read_only) const
 
     for (uint16_t i=0; i<num_param_overrides; i++) {
         if (this == param_overrides[i].object_ptr) {
-            read_only = param_overrides[i].read_only;
+            writable = param_overrides[i].writable;
             return true;
         }
     }
@@ -1432,18 +1432,18 @@ bool AP_Param::configured_in_defaults_file(bool &read_only) const
 
 bool AP_Param::configured(void) const
 {
-    bool read_only;
-    return configured_in_defaults_file(read_only) || configured_in_storage();
+    bool writable;
+    return configured_in_defaults_file(writable) || configured_in_storage();
 }
 
-bool AP_Param::is_read_only(void) const
+bool AP_Param::is_writable(void) const
 {
-    if (num_read_only == 0) {
+    if (num_writable == 0) {
         return false;
     }
-    bool read_only;
-    if (configured_in_defaults_file(read_only)) {
-        return read_only;
+    bool writable;
+    if (configured_in_defaults_file(writable)) {
+        return writable;
     }
     return false;
 }
@@ -2239,7 +2239,7 @@ void AP_Param::set_float(float value, enum ap_var_type var_type)
 /*
   parse a parameter file line
  */
-bool AP_Param::parse_param_line(char *line, char **vname, float &value, bool &read_only)
+bool AP_Param::parse_param_line(char *line, char **vname, float &value, bool &writable)
 {
     if (line[0] == '#') {
         return false;
@@ -2274,10 +2274,10 @@ bool AP_Param::parse_param_line(char *line, char **vname, float &value, bool &re
     *vname = pname;
 
     const char *flags_s = strtok_r(nullptr, ", =\t\r\n", &saveptr);
-    if (flags_s && strcmp(flags_s, "@READONLY") == 0) {
-        read_only = true;
+    if (flags_s && strcmp(flags_s, "@WRITABLE") == 0) {
+        writable = true;
     } else {
-        read_only = false;
+        writable = false;
     }
 
     return true;
@@ -2302,8 +2302,8 @@ bool AP_Param::count_defaults_in_file(const char *filename, uint16_t &num_defaul
     while (AP::FS().fgets(line, sizeof(line)-1, file_apfs)) {
         char *pname;
         float value;
-        bool read_only;
-        if (!parse_param_line(line, &pname, value, read_only)) {
+        bool writable;
+        if (!parse_param_line(line, &pname, value, writable)) {
             continue;
         }
         enum ap_var_type var_type;
@@ -2331,8 +2331,8 @@ bool AP_Param::read_param_defaults_file(const char *filename, bool last_pass, ui
     while (AP::FS().fgets(line, sizeof(line)-1, file_apfs)) {
         char *pname;
         float value;
-        bool read_only;
-        if (!parse_param_line(line, &pname, value, read_only)) {
+        bool writable;
+        if (!parse_param_line(line, &pname, value, writable)) {
             continue;
         }
         enum ap_var_type var_type;
@@ -2356,9 +2356,9 @@ bool AP_Param::read_param_defaults_file(const char *filename, bool last_pass, ui
         }
         param_overrides[idx].object_ptr = vp;
         param_overrides[idx].value = value;
-        param_overrides[idx].read_only = read_only;
-        if (read_only) {
-            num_read_only++;
+        param_overrides[idx].writable = writable;
+        if (writable) {
+            num_writable++;
         }
         idx++;
         if (!vp->configured_in_storage()) {
@@ -2401,7 +2401,7 @@ bool AP_Param::load_defaults_file(const char *filename, bool last_pass)
     delete[] param_overrides;
     param_overrides_len = 0;
     num_param_overrides = 0;
-    num_read_only = 0;
+    num_writable = 0;
 
     param_overrides = NEW_NOTHROW param_override[num_defaults];
     if (param_overrides == nullptr) {
@@ -2448,7 +2448,7 @@ bool AP_Param::count_param_defaults(const volatile char *ptr, int32_t length, ui
         char line[100];
         char *pname;
         float value;
-        bool read_only;
+        bool writable;
         uint16_t i;
         uint16_t n = length;
         for (i=0;i<n;i++) {
@@ -2468,7 +2468,7 @@ bool AP_Param::count_param_defaults(const volatile char *ptr, int32_t length, ui
             continue;
         }
 
-        if (!parse_param_line(line, &pname, value, read_only)) {
+        if (!parse_param_line(line, &pname, value, writable)) {
             continue;
         }
 
@@ -2491,7 +2491,7 @@ void AP_Param::load_param_defaults(const volatile char *ptr, int32_t length, boo
     param_overrides = nullptr;
     param_overrides_len = 0;
     num_param_overrides = 0;
-    num_read_only = 0;
+    num_writable = 0;
 
     uint16_t num_defaults = 0;
     if (!count_param_defaults(ptr, length, num_defaults)) {
@@ -2512,7 +2512,7 @@ void AP_Param::load_param_defaults(const volatile char *ptr, int32_t length, boo
         char line[100];
         char *pname;
         float value;
-        bool read_only;
+        bool writable;
         uint16_t i;
         uint16_t n = length;
         for (i=0;i<n;i++) {
@@ -2532,7 +2532,7 @@ void AP_Param::load_param_defaults(const volatile char *ptr, int32_t length, boo
             continue;
         }
         
-        if (!parse_param_line(line, &pname, value, read_only)) {
+        if (!parse_param_line(line, &pname, value, writable)) {
             continue;
         }
         enum ap_var_type var_type;
@@ -2551,9 +2551,9 @@ void AP_Param::load_param_defaults(const volatile char *ptr, int32_t length, boo
         }
         param_overrides[idx].object_ptr = vp;
         param_overrides[idx].value = value;
-        param_overrides[idx].read_only = read_only;
-        if (read_only) {
-            num_read_only++;
+        param_overrides[idx].writable = writable;
+        if (writable) {
+            num_writable++;
         }
         idx++;
         if (!vp->configured_in_storage()) {

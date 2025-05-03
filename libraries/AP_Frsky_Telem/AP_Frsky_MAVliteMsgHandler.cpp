@@ -222,7 +222,7 @@ void AP_Frsky_MAVliteMsgHandler::handle_param_set(const AP_Frsky_MAVlite_Message
             parameter_flags &= ~AP_PARAM_FLAG_INTERNAL_USE_ONLY;
         }
     }
-    if ((parameter_flags & AP_PARAM_FLAG_INTERNAL_USE_ONLY) || vp->is_read_only()) {
+    if ((parameter_flags & AP_PARAM_FLAG_INTERNAL_USE_ONLY) || !vp->is_writable()) {
         GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Param write denied (%s)", param_name);
     } else if (!AP_Param::set_and_save_by_name(param_name, param_value)) {
         GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Param write failed (%s)", param_name);

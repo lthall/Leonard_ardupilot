@@ -346,7 +346,7 @@ bool AP_OSD_ParamSetting::set_by_name(const char* name, uint8_t config_type, flo
 // only called when a change has been made
 void AP_OSD_ParamSetting::guess_ranges(bool force)
 {
-    if (_param->is_read_only()) {
+    if (!_param->is_writable()) {
         return;
     }
 
