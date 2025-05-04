@@ -289,7 +289,7 @@ void GCS_MAVLINK::handle_param_set(const mavlink_message_t &msg)
         }
     }
 
-    if ((parameter_flags & AP_PARAM_FLAG_INTERNAL_USE_ONLY) || !vp->is_writable()) {
+    if ((parameter_flags & AP_PARAM_FLAG_INTERNAL_USE_ONLY) || !(vp->is_writable() || AP_BoardConfig::allow_set_internal_parameters())) {
         GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Param write denied (%s)", key);
         // send the readonly value
         send_parameter_value(key, var_type, old_value);
