@@ -53,6 +53,8 @@ public:
     void set_dt(float dt) { _dt = dt; }
     float get_dt() const { return _dt; }
 
+    void update_estimates();
+
     /// get_shaping_jerk_NE_cmsss - gets the jerk limit of the ne kinematic path generation in cm/s/s/s
     float get_shaping_jerk_NE_cmsss() const { return _shaping_jerk_ne_msss * 100.0; }
 
@@ -555,8 +557,10 @@ protected:
     float       _yaw_rate_target_cds;       // desired yaw rate in centi-degrees per second calculated by position controller
 
     // position controller internal variables
+    Vector3p    _pos_estimate_ned_m;
     Vector3p    _pos_desired_neu_cm;        // desired location, frame NEU in cm relative to the EKF origin.  This is equal to the _pos_target minus offsets
     Vector3p    _pos_target_neu_cm;         // target location, frame NEU in cm relative to the EKF origin.  This is equal to the _pos_desired_neu_cm plus offsets
+    Vector3f    _vel_estimate_ned_ms;
     Vector3f    _vel_desired_neu_cms;       // desired velocity in NEU cm/s
     Vector3f    _vel_target_neu_cms;        // velocity target in NEU cm/s calculated by pos_to_rate step
     Vector3f    _accel_desired_neu_cmss;    // desired acceleration in NEU cm/s/s (feed forward)

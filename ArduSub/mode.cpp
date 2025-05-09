@@ -155,6 +155,7 @@ bool Sub::set_mode(const uint8_t new_mode, const ModeReason reason)
 // called at 100hz or more
 void Sub::update_flight_mode()
 {
+    pos_control.update_estimates();
     flightmode->run();
 }
 
