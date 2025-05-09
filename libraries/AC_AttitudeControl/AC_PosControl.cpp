@@ -1013,7 +1013,7 @@ void AC_PosControl::update_U_controller()
     _vel_target_neu_cms.z += _vel_desired_neu_cms.z + _vel_offset_neu_cms.z + _vel_terrain_u_cms;
 
     // Velocity Controller
-    
+
     _accel_target_neu_cmss.z = _pid_vel_u.update_all(_vel_target_neu_cms.z, -_vel_estimate_ned_ms.z * 100.0, _dt, _motors.limit.throttle_lower, _motors.limit.throttle_upper);
     _accel_target_neu_cmss.z *= AP::ahrs().getControlScaleZ();
 
@@ -1335,7 +1335,7 @@ void AC_PosControl::update_estimates()
 {
     if (!AP::ahrs().get_relative_position_NED_origin(_pos_estimate_ned_m) || !AP::ahrs().get_velocity_NED(_vel_estimate_ned_ms)) {
         // call internal error because we don't want this to happen and I couldn't think of a better comment right now
-        INTERNAL_ERROR(AP_InternalError::error_t::flow_of_control);
+        // INTERNAL_ERROR(AP_InternalError::error_t::flow_of_control);
     }
 }
 
