@@ -1343,7 +1343,7 @@ void AC_PosControl::update_estimates(bool high_vibes)
     if (!AP::ahrs().get_velocity_NED(_vel_estimate_ned_ms) || high_vibes) {
         float rate_z;
         if (AP::ahrs().get_vert_pos_rate_D(rate_z)) {
-            _vel_estimate_ned_ms.z = -rate_z * 100; // convert from m/s in NED to cm/s in NEU
+            _vel_estimate_ned_ms.z = rate_z;
         }
     }
 }
