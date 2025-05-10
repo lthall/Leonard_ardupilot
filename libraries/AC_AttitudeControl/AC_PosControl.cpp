@@ -1331,11 +1331,20 @@ int32_t AC_PosControl::get_bearing_to_target_cd() const
 ///
 
 
-void AC_PosControl::update_estimates()
+void AC_PosControl::update_estimates(bool high_vibes)
 {
-    if (!AP::ahrs().get_relative_position_NED_origin(_pos_estimate_ned_m) || !AP::ahrs().get_velocity_NED(_vel_estimate_ned_ms)) {
-        // call internal error because we don't want this to happen and I couldn't think of a better comment right now
-        // INTERNAL_ERROR(AP_InternalError::error_t::flow_of_control);
+    if (!AP::ahrs().get_relative_position_NED_origin(_pos_estimate_ned_m)) {
+        float posD;
+        if (AP::ahrs().get_relative_position_D_origin_float(posD)) {
+            _pos_estimate_ned_m.z = posD;
+        }
+    }
+
+    if (!AP::ahrs().get_velocity_NED(_vel_estimate_ned_ms) || high_vibes) {
+        float rate_z;
+        if (AP::ahrs().get_vert_pos_rate_D(rate_z)) {
+            _vel_estimate_ned_ms.z = -rate_z * 100; // convert from m/s in NED to cm/s in NEU
+        }
     }
 }
 

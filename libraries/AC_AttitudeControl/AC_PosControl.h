@@ -53,7 +53,7 @@ public:
     void set_dt(float dt) { _dt = dt; }
     float get_dt() const { return _dt; }
 
-    void update_estimates();
+    void update_estimates(bool high_vibes = false);
 
     /// get_shaping_jerk_NE_cmsss - gets the jerk limit of the ne kinematic path generation in cm/s/s/s
     float get_shaping_jerk_NE_cmsss() const { return _shaping_jerk_ne_msss * 100.0; }
