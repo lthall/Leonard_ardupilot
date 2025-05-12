@@ -358,6 +358,9 @@ define MODE_THROW_ENABLED 0
 define MODE_TURTLE_ENABLED 0
 define MODE_ZIGZAG_ENABLED 0
 
+define HAL_PERIPH_ENABLE_SERIAL_OPTIONS
+define AP_NETWORKING_BACKEND_PPP 1
+
 USE_BOOTLOADER_FROM_BOARD Durandal
 
 ROMFS scripts/LedFlash.lua libraries/AP_HAL_ChibiOS/hwdef/Callisto/scripts/LedFlash.lua
