@@ -892,6 +892,96 @@ void AP_Follow::Log_Write_FOLL()
                                 loc_estimate.lng,
                                 loc_estimate.alt
                                 );
+
+
+    // @LoggerMessage: TX
+    // @Description: Follow target tracking on X axis (North)
+    // @Field: TimeUS: Time since system startup (microseconds)
+    // @Field: TP: Target position X in NED frame (meters)
+    // @Field: TV: Target velocity X in NED frame (m/s)
+    // @Field: TA: Target acceleration X in NED frame (m/s^2)
+    // @Field: P: Estimated position X in NED frame (meters)
+    // @Field: V: Estimated velocity X in NED frame (m/s)
+    // @Field: A: Estimated acceleration X in NED frame (m/s^2)
+    // @Field: OP: Offset-corrected position X in NED frame (meters)
+    // @Field: OV: Offset-corrected velocity X in NED frame (m/s)
+    // @Field: OA: Offset-corrected acceleration X in NED frame (m/s^2)
+
+    AP::logger().Write("TX",
+        "TimeUS,TP,TV,TA,P,V,A,OP,OV,OA",
+        "smnomnomno",
+        "F000000000",
+        "Qfffffffff",
+        AP_HAL::micros64(),
+        double(_target_pos_ned_m.x),
+        double(_target_vel_ned_ms.x),
+        double(_target_accel_ned_mss.x),
+        double(_estimate_pos_ned_m.x),
+        double(_estimate_vel_ned_ms.x),
+        double(_estimate_accel_ned_mss.x),
+        double(_ofs_estimate_pos_ned_m.x),
+        double(_ofs_estimate_vel_ned_ms.x),
+        double(_ofs_estimate_accel_ned_mss.x));
+
+    // @LoggerMessage: TY
+    // @Description: Follow target tracking on Y axis (East)
+    // @Field: TimeUS: Time since system startup (microseconds)
+    // @Field: TP: Target position Y in NED frame (meters)
+    // @Field: TV: Target velocity Y in NED frame (m/s)
+    // @Field: TA: Target acceleration Y in NED frame (m/s^2)
+    // @Field: P: Estimated position Y in NED frame (meters)
+    // @Field: V: Estimated velocity Y in NED frame (m/s)
+    // @Field: A: Estimated acceleration Y in NED frame (m/s^2)
+    // @Field: OP: Offset-corrected position Y in NED frame (meters)
+    // @Field: OV: Offset-corrected velocity Y in NED frame (m/s)
+    // @Field: OA: Offset-corrected acceleration Y in NED frame (m/s^2)
+
+
+    AP::logger().Write("TY",
+        "TimeUS,TP,TV,TA,P,V,A,OP,OV,OA",
+        "smnomnomno",
+        "F000000000",
+        "Qfffffffff",
+        AP_HAL::micros64(),
+        double(_target_pos_ned_m.y),
+        double(_target_vel_ned_ms.y),
+        double(_target_accel_ned_mss.y),
+        double(_estimate_pos_ned_m.y),
+        double(_estimate_vel_ned_ms.y),
+        double(_estimate_accel_ned_mss.y),
+        double(_ofs_estimate_pos_ned_m.y),
+        double(_ofs_estimate_vel_ned_ms.y),
+        double(_ofs_estimate_accel_ned_mss.y));
+
+    // @LoggerMessage: TZ
+    // @Description: Follow target tracking on Z axis (Down)
+    // @Field: TimeUS: Time since system startup (microseconds)
+    // @Field: TP: Target position Z in NED frame (meters)
+    // @Field: TV: Target velocity Z in NED frame (m/s)
+    // @Field: TA: Target acceleration Z in NED frame (m/s^2)
+    // @Field: P: Estimated position Z in NED frame (meters)
+    // @Field: V: Estimated velocity Z in NED frame (m/s)
+    // @Field: A: Estimated acceleration Z in NED frame (m/s^2)
+    // @Field: OP: Offset-corrected position Z in NED frame (meters)
+    // @Field: OV: Offset-corrected velocity Z in NED frame (m/s)
+    // @Field: OA: Offset-corrected acceleration Z in NED frame (m/s^2)
+
+
+    AP::logger().Write("TZ",
+        "TimeUS,TP,TV,TA,P,V,A,OP,OV,OA",
+        "smnomnomno",
+        "F000000000",
+        "Qfffffffff",
+        AP_HAL::micros64(),
+        double(_target_pos_ned_m.z),
+        double(_target_vel_ned_ms.z),
+        double(_target_accel_ned_mss.z),
+        double(_estimate_pos_ned_m.z),
+        double(_estimate_vel_ned_ms.z),
+        double(_estimate_accel_ned_mss.z),
+        double(_ofs_estimate_pos_ned_m.z),
+        double(_ofs_estimate_vel_ned_ms.z),
+        double(_ofs_estimate_accel_ned_mss.z));
 }
 #endif  // HAL_LOGGING_ENABLED
 
