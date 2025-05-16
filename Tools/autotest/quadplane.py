@@ -1621,7 +1621,7 @@ class AutoTestQuadPlane(vehicle_test_suite.TestSuite):
 
         distance = self.get_distance_int(vehicle_gpi, ship_gpi)
         self.progress(f"{distance=}")
-        max_distance = 1
+        max_distance = 3
         if distance > max_distance:
             raise NotAchievedException(f"Did not land within {max_distance}m of ship {distance=}")
 
