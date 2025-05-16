@@ -319,7 +319,18 @@ bool AP_Follow::update_estimate()
     update_dist_and_bearing_to_target();
 
     _last_estimation_update_ms = now;
-    // _estimate_valid must be true here
+
+    // Check if the target is within the maximum distance
+    Vector3f current_position_ned_m;
+    if (!AP::ahrs().get_relative_position_NED_origin(current_position_ned_m)) {
+        return false;
+    }
+    const Vector3p dist_vec_ned_m = _target_pos_ned_m - current_position_ned_m.topostype();
+    // If _dist_max_m is not positive, we don't check the distance
+    if (is_positive(_dist_max_m.get()) && (dist_vec_ned_m.length() > _dist_max_m)) {
+        return false;
+    }
+    
     return true;
 }
 
@@ -448,8 +459,8 @@ void AP_Follow::handle_msg(const mavlink_message_t &msg)
 {
     // Invalidate the estimate if no position update has been received within the timeout period.
     // If using automatic sysid tracking, clear the sysid and reset tracking state.
-        if ((_last_location_update_ms == 0) ||
-            (AP_HAL::millis() - _last_location_update_ms > AP_FOLLOW_SYSID_TIMEOUT_MS)) {
+    if ((_last_location_update_ms == 0) ||
+        (AP_HAL::millis() - _last_location_update_ms > AP_FOLLOW_SYSID_TIMEOUT_MS)) {
         if (_automatic_sysid) {
             _sysid.set(0);         // clear target system ID
             _sysid_used = 0;       // reset used sysid tracking
@@ -635,17 +646,6 @@ bool AP_Follow::handle_global_position_int_message(const mavlink_message_t &msg)
         _target_heading_rate_degs = 0.0f;
     }
 
-    // Check if the target is within the maximum distance
-    Vector3f current_position_ned_m;
-    if (!AP::ahrs().get_relative_position_NED_origin(current_position_ned_m)) {
-        return false;
-    }
-    const Vector3p dist_vec_ned_m = _target_pos_ned_m - current_position_ned_m.topostype();
-    // If _dist_max_m is not positive, we don't check the distance
-    if (is_positive(_dist_max_m.get()) && (dist_vec_ned_m.length() > _dist_max_m)) {
-        return false;
-    }
-
     // apply jitter-corrected timestamp to this update
     _last_location_update_ms = _jitter.correct_offboard_timestamp_msec(packet.time_boot_ms, AP_HAL::millis());
 
@@ -740,17 +740,6 @@ bool AP_Follow::handle_follow_target_message(const mavlink_message_t &msg)
     } else {
         // otherwise, default heading rate to zero
         _target_heading_rate_degs = 0.0f;
-    }
-
-    // Check if the target is within the maximum distance
-    Vector3f current_position_ned_m;
-    if (!AP::ahrs().get_relative_position_NED_origin(current_position_ned_m)) {
-        return false;
-    }
-    const Vector3p dist_vec_ned_m = _target_pos_ned_m - current_position_ned_m.topostype();
-    // If _dist_max_m is not positive, we don't check the distance
-    if (is_positive(_dist_max_m.get()) && (dist_vec_ned_m.length() > _dist_max_m)) {
-        return false;
     }
 
     // apply jitter-corrected timestamp to this update
