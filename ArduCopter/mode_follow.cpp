@@ -20,7 +20,7 @@ bool ModeFollow::init(const bool ignore_checks)
         gcs().send_text(MAV_SEVERITY_WARNING, "Set FOLL_ENABLE = 1");
         return false;
     }
-
+    
 #if HAL_MOUNT_ENABLED
     AP_Mount *mount = AP_Mount::get_singleton();
     // follow the lead vehicle using sysid
@@ -46,6 +46,10 @@ void ModeFollow::run()
         make_safe_ground_handling();
         return;
     }
+
+    // set offsets to current relative position if not already set
+    // this is done here to prevent the vehicle coliding with the target vehicle
+    g2.follow.init_offsets_if_required();
 
     // set motors to full range
     motors->set_desired_spool_state(AP_Motors::DesiredSpoolState::THROTTLE_UNLIMITED);
