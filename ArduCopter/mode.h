@@ -177,8 +177,10 @@ public:
 
     // pilot input processing
     void get_pilot_desired_lean_angles(float &roll_out_cd, float &pitch_out_cd, float angle_max_cd, float angle_limit_cd) const;
+    void get_pilot_desired_lean_angles_rad(float &roll_out_cd, float &pitch_out_cd, float angle_max_cd, float angle_limit_cd) const;
     Vector2f get_pilot_desired_velocity(float vel_max) const;
     float get_pilot_desired_yaw_rate() const;
+    float get_pilot_desired_yaw_rate_rads() const;
     float get_pilot_desired_throttle() const;
 
     // returns climb target_rate reduced to avoid obstacles and
@@ -441,6 +443,7 @@ protected:
     // get_pilot_desired_angle_rates - transform pilot's normalised roll pitch and yaw input into a desired lean angle rates
     // inputs are -1 to 1 and the function returns desired angle rates in centi-degrees-per-second
     void get_pilot_desired_angle_rates(float roll_in, float pitch_in, float yaw_in, float &roll_out, float &pitch_out, float &yaw_out);
+    void get_pilot_desired_angle_rates_rads(float roll_in, float pitch_in, float yaw_in, float &roll_out_rads, float &pitch_out_rads, float &yaw_out_rads);
 
     float throttle_hover() const override;
 
@@ -942,7 +945,7 @@ protected:
 private:
 
     // Flip
-    Vector3f orig_attitude;         // original vehicle attitude before flip
+    Vector3f orig_attitude_rad;         // original vehicle attitude before flip
 
     enum class FlipState : uint8_t {
         Start,
