@@ -541,6 +541,54 @@ void AC_Avoid::adjust_roll_pitch(float &roll, float &pitch, float veh_angle_max)
     pitch = rp_out.y;
 }
 
+// adjust roll-pitch to push vehicle away from objects
+// roll and pitch value are in radians
+void AC_Avoid::adjust_roll_pitch_rad(float &roll_rad, float &pitch_rad, float veh_angle_max_rad)
+{
+    // exit immediately if proximity based avoidance is disabled
+    if (!proximity_avoidance_enabled()) {
+        return;
+    }
+
+    // exit immediately if angle max is zero
+    if (_angle_max <= 0.0f || veh_angle_max_rad <= 0.0f) {
+        return;
+    }
+
+    float roll_positive = 0.0f;    // maximum positive roll value
+    float roll_negative = 0.0f;    // minimum negative roll value
+    float pitch_positive = 0.0f;   // maximum positive pitch value
+    float pitch_negative = 0.0f;   // minimum negative pitch value
+
+    // get maximum positive and negative roll and pitch percentages from proximity sensor
+    get_proximity_roll_pitch_pct(roll_positive, roll_negative, pitch_positive, pitch_negative);
+
+    // add maximum positive and negative percentages together for roll and pitch, convert to radians
+    Vector2f rp_out_rad((roll_positive + roll_negative) * radians(45.0f), (pitch_positive + pitch_negative) * radians(45.0f));
+
+    // apply avoidance angular limits
+    // the object avoidance lean angle is never more than 75% of the total angle-limit to allow the pilot to override
+    const float angle_limit_rad= constrain_float(_angle_max * radians(0.01f), 0.0f, veh_angle_max_rad * AC_AVOID_ANGLE_MAX_PERCENT);
+    float vec_len = rp_out_rad.length();
+    if (vec_len > angle_limit_rad) {
+        rp_out_rad *= (angle_limit_rad / vec_len);
+    }
+
+    // add passed in roll, pitch angles
+    rp_out_rad.x += roll_rad;
+    rp_out_rad.y += pitch_rad;
+
+    // apply total angular limits
+    vec_len = rp_out_rad.length();
+    if (vec_len > veh_angle_max_rad) {
+        rp_out_rad *= (veh_angle_max_rad / vec_len);
+    }
+
+    // return adjusted roll, pitch
+    roll_rad = rp_out_rad.x;
+    pitch_rad = rp_out_rad.y;
+}
+
 /*
  * Note: This method is used to limit velocity horizontally only 
  * Limits the component of desired_vel_cms in the direction of the unit vector

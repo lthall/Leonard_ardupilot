@@ -206,6 +206,8 @@ public:
     /// get desired roll, pitch which should be fed into stabilize controllers
     float get_roll() const { return _pos_control.get_roll_cd(); }
     float get_pitch() const { return _pos_control.get_pitch_cd(); }
+    float get_roll_rad() const { return _pos_control.get_roll_cd() * radians(0.01f); }
+    float get_pitch_rad() const { return _pos_control.get_pitch_cd() * radians(0.01f); }
     Vector3f get_thrust_vector() const { return _pos_control.get_thrust_vector(); }
 
     // get target yaw in centi-degrees
