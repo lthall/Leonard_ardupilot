@@ -410,11 +410,11 @@ void AC_AttitudeControl_Heli::integrate_bf_rate_error_to_angle_errors()
 }
 
 // subclass non-passthrough too, for external gyro, no flybar
-void AC_AttitudeControl_Heli::input_rate_bf_roll_pitch_yaw_cds(float roll_rate_bf_cds, float pitch_rate_bf_cds, float yaw_rate_bf_cds)
+void AC_AttitudeControl_Heli::input_rate_bf_roll_pitch_yaw_rads(float roll_rate_bf_rads, float pitch_rate_bf_rads, float yaw_rate_bf_rads)
 {
-    _passthrough_yaw = yaw_rate_bf_cds;
+    _passthrough_yaw = yaw_rate_bf_rads;
 
-    AC_AttitudeControl::input_rate_bf_roll_pitch_yaw_cds(roll_rate_bf_cds, pitch_rate_bf_cds, yaw_rate_bf_cds);
+    AC_AttitudeControl::input_rate_bf_roll_pitch_yaw_rads(roll_rate_bf_rads, pitch_rate_bf_rads, yaw_rate_bf_rads);
 }
 
 //
@@ -595,7 +595,7 @@ void AC_AttitudeControl_Heli::input_euler_angle_roll_pitch_euler_rate_yaw_rad(fl
     if (_inverted_flight) {
         euler_roll_angle_rad = wrap_PI(euler_roll_angle_rad + M_PI);
     }
-    AC_AttitudeControl::input_euler_angle_roll_pitch_euler_rate_yaw_cd(euler_roll_angle_rad, euler_pitch_angle_rad, euler_yaw_rate_rads);
+    AC_AttitudeControl::input_euler_angle_roll_pitch_euler_rate_yaw_rad(euler_roll_angle_rad, euler_pitch_angle_rad, euler_yaw_rate_rads);
 }
 
 // Command an euler roll, pitch and yaw angle with angular velocity feedforward and smoothing
@@ -644,5 +644,5 @@ void AC_AttitudeControl_Heli::input_thrust_vector_heading_rad(const Vector3f& th
     Vector3f angle_target = attitude_from_thrust_vector(thrust_vector, _ahrs.yaw).to_vector312();
 
     angle_target.x = wrap_PI(angle_target.x + M_PI);
-    AC_AttitudeControl::input_euler_angle_roll_pitch_yaw_cd(angle_target.x, angle_target.y, heading_angle_rad, true);
+    AC_AttitudeControl::input_euler_angle_roll_pitch_yaw_rad(angle_target.x, angle_target.y, heading_angle_rad, true);
 }
