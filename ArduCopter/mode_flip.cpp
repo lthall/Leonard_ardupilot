@@ -80,9 +80,9 @@ bool ModeFlip::init(bool ignore_checks)
 
     // capture current attitude which will be used during the FlipState::Recovery stage
     const float angle_max_rad = cd_to_rad(copter.aparm.angle_max);
-    orig_attitude_rad.x = constrain_float(ahrs.get_roll(), -angle_max_rad, angle_max_rad);
-    orig_attitude_rad.y = constrain_float(ahrs.get_pitch(), -angle_max_rad, angle_max_rad);
-    orig_attitude_rad.z = ahrs.get_yaw();
+    orig_attitude_rad.x = constrain_float(ahrs.get_roll_rad(), -angle_max_rad, angle_max_rad);
+    orig_attitude_rad.y = constrain_float(ahrs.get_pitch_rad(), -angle_max_rad, angle_max_rad);
+    orig_attitude_rad.z = ahrs.get_yaw_rad();
 
     return true;
 }
@@ -107,9 +107,9 @@ void ModeFlip::run()
     float flip_angle_rad;
 
     if (roll_dir != 0) {
-        flip_angle_rad = ahrs.get_roll() * roll_dir;
+        flip_angle_rad = ahrs.get_roll_rad() * roll_dir;
     } else {
-        flip_angle_rad = ahrs.get_pitch() * pitch_dir;
+        flip_angle_rad = ahrs.get_pitch_rad() * pitch_dir;
     }
 
     // state machine
@@ -153,7 +153,7 @@ void ModeFlip::run()
         throttle_out = MAX(throttle_out - FLIP_THR_DEC, 0.0f);
 
         // check roll for inversion
-        if ((fabsf(ahrs.get_roll()) > radians(90.0)) && (flip_angle_rad > radians(45.0))) {
+        if ((fabsf(ahrs.get_roll_rad()) > radians(90.0)) && (flip_angle_rad > radians(45.0))) {
             _state = FlipState::Pitch_B;
         }
         break;
@@ -165,7 +165,7 @@ void ModeFlip::run()
         throttle_out = MAX(throttle_out - FLIP_THR_DEC, 0.0f);
 
         // check roll for inversion
-        if ((fabsf(ahrs.get_roll()) < radians(90.0)) && (flip_angle_rad > -radians(45.0))) {
+        if ((fabsf(ahrs.get_roll_rad()) < radians(90.0)) && (flip_angle_rad > -radians(45.0))) {
             _state = FlipState::Recover;
         }
         break;
@@ -180,10 +180,10 @@ void ModeFlip::run()
         float recovery_angle_rad;
         if (roll_dir != 0) {
             // we are rolling
-            recovery_angle_rad = fabsf(orig_attitude_rad.x - ahrs.get_roll());
+            recovery_angle_rad = fabsf(orig_attitude_rad.x - ahrs.get_roll_rad());
         } else {
             // we are pitching
-            recovery_angle_rad = fabsf(orig_attitude_rad.y - ahrs.get_pitch());
+            recovery_angle_rad = fabsf(orig_attitude_rad.y - ahrs.get_pitch_rad());
         }
 
         // check for successful recovery
