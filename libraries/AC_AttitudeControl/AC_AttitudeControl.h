@@ -313,6 +313,7 @@ public:
     // Sets desired thrust vector and heading (in centidegrees), with zero heading rate.
     // See input_thrust_vector_heading_rad() for full details.
     void input_thrust_vector_heading_cd(const Vector3f& thrust_vector, float heading_cd) {input_thrust_vector_heading_cd(thrust_vector, heading_cd, 0.0f);}
+    void input_thrust_vector_heading_rad(const Vector3f& thrust_vector, float heading_rad) {input_thrust_vector_heading_rad(thrust_vector, heading_rad, 0.0f);}
 
     ////// end rate update functions //////
 
@@ -714,9 +715,10 @@ public:
         Rate_Only
     };
     struct HeadingCommand {
-        float yaw_angle_cd;
-        float yaw_rate_cds;
+        float yaw_angle_rad;
+        float yaw_rate_rads;
         HeadingMode heading_mode;
     };
     void input_thrust_vector_heading_cd(const Vector3f& thrust_vector, HeadingCommand heading);
+    void input_thrust_vector_heading_rad(const Vector3f& thrust_vector, HeadingCommand heading);
 };

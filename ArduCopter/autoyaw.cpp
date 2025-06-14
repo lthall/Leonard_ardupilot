@@ -346,8 +346,8 @@ AC_AttitudeControl::HeadingCommand Mode::AutoYaw::get_heading()
 #endif
 
     AC_AttitudeControl::HeadingCommand heading;
-    heading.yaw_angle_cd = auto_yaw.yaw_cd();
-    heading.yaw_rate_cds = auto_yaw.rate_cds();
+    heading.yaw_angle_rad = cd_to_rad(auto_yaw.yaw_cd());
+    heading.yaw_rate_rads = cd_to_rad(auto_yaw.rate_cds());
 
     switch (auto_yaw.mode()) {
         case Mode::HOLD:

@@ -480,6 +480,21 @@ void Mode::get_pilot_desired_lean_angles(float &roll_out_cd, float &pitch_out_cd
     pitch_out_cd = pitch_out_deg * 100.0;
 }
 
+// get_pilot_desired_angle - transform pilot's roll or pitch input into a desired lean angle
+// returns desired angle in centi-degrees
+void Mode::get_pilot_desired_lean_angles_rad(float &roll_out_rad, float &pitch_out_rad, float angle_max_rad, float angle_limit_rad) const
+{
+    // throttle failsafe check
+    if (copter.failsafe.radio || !rc().has_ever_seen_rc_input()) {
+        roll_out_rad = 0.0;
+        pitch_out_rad = 0.0;
+        return;
+    }
+
+    //transform pilot's normalised roll or pitch stick input into a roll and pitch euler angle command
+    rc_input_to_roll_pitch(channel_roll->get_control_in()*(1.0/ROLL_PITCH_YAW_INPUT_MAX), channel_pitch->get_control_in()*(1.0/ROLL_PITCH_YAW_INPUT_MAX), angle_max_rad,  angle_limit_rad, roll_out_rad, pitch_out_rad);
+}
+
 // transform pilot's roll or pitch input into a desired velocity
 Vector2f Mode::get_pilot_desired_velocity(float vel_max) const
 {
@@ -546,14 +561,14 @@ void Mode::zero_throttle_and_relax_ac(bool spool_up)
     } else {
         motors->set_desired_spool_state(AP_Motors::DesiredSpoolState::GROUND_IDLE);
     }
-    attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw_cd(0.0f, 0.0f, 0.0f);
+    attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw_rad(0.0f, 0.0f, 0.0f);
     attitude_control->set_throttle_out(0.0f, false, copter.g.throttle_filt);
 }
 
 void Mode::zero_throttle_and_hold_attitude()
 {
     // run attitude controller
-    attitude_control->input_rate_bf_roll_pitch_yaw_cds(0.0f, 0.0f, 0.0f);
+    attitude_control->input_rate_bf_roll_pitch_yaw_rads(0.0f, 0.0f, 0.0f);
     attitude_control->set_throttle_out(0.0f, false, copter.g.throttle_filt);
 }
 
@@ -594,7 +609,7 @@ void Mode::make_safe_ground_handling(bool force_throttle_unlimited)
     pos_control->relax_U_controller(0.0f);   // forces throttle output to decay to zero
     pos_control->update_U_controller();
     // we may need to move this out
-    attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw_cd(0.0f, 0.0f, 0.0f);
+    attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw_rad(0.0f, 0.0f, 0.0f);
 }
 
 /*
@@ -778,7 +793,7 @@ void Mode::land_run_horizontal_control()
     }
 
     // call attitude controller
-    attitude_control->input_thrust_vector_heading_cd(thrust_vector, auto_yaw.get_heading());
+    attitude_control->input_thrust_vector_heading_rad(thrust_vector, auto_yaw.get_heading());
 
 }
 
@@ -818,13 +833,13 @@ void Mode::precland_retry_position(const Vector3f &retry_pos)
         // allow user to take control during repositioning. Note: copied from land_run_horizontal_control()
         // To-Do: this code exists at several different places in slightly different forms and that should be fixed
         if (g.land_repositioning) {
-            float target_roll = 0.0f;
-            float target_pitch = 0.0f;
+            float target_roll_rad = 0.0f;
+            float target_pitch_rad = 0.0f;
             // convert pilot input to lean angles
-            get_pilot_desired_lean_angles(target_roll, target_pitch, loiter_nav->get_angle_max_cd(), attitude_control->get_althold_lean_angle_max_cd());
+            get_pilot_desired_lean_angles_rad(target_roll_rad, target_pitch_rad, cd_to_rad(loiter_nav->get_angle_max_cd()), cd_to_rad(attitude_control->get_althold_lean_angle_max_cd()));
 
             // record if pilot has overridden roll or pitch
-            if (!is_zero(target_roll) || !is_zero(target_pitch)) {
+            if (!is_zero(target_roll_rad) || !is_zero(target_pitch_rad)) {
                 if (!copter.ap.land_repo_active) {
                     LOGGER_WRITE_EVENT(LogEvent::LAND_REPO_ACTIVE);
                 }
@@ -844,7 +859,7 @@ void Mode::precland_retry_position(const Vector3f &retry_pos)
     pos_control->update_U_controller();
 
     // call attitude controller
-    attitude_control->input_thrust_vector_heading_cd(pos_control->get_thrust_vector(), auto_yaw.get_heading());
+    attitude_control->input_thrust_vector_heading_rad(pos_control->get_thrust_vector(), auto_yaw.get_heading());
 
 }
 
@@ -1011,6 +1026,22 @@ float Mode::get_pilot_desired_yaw_rate() const
 
     // convert pilot input to the desired yaw rate
     return g2.command_model_pilot.get_rate() * 100.0 * input_expo(yaw_in, g2.command_model_pilot.get_expo());
+}
+
+// transform pilot's yaw input into a desired yaw rate
+// returns desired yaw rate in centi-degrees per second
+float Mode::get_pilot_desired_yaw_rate_rads() const
+{
+    // throttle failsafe check
+    if (copter.failsafe.radio || !rc().has_ever_seen_rc_input()) {
+        return 0.0f;
+    }
+
+    // Get yaw input
+    const float yaw_in = channel_yaw->norm_input_dz();
+
+    // convert pilot input to the desired yaw rate
+    return radians(g2.command_model_pilot.get_rate()) * input_expo(yaw_in, g2.command_model_pilot.get_expo());
 }
 
 // pass-through functions to reduce code churn on conversion;

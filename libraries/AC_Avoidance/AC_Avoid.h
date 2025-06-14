@@ -74,6 +74,7 @@ public:
     // roll and pitch value are in centi-degrees
     // angle_max is the user defined maximum lean angle for the vehicle in centi-degrees
     void adjust_roll_pitch(float &roll, float &pitch, float angle_max);
+    void adjust_roll_pitch_rad(float &roll_rad, float &pitch_rad, float angle_max_rad);
 
     // enable/disable proximity based avoidance
     void proximity_avoidance_enable(bool on_off) { _proximity_enabled = on_off; }
