@@ -35,7 +35,7 @@ void QAutoTune::get_pilot_desired_rp_yrate_rad(float &des_roll_rad, float &des_p
         des_roll_rad = cd_to_rad(plane.nav_roll_cd);
         des_pitch_rad = cd_to_rad(plane.nav_pitch_cd);
     }
-    yaw_rate_rad = cd_to_rad(plane.quadplane.get_desired_yaw_rate_cds());
+    yaw_rate_rads = cd_to_rad(plane.quadplane.get_desired_yaw_rate_cds());
 }
 
 void QAutoTune::init_z_limits()
