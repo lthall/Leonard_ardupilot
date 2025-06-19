@@ -24,16 +24,16 @@ public:
     /// reduce response for landing
     void soften_for_landing();
 
-    /// set pilot desired acceleration in centi-degrees
+    /// set pilot desired acceleration in radians
     //   dt should be the time (in seconds) since the last call to this function
-    void set_pilot_desired_acceleration_cd(float euler_roll_angle_cd, float euler_pitch_angle_cd);
+    void set_pilot_desired_acceleration_rad(float euler_roll_angle_rad, float euler_pitch_angle_rad);
 
     /// gets pilot desired acceleration in the earth frame
     Vector2f get_pilot_desired_acceleration_NE_cmss() const { return Vector2f{_desired_accel_ne_cmss.x, _desired_accel_ne_cmss.y}; }
 
     /// clear pilot desired acceleration
     void clear_pilot_desired_acceleration() {
-        set_pilot_desired_acceleration_cd(0, 0);
+        set_pilot_desired_acceleration_rad(0, 0);
     }
 
     /// get vector to stopping point based on a horizontal position and velocity
@@ -46,6 +46,7 @@ public:
     int32_t get_bearing_to_target_cd() const { return _pos_control.get_bearing_to_target_cd(); }
 
     /// get maximum lean angle when using loiter
+    float get_angle_max_rad() const;
     float get_angle_max_cd() const;
 
     /// run the loiter controller
@@ -57,6 +58,8 @@ public:
     /// get desired roll, pitch which should be fed into stabilize controllers
     float get_roll_cd() const { return _pos_control.get_roll_cd(); }
     float get_pitch_cd() const { return _pos_control.get_pitch_cd(); }
+    float get_roll_rad() const { return _pos_control.get_roll_rad(); }
+    float get_pitch_rad() const { return _pos_control.get_pitch_rad(); }
     Vector3f get_thrust_vector() const { return _pos_control.get_thrust_vector(); }
 
     static const struct AP_Param::GroupInfo var_info[];

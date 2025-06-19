@@ -826,7 +826,7 @@ float ModeGuided::get_auto_heading()
     default:
         // point towards next waypoint.
         // we don't use wp_bearing because we don't want the vehicle to turn too much during flight
-        return sub.wp_nav.get_yaw();
+        return sub.wp_nav.get_yaw_cd();
         break;
     }
 }

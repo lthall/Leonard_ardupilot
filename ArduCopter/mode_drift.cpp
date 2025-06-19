@@ -45,8 +45,8 @@ void ModeDrift::run()
     static float roll_input_cd = 0.0f;
 
     // convert pilot input to lean angles
-    float target_roll_cd, target_pitch_cd;
-    get_pilot_desired_lean_angles(target_roll_cd, target_pitch_cd, copter.aparm.angle_max, copter.aparm.angle_max);
+    float target_roll_rad, target_pitch_rad;
+    get_pilot_desired_lean_angles_rad(target_roll_rad, target_pitch_rad, attitude_control->lean_angle_max_rad(), attitude_control->lean_angle_max_rad());
 
     // Grab inertial velocity
     const Vector3f& vel_NEU_cms = pos_control->get_vel_estimate_NEU_cms();
@@ -57,7 +57,7 @@ void ModeDrift::run()
 
     // gain scheduling for yaw
     float vel_forward_2_cms = MIN(fabsf(vel_forward_cms), DRIFT_VEL_FORWARD_MIN);
-    float target_yaw_rate_cds = target_roll_cd * (1.0f - (vel_forward_2_cms / 5000.0f)) * g2.command_model_acro_y.get_rate() / 45.0;
+    float target_yaw_rate_cds = target_roll_rad * (1.0f - (vel_forward_2_cms / 5000.0f)) * g2.command_model_acro_y.get_rate() / 45.0;
 
     vel_right_cms = constrain_float(vel_right_cms, -DRIFT_SPEEDLIMIT, DRIFT_SPEEDLIMIT);
     vel_forward_cms = constrain_float(vel_forward_cms, -DRIFT_SPEEDLIMIT, DRIFT_SPEEDLIMIT);
@@ -68,15 +68,15 @@ void ModeDrift::run()
     float roll_vel_error = vel_right_cms - (roll_input_cd / DRIFT_SPEEDGAIN);
 
     // roll velocity is feed into roll acceleration to minimize slip
-    target_roll_cd = roll_vel_error * -DRIFT_SPEEDGAIN;
-    target_roll_cd = constrain_float(target_roll_cd, -4500.0f, 4500.0f);
+    target_roll_rad = roll_vel_error * cd_to_rad(-DRIFT_SPEEDGAIN);
+    target_roll_rad = constrain_float(target_roll_rad, radians(-45.0), radians(45.0));
 
     // If we let go of sticks, bring us to a stop
-    if (is_zero(target_pitch_cd)) {
+    if (is_zero(target_pitch_rad)) {
         // 0.14/ (0.03 * 100) = 4.6 seconds till full braking
         braker += 0.03f;
         braker = MIN(braker, DRIFT_SPEEDGAIN);
-        target_pitch_cd = vel_forward_cms * braker;
+        target_pitch_rad = vel_forward_cms * cd_to_rad(braker);
     } else {
         braker = 0.0f;
     }
@@ -118,7 +118,7 @@ void ModeDrift::run()
     }
 
     // call attitude controller
-    attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw_cd(target_roll_cd, target_pitch_cd, target_yaw_rate_cds);
+    attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw_rad(cd_to_rad(target_roll_rad), cd_to_rad(target_pitch_rad), cd_to_rad(target_yaw_rate_cds));
 
     // output pilot's throttle with angle boost
     const float assisted_throttle = get_throttle_assist(vel_NEU_cms.z, get_pilot_desired_throttle());

@@ -100,22 +100,22 @@ void ModeAcro_Heli::run()
          */
         float roll_in_cds = channel_roll->get_control_in_zero_dz();
         float pitch_in_cds = channel_pitch->get_control_in_zero_dz();
-        float yaw_in_cds;
+        float yaw_in_rads;
         
         if (motors->supports_yaw_passthrough()) {
             // if the tail on a flybar heli has an external gyro then
             // also use no deadzone for the yaw control and
             // pass-through the input direct to output.
-            yaw_in_cds = channel_yaw->get_control_in_zero_dz();
+            yaw_in_rads = channel_yaw->get_control_in_zero_dz();
         } else {
             // if there is no external gyro then run the usual
             // ACRO_YAW_P gain on the input control, including
             // deadzone
-            yaw_in_cds = get_pilot_desired_yaw_rate();
+            yaw_in_rads = get_pilot_desired_yaw_rate_rads();
         }
 
         // run attitude controller
-        attitude_control->passthrough_bf_roll_pitch_rate_yaw_cds(roll_in_cds, pitch_in_cds, yaw_in_cds);
+        attitude_control->passthrough_bf_roll_pitch_rate_yaw_cds(roll_in_cds, pitch_in_cds, rad_to_cd(yaw_in_rads));
     }
 
     // get pilot's desired throttle

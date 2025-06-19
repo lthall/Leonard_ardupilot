@@ -334,7 +334,7 @@ void AC_Autorotation::update_forward_speed_controller(float pilot_norm_accel)
 
     // we may have scaled the lateral accel in the angle limit scaling, so we need to
     // back calculate the resulting accel from this constrained angle for the yaw rate calc
-    const float bf_lat_accel_target = angle_to_accel(angle_target.y);
+    const float bf_lat_accel_target = angle_to_accel_mss(angle_target.y);
 
     // Calc yaw rate from desired body-frame accels
     // this seems suspiciously simple, but it is correct

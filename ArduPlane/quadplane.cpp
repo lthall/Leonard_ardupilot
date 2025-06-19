@@ -3216,8 +3216,8 @@ void QuadPlane::waypoint_controller(void)
     wp_nav->update_wpnav();
 
     // nav roll and pitch are controller by waypoint controller
-    plane.nav_roll_cd = wp_nav->get_roll();
-    plane.nav_pitch_cd = wp_nav->get_pitch();
+    plane.nav_roll_cd = wp_nav->get_roll_cd();
+    plane.nav_pitch_cd = wp_nav->get_pitch_cd();
 
     assign_tilt_to_fwd_thr();
 
@@ -3229,7 +3229,7 @@ void QuadPlane::waypoint_controller(void)
     disable_yaw_rate_time_constant();
     attitude_control->input_euler_angle_roll_pitch_yaw_cd(plane.nav_roll_cd,
                                                        plane.nav_pitch_cd,
-                                                       wp_nav->get_yaw(),
+                                                       wp_nav->get_yaw_cd(),
                                                        true);
 
     // climb based on altitude error

@@ -582,16 +582,22 @@ float input_expo(float input, float expo)
     return input;
 }
 
-// angle_to_accel converts a maximum lean angle in degrees to an accel limit in m/s/s
-float angle_to_accel(float angle_deg)
+// angle_to_accel_mss converts a maximum lean angle in degrees to an accel limit in m/s/s
+float angle_to_accel_mss(float angle_rad)
 {
-    return GRAVITY_MSS * tanf(radians(angle_deg));
+    return GRAVITY_MSS * tanf(angle_rad);
+}
+
+// accel_to_angle converts a maximum accel in m/s/s to a lean angle in degrees
+float accel_to_angle_rad(float accel)
+{
+    return atanf((accel/GRAVITY_MSS));
 }
 
 // accel_to_angle converts a maximum accel in m/s/s to a lean angle in degrees
 float accel_to_angle(float accel)
 {
-    return degrees(atanf((accel/GRAVITY_MSS)));
+    return degrees(accel_to_angle_rad(accel));
 }
 
 // rc_input_to_roll_pitch - transform pilot's normalised roll or pitch stick input into a roll and pitch euler angle command

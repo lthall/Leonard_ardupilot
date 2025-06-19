@@ -115,7 +115,7 @@ bool ModeFlowHold::init(bool ignore_checks)
 /*
   calculate desired attitude from flow sensor. Called when flow sensor is healthy
  */
-void ModeFlowHold::flowhold_flow_to_angle(Vector2f &bf_angles_cd, bool stick_input)
+void ModeFlowHold::flowhold_flow_to_angle(Vector2f &bf_angles_rad, bool stick_input)
 {
     uint32_t now = AP_HAL::millis();
 
@@ -180,27 +180,28 @@ void ModeFlowHold::flowhold_flow_to_angle(Vector2f &bf_angles_cd, bool stick_inp
             float &velocity = sensor_flow[i];
             float abs_vel_cms = fabsf(velocity)*100;
             const float brake_gain = (15.0f * brake_rate_dps.get() + 95.0f) * 0.01f;
-            float lean_angle_cd = brake_gain * abs_vel_cms * (1.0f+500.0f/(abs_vel_cms+60.0f));
+            float lean_angle_rad = cd_to_rad(brake_gain * abs_vel_cms * (1.0f+500.0f/(abs_vel_cms+60.0f)));
             if (velocity < 0) {
-                lean_angle_cd = -lean_angle_cd;
+                lean_angle_rad = -lean_angle_rad;
             }
-            bf_angles_cd[i] = lean_angle_cd;
+            bf_angles_rad[i] = lean_angle_rad;
         }
         ef_output.zero();
     }
 
     ef_output += xy_I;
-    ef_output *= copter.aparm.angle_max;
+    float angle_max_rad = attitude_control->lean_angle_max_rad();
+    ef_output *= angle_max_rad;
 
     // convert to body frame
-    bf_angles_cd += copter.ahrs.earth_to_body2D(ef_output);
+    bf_angles_rad += copter.ahrs.earth_to_body2D(ef_output);
 
     // set limited flag to prevent integrator windup
-    limited = fabsf(bf_angles_cd.x) > copter.aparm.angle_max || fabsf(bf_angles_cd.y) > copter.aparm.angle_max;
+    limited = fabsf(bf_angles_rad.x) > angle_max_rad || fabsf(bf_angles_rad.y) > angle_max_rad;
 
     // constrain to angle limit
-    bf_angles_cd.x = constrain_float(bf_angles_cd.x, -copter.aparm.angle_max, copter.aparm.angle_max);
-    bf_angles_cd.y = constrain_float(bf_angles_cd.y, -copter.aparm.angle_max, copter.aparm.angle_max);
+    bf_angles_rad.x = constrain_float(bf_angles_rad.x, -angle_max_rad, angle_max_rad);
+    bf_angles_rad.y = constrain_float(bf_angles_rad.y, -angle_max_rad, angle_max_rad);
 
 #if HAL_LOGGING_ENABLED
 // @LoggerMessage: FHLD
@@ -218,10 +219,11 @@ void ModeFlowHold::flowhold_flow_to_angle(Vector2f &bf_angles_cd, bool stick_inp
     if (log_counter++ % 20 == 0) {
         AP::logger().WriteStreaming("FHLD", "TimeUS,SFx,SFy,Ax,Ay,Qual,Ix,Iy", "Qfffffff",
                                                AP_HAL::micros64(),
-                                               (double)sensor_flow.x, (double)sensor_flow.y,
-                                               (double)bf_angles_cd.x, (double)bf_angles_cd.y,
-                                               (double)quality_filtered,
-                                               (double)xy_I.x, (double)xy_I.y);
+                                                (double)sensor_flow.x, (double)sensor_flow.y,
+                                                (double)degrees(bf_angles_rad.x), 
+                                                (double)degrees(bf_angles_rad.y),
+                                                (double)quality_filtered,
+                                                (double)xy_I.x, (double)xy_I.y);
     }
 #endif  // HAL_LOGGING_ENABLED
 }
@@ -248,7 +250,7 @@ void ModeFlowHold::run()
     target_climb_rate_cms = constrain_float(target_climb_rate_cms, -get_pilot_speed_dn(), copter.g.pilot_speed_up);
 
     // get pilot's desired yaw rate
-    float target_yaw_rate_cds = get_pilot_desired_yaw_rate();
+    float target_yaw_rate_rads = get_pilot_desired_yaw_rate_rads();
 
     // Flow Hold State Machine Determination
     AltHoldModeState flowhold_state = get_alt_hold_state(target_climb_rate_cms);
@@ -313,34 +315,34 @@ void ModeFlowHold::run()
     }
 
     // flowhold attitude target calculations
-    Vector2f bf_angles_cd;
+    Vector2f bf_angles_rad;
 
     // calculate alt-hold angles
     int16_t roll_in = copter.channel_roll->get_control_in();
     int16_t pitch_in = copter.channel_pitch->get_control_in();
-    float angle_max_cd = copter.aparm.angle_max;
-    get_pilot_desired_lean_angles(bf_angles_cd.x, bf_angles_cd.y, angle_max_cd, attitude_control->get_althold_lean_angle_max_cd());
+    float angle_max_rad = attitude_control->lean_angle_max_rad();
+    get_pilot_desired_lean_angles_rad(bf_angles_rad.x, bf_angles_rad.y, angle_max_rad, attitude_control->get_althold_lean_angle_max_rad());
 
     if (quality_filtered >= flow_min_quality &&
         AP_HAL::millis() - copter.arm_time_ms > 3000) {
         // don't use for first 3s when we are just taking off
-        Vector2f flow_angles;
+        Vector2f flow_angles_rad;
 
-        flowhold_flow_to_angle(flow_angles, (roll_in != 0) || (pitch_in != 0));
-        flow_angles.x = constrain_float(flow_angles.x, -angle_max_cd/2, angle_max_cd/2);
-        flow_angles.y = constrain_float(flow_angles.y, -angle_max_cd/2, angle_max_cd/2);
-        bf_angles_cd += flow_angles;
+        flowhold_flow_to_angle(flow_angles_rad, (roll_in != 0) || (pitch_in != 0));
+        flow_angles_rad.x = constrain_float(flow_angles_rad.x, -angle_max_rad/2, angle_max_rad/2);
+        flow_angles_rad.y = constrain_float(flow_angles_rad.y, -angle_max_rad/2, angle_max_rad/2);
+        bf_angles_rad += flow_angles_rad;
     }
-    bf_angles_cd.x = constrain_float(bf_angles_cd.x, -angle_max_cd, angle_max_cd);
-    bf_angles_cd.y = constrain_float(bf_angles_cd.y, -angle_max_cd, angle_max_cd);
+    bf_angles_rad.x = constrain_float(bf_angles_rad.x, -angle_max_rad, angle_max_rad);
+    bf_angles_rad.y = constrain_float(bf_angles_rad.y, -angle_max_rad, angle_max_rad);
 
 #if AP_AVOIDANCE_ENABLED
     // apply avoidance
-    copter.avoid.adjust_roll_pitch(bf_angles_cd.x, bf_angles_cd.y, copter.aparm.angle_max);
+    copter.avoid.adjust_roll_pitch(bf_angles_rad.x, bf_angles_rad.y, copter.aparm.angle_max);
 #endif
 
     // call attitude controller
-    copter.attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw_cd(bf_angles_cd.x, bf_angles_cd.y, target_yaw_rate_cds);
+    copter.attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw_cd(bf_angles_rad.x, bf_angles_rad.y, target_yaw_rate_rads);
 
     // run the vertical position controller and set output throttle
     pos_control->update_U_controller();

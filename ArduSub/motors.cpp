@@ -139,8 +139,8 @@ bool Sub::handle_do_motor_test(mavlink_command_int_t command) {
 void Sub::translate_wpnav_rp(float &lateral_out, float &forward_out)
 {
     // get roll and pitch targets in centidegrees
-    int32_t lateral = wp_nav.get_roll();
-    int32_t forward = -wp_nav.get_pitch(); // output is reversed
+    int32_t lateral = wp_nav.get_roll_cd();
+    int32_t forward = -wp_nav.get_pitch_cd(); // output is reversed
 
     // constrain target forward/lateral values
     // The outputs of wp_nav.get_roll and get_pitch should already be constrained to these values

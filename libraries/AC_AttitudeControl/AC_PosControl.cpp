@@ -505,12 +505,12 @@ void AC_PosControl::init_NE_controller()
     init_offsets_NE();
     
     // set roll, pitch lean angle targets to current attitude
-    const Vector3f &att_target_euler_cd = _attitude_control.get_att_target_euler_cd();
-    _roll_target_cd = att_target_euler_cd.x;
-    _pitch_target_cd = att_target_euler_cd.y;
-    _yaw_target_cd = att_target_euler_cd.z; // todo: this should be thrust vector heading, not yaw.
-    _yaw_rate_target_cds = 0.0f;
-    _angle_max_override_cd = 0.0;
+    const Vector3f &att_target_euler_rad = _attitude_control.get_att_target_euler_rad();
+    _roll_target_rad = att_target_euler_rad.x;
+    _pitch_target_rad = att_target_euler_rad.y;
+    _yaw_target_rad = att_target_euler_rad.z; // todo: this should be thrust vector heading, not yaw.
+    _yaw_rate_target_rads = 0.0f;
+    _angle_max_override_rad = 0.0;
 
     _pos_target_neu_cm.xy() = _pos_estimate_neu_cm.xy();
     _pos_desired_neu_cm.xy() = _pos_target_neu_cm.xy() - _pos_offset_neu_cm.xy();
@@ -526,9 +526,9 @@ void AC_PosControl::init_NE_controller()
     }
 
     // limit acceleration using maximum lean angles
-    float angle_max = MIN(_attitude_control.get_althold_lean_angle_max_cd(), get_lean_angle_max_cd());
-    float accel_max = angle_to_accel(angle_max * 0.01) * 100.0;
-    _accel_target_neu_cmss.xy().limit_length(accel_max);
+    const float angle_max_rad = MIN(_attitude_control.get_althold_lean_angle_max_rad(), get_lean_angle_max_rad());
+    const float accel_max_cmss = angle_to_accel_mss(angle_max_rad) * 100.0;
+    _accel_target_neu_cmss.xy().limit_length(accel_max_cmss);
 
     // initialise I terms from lean angles
     _pid_vel_ne.reset_filter();
@@ -700,17 +700,17 @@ void AC_PosControl::update_NE_controller()
     _accel_target_neu_cmss.xy() += _accel_desired_neu_cmss.xy() + _accel_offset_neu_cmss.xy();
 
     // limit acceleration using maximum lean angles
-    float angle_max = MIN(_attitude_control.get_althold_lean_angle_max_cd(), get_lean_angle_max_cd());
-    float accel_max = angle_to_accel(angle_max * 0.01) * 100;
+    const float angle_max_rad = MIN(_attitude_control.get_althold_lean_angle_max_rad(), get_lean_angle_max_rad());
+    const float accel_max_cmss = angle_to_accel_mss(angle_max_rad) * 100.0;
     // Define the limit vector before we constrain _accel_target_neu_cmss 
     _limit_vector.xy() = _accel_target_neu_cmss.xy();
-    if (!limit_accel_xy(_vel_desired_neu_cms.xy(), _accel_target_neu_cmss.xy(), accel_max)) {
+    if (!limit_accel_xy(_vel_desired_neu_cms.xy(), _accel_target_neu_cmss.xy(), accel_max_cmss)) {
         // _accel_target_neu_cmss was not limited so we can zero the xy limit vector
         _limit_vector.xy().zero();
     }
 
     // update angle targets that will be passed to stabilize controller
-    accel_NE_cmss_to_lean_angles(_accel_target_neu_cmss.x, _accel_target_neu_cmss.y, _roll_target_cd, _pitch_target_cd);
+    accel_NE_cmss_to_lean_angles(_accel_target_neu_cmss.x, _accel_target_neu_cmss.y, _roll_target_rad, _pitch_target_rad);
     calculate_yaw_and_rate_yaw();
 
     // reset the disturbance from system ID mode to zero
@@ -1063,16 +1063,16 @@ void AC_PosControl::update_U_controller()
 /// Accessors
 ///
 
-/// get_lean_angle_max_cd - returns the maximum lean angle the autopilot may request
-float AC_PosControl::get_lean_angle_max_cd() const
+/// get_lean_angle_max_rad - returns the maximum lean angle the autopilot may request
+float AC_PosControl::get_lean_angle_max_rad() const
 {
-    if (is_positive(_angle_max_override_cd)) {
-        return _angle_max_override_cd;
+    if (is_positive(_angle_max_override_rad)) {
+        return _angle_max_override_rad;
     }
     if (!is_positive(_lean_angle_max_deg)) {
-        return _attitude_control.lean_angle_max_cd();
+        return _attitude_control.lean_angle_max_rad();
     }
-    return _lean_angle_max_deg * 100.0f;
+    return radians(_lean_angle_max_deg);
 }
 
 /// set the desired position, velocity and acceleration targets
@@ -1446,11 +1446,11 @@ bool AC_PosControl::get_fwd_pitch_is_limited() const
     if (_limit_vector.xy().is_zero()) {  
         return false;  
     }  
-    const float angle_max = MIN(_attitude_control.get_althold_lean_angle_max_cd(), get_lean_angle_max_cd());
-    const float accel_max = angle_to_accel(angle_max * 0.01) * 100;
+    const float angle_max_rad = MIN(_attitude_control.get_althold_lean_angle_max_rad(), get_lean_angle_max_rad());
+    const float accel_max_cmss = angle_to_accel_mss(angle_max_rad) * 100.0;
     // Check for pitch limiting in the forward direction
     const float accel_fwd_unlimited = _limit_vector.x * _ahrs.cos_yaw() + _limit_vector.y * _ahrs.sin_yaw();
-    const float pitch_target_unlimited = accel_to_angle(- MIN(accel_fwd_unlimited, accel_max) * 0.01f) * 100;
+    const float pitch_target_unlimited = accel_to_angle(- MIN(accel_fwd_unlimited, accel_max_cmss) * 0.01f) * 100;
     const float accel_fwd_limited = _accel_target_neu_cmss.x * _ahrs.cos_yaw() + _accel_target_neu_cmss.y * _ahrs.sin_yaw();
     const float pitch_target_limited = accel_to_angle(- accel_fwd_limited * 0.01f) * 100;
 
@@ -1527,14 +1527,14 @@ void AC_PosControl::calculate_yaw_and_rate_yaw()
 
     // update the target yaw if velocity is greater than 5% _vel_max_ne_cms
     if (vel_desired_length_ne_cms > _vel_max_ne_cms * 0.05f) {
-        _yaw_target_cd = degrees(_vel_desired_neu_cms.xy().angle()) * 100.0f;
-        _yaw_rate_target_cds = turn_rate_rads * degrees(100.0f);
+        _yaw_target_rad = degrees(_vel_desired_neu_cms.xy().angle()) * 100.0f;
+        _yaw_rate_target_rads = turn_rate_rads * degrees(100.0f);
         return;
     }
 
     // use the current attitude controller yaw target
-    _yaw_target_cd = _attitude_control.get_att_target_euler_cd().z;
-    _yaw_rate_target_cds = 0;
+    _yaw_target_rad = _attitude_control.get_att_target_euler_cd().z;
+    _yaw_rate_target_rads = 0;
 }
 
 // calculate_overspeed_gain - calculated increased maximum acceleration and jerk if over speed condition is detected

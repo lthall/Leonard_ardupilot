@@ -176,9 +176,9 @@ public:
     virtual int32_t get_alt_above_ground_cm(void) const;
 
     // pilot input processing
-    void get_pilot_desired_lean_angles(float &roll_out_cd, float &pitch_out_cd, float angle_max_cd, float angle_limit_cd) const;
+    void get_pilot_desired_lean_angles_rad(float &roll_out_rad, float &pitch_out_rad, float angle_max_rad, float angle_limit_rad) const;
+    float get_pilot_desired_yaw_rate_rads() const;
     Vector2f get_pilot_desired_velocity(float vel_max) const;
-    float get_pilot_desired_yaw_rate() const;
     float get_pilot_desired_throttle() const;
 
     // returns climb target_rate reduced to avoid obstacles and
@@ -381,8 +381,8 @@ public:
 
         // turn rate (in cds) when auto_yaw_mode is set to AUTO_YAW_RATE
         float _yaw_angle_cd;
-        float _yaw_rate_cds;
-        float _pilot_yaw_rate_cds;
+        float _yaw_rate_rads;
+        float _pilot_yaw_rate_rads;
     };
     static AutoYaw auto_yaw;
 
@@ -800,7 +800,7 @@ public:
 protected:
     bool position_ok() override;
     float get_pilot_desired_climb_rate_cms(void) const override;
-    void get_pilot_desired_rp_yrate_cd(float &roll_cd, float &pitch_cd, float &yaw_rate_cds) override;
+    void get_pilot_desired_rp_yrate_rad(float &roll_rad, float &pitch_rad, float &yaw_rate_rads) override;
     void init_z_limits() override;
 #if HAL_LOGGING_ENABLED
     void log_pids() override;
@@ -947,7 +947,7 @@ protected:
 private:
 
     // Flip
-    Vector3f orig_attitude;         // original vehicle attitude before flip
+    Vector3f orig_attitude_euler_rad;         // original vehicle attitude before flip
 
     enum class FlipState : uint8_t {
         Start,
@@ -1379,12 +1379,12 @@ protected:
 
 private:
 
-    void update_pilot_lean_angle_cd(float &lean_angle_filtered, float &lean_angle_raw);
+    void update_pilot_lean_angle_rad(float &lean_angle_filtered_rad, float &lean_angle_raw_rad);
     float mix_controls(float mix_ratio, float first_control, float second_control);
-    void update_brake_angle_from_velocity(float &brake_angle_cd, float velocity_cms);
+    void update_brake_angle_from_velocity(float &brake_angle_rad, float velocity_cms);
     void init_wind_comp_estimate();
     void update_wind_comp_estimate();
-    void get_wind_comp_lean_angles(float &roll_angle_cd, float &pitch_angle_cd);
+    void get_wind_comp_lean_angles_rad(float &roll_angle_cd, float &pitch_angle_cd);
     void roll_controller_to_pilot_override();
     void pitch_controller_to_pilot_override();
 
@@ -1401,8 +1401,8 @@ private:
     RPMode pitch_mode;
 
     // pilot input related variables
-    float pilot_roll_cd;  // filtered roll lean angle commanded by the pilot. Slowly returns to zero when stick is released
-    float pilot_pitch_cd; // filtered pitch lean angle commanded by the pilot. Slowly returns to zero when stick is released
+    float pilot_roll_rad;  // filtered roll lean angle commanded by the pilot. Slowly returns to zero when stick is released
+    float pilot_pitch_rad; // filtered pitch lean angle commanded by the pilot. Slowly returns to zero when stick is released
 
 
     // braking related variables
@@ -1410,12 +1410,12 @@ private:
         bool  time_updated_roll;            // true if braking timeout on roll axis has been re-estimated
         bool  time_updated_pitch;           // true if braking timeout on pitch axis has been re-estimated
         float gain;                         // braking gain used to convert velocity to lean angle
-        float roll_cd;                      // braking roll angle in centidegrees
-        float pitch_cd;                     // braking pitch angle in centidegrees
+        float roll_rad;                      // braking roll angle in centidegrees
+        float pitch_rad;                     // braking pitch angle in centidegrees
         uint32_t start_time_roll_ms;        // time (ms) when braking on roll axis begins
         uint32_t start_time_pitch_ms;       // time (ms) when braking on pitch axis begins
-        float angle_max_roll_cd;            // peak roll angle (deg x100) during braking, used to detect vehicle flattening
-        float angle_max_pitch_cd;           // peak pitch angle (deg x100) during braking, used to detect vehicle flattening
+        float angle_max_roll_rad;            // peak roll angle (deg x100) during braking, used to detect vehicle flattening
+        float angle_max_pitch_rad;           // peak pitch angle (deg x100) during braking, used to detect vehicle flattening
         uint32_t loiter_transition_start_time_ms;   // time (ms) when transition from brake to loiter started
     } brake;
 
@@ -1424,18 +1424,18 @@ private:
     uint32_t controller_to_pilot_start_time_roll_ms;   // time (ms) when transition from controller to pilot roll input began
     uint32_t controller_to_pilot_start_time_pitch_ms;  // time (ms) when transition from controller to pilot pitch input began
 
-    float controller_final_roll_cd;   // final roll output (deg x100) from controller before transition to pilot input
-    float controller_final_pitch_cd;  // final pitch output (deg x100) from controller before transition to pilot input
+    float controller_final_roll_rad;   // final roll output (deg x100) from controller before transition to pilot input
+    float controller_final_pitch_rad;  // final pitch output (deg x100) from controller before transition to pilot input
 
     // wind compensation related variables
     Vector2f wind_comp_ef;              // wind compensation acceleration vector (earth frame), low-pass filtered
-    float wind_comp_roll_cd;            // roll angle (deg x100) to counter wind based on earth-frame lean
-    float wind_comp_pitch_cd;           // pitch angle (deg x100) to counter wind based on earth-frame lean
+    float wind_comp_roll_rad;            // roll angle (deg x100) to counter wind based on earth-frame lean
+    float wind_comp_pitch_rad;           // pitch angle (deg x100) to counter wind based on earth-frame lean
     uint32_t wind_comp_start_time_ms;   // time (ms) when wind compensation updates are started
 
     // final output
-    float roll_cd;   // final roll angle sent to attitude controller
-    float pitch_cd;  // final pitch angle sent to attitude controller
+    float roll_rad;   // final roll angle sent to attitude controller
+    float pitch_rad;  // final pitch angle sent to attitude controller
 };
 
 
