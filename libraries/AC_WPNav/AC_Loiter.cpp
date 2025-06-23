@@ -165,6 +165,12 @@ void AC_Loiter::set_pilot_desired_acceleration_cd(float euler_roll_angle_cd, flo
 
     _predicted_accel_ne_cmss.x = predicted_accel.x;
     _predicted_accel_ne_cmss.y = predicted_accel.y;
+
+    Vector3f target_ang_vel_rads = _attitude_control.get_attitude_target_ang_vel();
+    Vector3f desired_velocity_cms = _pos_control.get_vel_desired_NEU_cms();
+    Vector2f turn_accel_ne_cmss = Vector2f(-desired_velocity_cms.y * target_ang_vel_rads.z, desired_velocity_cms.x * target_ang_vel_rads.z);
+    _desired_accel_ne_cmss += turn_accel_ne_cmss;
+    _predicted_accel_ne_cmss += turn_accel_ne_cmss;
 }
 
 /// get vector to stopping point based on a horizontal position and velocity
