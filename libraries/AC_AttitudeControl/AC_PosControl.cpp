@@ -362,7 +362,8 @@ AC_PosControl::AC_PosControl(AP_AHRS_View& ahrs, const AP_Motors& motors, AC_Att
 // See input_pos_NEU_m() for full details.
 void AC_PosControl::input_pos_NEU_cm(const Vector3p& pos_neu_cm, float pos_terrain_target_u_cm, float terrain_buffer_cm)
 {
-    input_pos_NEU_m(pos_neu_cm * 0.01, pos_terrain_target_u_cm * 0.01, terrain_buffer_cm * 0.01);
+    const Vector3p pos_neu_m = pos_neu_cm * 0.01;
+    input_pos_NEU_m(pos_neu_m, pos_terrain_target_u_cm * 0.01, terrain_buffer_cm * 0.01);
 }
 
 // Sets a new NEU position target in meters and computes a jerk-limited trajectory.
@@ -577,7 +578,8 @@ void AC_PosControl::init_NE_controller()
 // See input_accel_NE_m() for full details.
 void AC_PosControl::input_accel_NE_cm(const Vector3f& accel_neu_cmss)
 {
-    input_accel_NE_m(accel_neu_cmss * 0.01);
+    const Vector3f accel_neu_mss = accel_neu_cmss * 0.01;
+    input_accel_NE_m(accel_neu_mss);
 }
 
 // Sets the desired NE-plane acceleration in m/s² using jerk-limited shaping.
@@ -594,7 +596,8 @@ void AC_PosControl::input_accel_NE_m(const Vector3f& accel_neu_mss)
 void AC_PosControl::input_vel_accel_NE_cm(Vector2f& vel_ne_cms, const Vector2f& accel_ne_cmss, bool limit_output)
 {
     Vector2f vel_ne_ms = vel_ne_cms * 0.01;
-    input_vel_accel_NE_m(vel_ne_ms, accel_ne_cmss * 0.01, limit_output);
+    const Vector2f accel_ne_mss = accel_ne_cmss * 0.01;
+    input_vel_accel_NE_m(vel_ne_ms, accel_ne_mss, limit_output);
     vel_ne_cms = vel_ne_ms * 100.0;
 }
 
@@ -617,7 +620,8 @@ void AC_PosControl::input_pos_vel_accel_NE_cm(Vector2p& pos_ne_cm, Vector2f& vel
 {
     Vector2p pos_ne_m = pos_ne_cm * 0.01; 
     Vector2f vel_ne_ms = vel_ne_cms * 0.01;
-    input_pos_vel_accel_NE_m(pos_ne_m, vel_ne_ms, accel_ne_cmss * 0.01, limit_output);
+    const Vector2f accel_ne_mss = accel_ne_cmss * 0.01;
+    input_pos_vel_accel_NE_m(pos_ne_m, vel_ne_ms, accel_ne_mss, limit_output);
     pos_ne_cm = pos_ne_m * 100.0; 
     vel_ne_cms = vel_ne_ms * 100.0;
 }
@@ -1203,7 +1207,10 @@ float AC_PosControl::get_lean_angle_max_rad() const
 // See set_pos_vel_accel_NEU_m() for full details.
 void AC_PosControl::set_pos_vel_accel_NEU_cm(const Vector3p& pos_neu_cm, const Vector3f& vel_neu_cms, const Vector3f& accel_neu_cmss)
 {
-    set_pos_vel_accel_NEU_m(pos_neu_cm * 0.01, vel_neu_cms * 0.01, accel_neu_cmss * 0.01);
+    const Vector3p pos_neu_m = pos_neu_cm * 0.01;
+    const Vector3f vel_neu_ms = vel_neu_cms * 0.01;
+    const Vector3f& accel_neu_mss = accel_neu_cmss * 0.01;
+    set_pos_vel_accel_NEU_m(pos_neu_m, vel_neu_ms, accel_neu_mss);
 }
 
 // Sets externally computed NEU position, velocity, and acceleration in meters, m/s, and m/s².
@@ -1219,7 +1226,10 @@ void AC_PosControl::set_pos_vel_accel_NEU_m(const Vector3p& pos_neu_m, const Vec
 // See set_pos_vel_accel_NE_m() for full details.
 void AC_PosControl::set_pos_vel_accel_NE_cm(const Vector2p& pos_ne_cm, const Vector2f& vel_ne_cms, const Vector2f& accel_ne_cmss)
 {
-    set_pos_vel_accel_NE_m(pos_ne_cm * 0.01, vel_ne_cms * 0.01, accel_ne_cmss * 0.01);
+    const Vector2p& pos_ne_m = pos_ne_cm * 0.01;
+    const Vector2f& vel_ne_ms = vel_ne_cms * 0.01;
+    const Vector2f& accel_ne_mss = accel_ne_cmss * 0.01;
+    set_pos_vel_accel_NE_m(pos_ne_m, vel_ne_ms, accel_ne_mss);
 }
 
 // Sets externally computed NE position, velocity, and acceleration in meters, m/s, and m/s².
@@ -1394,7 +1404,10 @@ bool AC_PosControl::get_accel_target(Vector3f &accel_target_NED)
 // See set_posvelaccel_offset_target_NE_m() for full details.
 void AC_PosControl::set_posvelaccel_offset_target_NE_cm(const Vector2p& pos_offset_target_ne_cm, const Vector2f& vel_offset_target_ne_cms, const Vector2f& accel_offset_target_ne_cmss)
 {
-    set_posvelaccel_offset_target_NE_m(pos_offset_target_ne_cm * 0.01, vel_offset_target_ne_cms * 0.01, accel_offset_target_ne_cmss * 0.01);
+    const Vector2p pos_offset_target_ne_m = pos_offset_target_ne_cm * 0.01;
+    const Vector2f vel_offset_target_ne_ms = vel_offset_target_ne_cms * 0.01;
+    const Vector2f accel_offset_target_ne_mss = accel_offset_target_ne_cmss * 0.01;
+    set_posvelaccel_offset_target_NE_m(pos_offset_target_ne_m, vel_offset_target_ne_ms, accel_offset_target_ne_mss);
 }
 
 // Sets NE offset targets in meters, m/s, and m/s².
