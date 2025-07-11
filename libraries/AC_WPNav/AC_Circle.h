@@ -94,7 +94,7 @@ public:
 
     /// provide rangefinder based terrain offset
     /// terrain offset is the terrain's height above the EKF origin
-    void set_rangefinder_terrain_offset_cm(bool use, bool healthy, float terrain_offset_cm) { _rangefinder_available = use; _rangefinder_healthy = healthy; _rangefinder_terrain_offset_cm = terrain_offset_cm;}
+    void set_rangefinder_terrain_offset_cm(bool use, bool healthy, float terrain_offset_cm) { _rangefinder_available = use; _rangefinder_healthy = healthy; _rangefinder_terrain_offset_m = terrain_offset_cm;}
 
     /// check for a change in the radius params
     void check_param_change();
@@ -163,5 +163,5 @@ private:
     bool        _is_terrain_alt;           // true if _center_neu_cm.z is alt-above-terrain, false if alt-above-ekf-origin
     bool        _rangefinder_available; // true if range finder could be used
     bool        _rangefinder_healthy;   // true if range finder is healthy
-    float       _rangefinder_terrain_offset_cm; // latest rangefinder based terrain offset (e.g. terrain's height above EKF origin)
+    float       _rangefinder_terrain_offset_m; // latest rangefinder based terrain offset (e.g. terrain's height above EKF origin)
 };

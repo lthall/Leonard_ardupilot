@@ -354,7 +354,7 @@ bool AC_Circle::get_terrain_offset_cm(float& offset_cm)
         return false;
     case AC_Circle::TerrainSource::TERRAIN_FROM_RANGEFINDER:
         if (_rangefinder_healthy) {
-            offset_cm = _rangefinder_terrain_offset_cm;
+            offset_cm = _rangefinder_terrain_offset_m;
             return true;
         }
         return false;
