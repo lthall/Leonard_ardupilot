@@ -1,0 +1,70 @@
+May 22nd, 2025 : Callisto: Version: ArduCopter V4.5.7-C2.4r8
+May 6th, 2025 : AP_Param: add option to ignore PARAM_SET
+May 6th, 2025 : GCS_MAVLink: disallow setting of readonly/internal parameters via mavftp
+May 6th, 2025 : AP_Scripting: add param-set-filter LUA applet and bindings for new applet
+
+March 22nd, 2025 : Callisto: Version: ArduCopter V4.5.7-C2.Xr7
+March 22nd, 2025 : AP_GPS: Remove GPS[bla] part of mavlink message.
+
+March 21st, 2025 : Callisto: Version: ArduCopter V4.5.7-C2.Xr6
+March 20th, 2025 : AP_DroneCAN: Remove CAN[bla] part of mavlink message.
+February 18th, 2025 : Callisto: add Callisto-2.5 variant
+February 18th, 2025 : Callisto: add Callisto-2.4 variant
+February 18th, 2025 : Callisto: remove unnecessary flight modes
+February 18th, 2025 : Callisto: add base Callisto files for Callisto variants to inherit from
+August 7th, 2024 : AP_BattMonitor: add and use Battery backend internal-use-only flag
+June 5th, 2024 : AP_BattMonitor: avoid casting DroneCAN backend to incorrect type
+February 10th, 2024 : GCS_MAVLink: use can_printf_severity() for AP_Periph
+February 10th, 2024 : AP_Periph: map MAV_SEVERITY to DroneCAN debug level
+July 23rd, 2024 : Copter: Ground oscillation gain reduction
+July 23rd, 2024 : AC_AttitudeControl: Add Landed Gain Backoff
+October 8th, 2024 : GCS_MAVLink: raise number of MAVLink ports
+May 8th, 2024 : GCS_MAVLink: deny attempt to do partial upload while mission transfer in progress
+February 10th, 2024 : chibios_hwdef.py: allow re-use of bootloader from other boards
+
+November 30th, 2024 : ArduCopter V4.5.7-C2.4r4
+November 30th, 2024 : Callisto: Param: Relay fix
+
+November 28th, 2024 : ArduCopter V4.5.7-C2.4r3
+July 23rd, 2024 : AC_AttitudeControl: Add Landed Gain Backoff
+April 24th, 2023 : Filter: Increase triple notch spacing
+October 7th, 2024 : Copter: version to 4.5.7
+December 19th, 2022 : Copter: Payload Place enhancements
+December 13th, 2022 : AP_Gripper: Add Neutral state after init
+December 19th, 2022 : Copter: Use wp_start() in do_nav_wp()
+December 19th, 2022 : Copter: Fix Auto Takeoff when complete_alt_cm is current altitude
+
+December 17th, 2022 : Version: V4.3.2-Cal1
+December 19th, 2022 : AC_WPNav: Add corner acceleration limit parameter
+December 16th, 2022 : Copter: Tuning for position controller angle max
+December 15th, 2022 : Copter: Update use of input_vel_accel_z
+December 15th, 2022 : AC_AttitudeControl: AC_PosControl: Simplify and clarify use of vertical controllers
+December 8th, 2022 : Copter: Reserve G2 63 for Ship Operations
+
+November 6th, 2022 : Callisto 2.2: Version 4.3.0-b1-Cal2.2
+October 31st, 2022: Copter: version to 4.3.0 official
+
+August 21st, 2022: Copter: V4.2.3-rc3-Cal2.2
+July 28th, 2022: Copter: Fix Payload Place Bug
+July 22nd, 2022: Copter: Payload Place fix takeoff
+August 20th, 2022: Copter: version to 4.2.3-rc3
+November 18th, 2021: Copter: Version ArduCopter V4.0.7 Cal2.2"
+November 18th, 2021: AP_Motors: Add CW X
+
+May 28th, 2021: Copter: version to 4.0.7 Cal21c
+May 24th, 2021: Copter: Fix Loiter attitude error during Pre-Takeoff
+May 28th, 2021: AC_AttitudeControl: Set yaw rate to zero during arming procedure
+
+April 15th, 2021: Copter: version to 4.0.7 Cal21b
+April 15th, 2021: AP_GPS: fixed moving baseline Z check for attitude lag (for 4.0)
+
+March 30th, 2021: Copter: version to 4.0.7 Cal21a
+August 15th, 2020: Copter: add gripper release FS_Option
+
+March 28th, 2021: Copter: Version Cal21
+February 9th, 2021: Callisto release
+February 8th, 2021: Create LedFlash.lua script to flash arm LED's
+February 8th, 2021: Create Callisto custom build
+
+January 29th, 2021: ArduCopter V4.0.6 ATUN1
+January 29th, 2021: AC_AutoTune: Tighten up Autotune level requirements
