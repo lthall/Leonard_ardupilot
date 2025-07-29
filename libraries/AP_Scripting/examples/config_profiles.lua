@@ -11,27 +11,11 @@
 -- emit profiles being used once every 60 seconds or so
 
 -- roll in the parameter whitelist script (so one script not two)
--- Add a mission config for flightmodes, failsafes, WPNav, Loiter, Pilot, PSC parameters.
 -- Backport to the Callisto Branch: https://github.com/lthall/Leonard_ardupilot/commits/20250702_Callisto_4.5.7-9_dev/
 
 -- far flung future - change parameters on peripherals too
 
 gcs:send_text(6, string.format("CFG: config_profiles v0.2 starting"))
-
-local msg_pfx = "CFG: "
-
--- set up for denying arming when problems occur:
-local auth_id = arming:get_aux_auth_id() or 0
-
-local function set_aux_auth_failed(reason)
-   arming:set_aux_auth_failed(auth_id, msg_pfx .. reason)
-end
-
-local function set_aux_auth_passed()
-   arming:set_aux_auth_passed(auth_id)
-end
-
-set_aux_auth_failed("Validation pending")
 
 local SEL_APPLY_DEFAULTS = 0
 local SEL_DO_NOTHING = -1
@@ -462,6 +446,21 @@ local config_domains = {
 }
 -- This is a marker for the end of the config_domains; it is used to swap these out for CI testing
 
+local msg_pfx = "CFG: "
+
+-- set up for denying arming when problems occur:
+local auth_id = arming:get_aux_auth_id() or 0
+
+local function set_aux_auth_failed(reason)
+   arming:set_aux_auth_failed(auth_id, msg_pfx .. reason)
+end
+
+local function set_aux_auth_passed()
+   arming:set_aux_auth_passed(auth_id)
+end
+
+set_aux_auth_failed("Validation pending")
+
 local function send_text(severity, message)
    gcs:send_text(severity, msg_pfx .. message)
 end
@@ -745,7 +744,7 @@ end
 -- update function
 local domains_valid = false
 function update()
-   if PARAM_SET_ENABLE:get() == 0then
+   if PARAM_SET_ENABLE:get() == 0 then
       -- permanently exit
       send_text(3, string.format("exitting"))
       return
