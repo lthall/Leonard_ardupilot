@@ -6,31 +6,39 @@
 -- these values are used if the domain doesn't have one.  The same
 -- parameter must not exist in multiple domains!
 
--- verify parameters have been set in the main loop
+
+-- TODO:
 -- emit profiles being used once every 60 seconds or so
 
--- all_param_defaults should not contain any parameter value which is the same as the default value for athat parameter from defaults.parm
-
 -- roll in the parameter whitelist script (so one script not two)
--- Change config_profiles: to CFG
 -- Add a mission config for flightmodes, failsafes, WPNav, Loiter, Pilot, PSC parameters.
 -- Backport to the Callisto Branch: https://github.com/lthall/Leonard_ardupilot/commits/20250702_Callisto_4.5.7-9_dev/
 
 -- far flung future - change parameters on peripherals too
 
-gcs:send_text(6, string.format("config_profiles v0.2 starting"))
+gcs:send_text(6, string.format("CFG: config_profiles v0.2 starting"))
 
-local must_be_set = "must be set"
+local msg_pfx = "CFG: "
 
-auth_id = arming:get_aux_auth_id() or 0
-arming:set_aux_auth_failed(auth_id, "Validation pending")
+-- set up for denying arming when problems occur:
+local auth_id = arming:get_aux_auth_id() or 0
 
-local a_parameter_was_ever_set = false
+local function set_aux_auth_failed(reason)
+   arming:set_aux_auth_failed(auth_id, msg_pfx .. reason)
+end
 
-SEL_APPLY_DEFAULTS = 0
-SEL_DO_NOTHING = -1
+local function set_aux_auth_passed()
+   arming:set_aux_auth_passed(auth_id)
+end
+
+set_aux_auth_failed("Validation pending")
+
+local SEL_APPLY_DEFAULTS = 0
+local SEL_DO_NOTHING = -1
 
 -- This is a marker for the start of the config_domains; it is used to swap these out for CI testing
+local must_be_set = "must be set"
+
 local config_domains = {
    ARMS = {
       param_name = "ARMS",
@@ -404,7 +412,7 @@ local config_domains = {
 -- This is a marker for the end of the config_domains; it is used to swap these out for CI testing
 
 local function send_text(severity, message)
-   gcs:send_text(severity, string.format("config_profiles: %s", message))
+   gcs:send_text(severity, msg_pfx .. message)
 end
 
 local function validate_unique_parameters_across_domains()
@@ -557,13 +565,11 @@ local function validate_config_domains()
    }
    for _, validator in pairs(validators) do
       if validator == nil then
-         send_text(3, string.format("Invalid validator"))
-         arming:set_aux_auth_failed(auth_id, "config_profiles error")
+         set_aux_auth_failed("Invalid validator")
          return false
       end
       if not validator() then
-         send_text(3, string.format("config_profiles: Validation failed"))
-         arming:set_aux_auth_failed(auth_id, "Domain configuration invalid")
+         set_aux_auth_failed("Domain configuration invalid")
          return false
       end
    end
@@ -604,6 +610,9 @@ for _, domain in pairs(config_domains) do
    end
    domain.sel_param = add_param_for_domain(domain, domain.param_sel_index, "SEL", domain_sel_default)
 end
+
+local a_parameter_was_ever_set = false
+
 
 -- utility: apply one profile
 local function apply_parameters(domain, params)
@@ -661,8 +670,7 @@ local function handle_domains()
 
       local profile = domain.profiles[sel_value]
       if profile == nil then
-         send_text(3, string.format("Invalid profile selected for %s", domain.param_name))
-         arming:set_aux_auth_failed(auth_id, string.format("Invalid profile selected for %s", domain.param_name))
+         set_aux_auth_failed(string.format("Invalid profile selected for %s", domain.param_name))
          success = false
          goto cd_next_domain
       end
@@ -677,14 +685,14 @@ local function handle_domains()
       ::cd_next_domain::
    end
    if a_parameter_was_ever_set then
-      arming:set_aux_auth_failed(auth_id, string.format("Reboot required for configuration change"))
+      set_aux_auth_failed("Reboot required for configuration change")
    elseif success then
-      arming:set_aux_auth_passed(auth_id)
+      set_aux_auth_passed()
    end
 end
 
 -- update function
-local validation_done = false
+local domains_valid = false
 function update()
    if not PARAM_SET_ENABLE then
       -- permanently exit
@@ -692,20 +700,15 @@ function update()
       return
    end
 
-   if not auth_id then
-      send_text("auth_id not available")
-      return update, 1000
-   end
-
    -- do nothing if armed:
    if arming:is_armed() then
       return update, 1000
    end
 
-   if not validation_done then
+   if not domains_valid then
       if validate_config_domains() then
-         validation_done = true
-         arming:set_aux_auth_failed(auth_id, "Profile value validation pending")
+         domains_valid = true
+         set_aux_auth_failed("Profile value validation pending")
       else
          return update, 10000  -- rerun periodically to make the problem clear
       end
