@@ -10,7 +10,6 @@
 -- TODO:
 -- emit profiles being used once every 60 seconds or so
 
--- roll in the parameter whitelist script (so one script not two)
 -- Backport to the Callisto Branch: https://github.com/lthall/Leonard_ardupilot/commits/20250702_Callisto_4.5.7-9_dev/
 
 -- far flung future - change parameters on peripherals too
@@ -23,10 +22,20 @@ local SEL_DO_NOTHING = -1
 -- This is a marker for the start of the config_domains; it is used to swap these out for CI testing
 local must_be_set = "must be set"
 
+-- a table of param indexes to help avoid annoying conflicts:
+local param_index = {
+   ["enable"]    =  1,
+   ["pm_filter"] =  2,
+
+   ["JOB"]       = 10,
+   ["ARMS"]      = 11,
+   ["BAT"]       = 12,
+   ["PAY"]       = 13,
+}
+
 local config_domains = {
    JOB = {
       param_name = "JOB",
-      param_sel_index = 6,
       all_param_defaults = {
          ["FLTMODE1"] = must_be_set,
          ["FLTMODE2"] = must_be_set,
@@ -76,7 +85,6 @@ local config_domains = {
    },
    ARMS = {
       param_name = "ARMS",
-      param_sel_index = 5,
       all_param_defaults = {  -- all parameters present in the params for each option
          ["ACRO_BAL_PITCH"] = 1,
          ["ACRO_BAL_ROLL"] = 1,
@@ -289,9 +297,8 @@ local config_domains = {
       },
    },
 
-   BATTERY = {
+   BAT = {
       param_name = "BAT",
-      param_sel_index = 4,
       all_param_defaults = {
          ["BATT_CAPACITY"] = must_be_set,
          ["BATT_CRT_MAH"] = must_be_set,
@@ -336,7 +343,6 @@ local config_domains = {
 
    PAY = {
       param_name = "PAY",
-      param_sel_index = 3,
       all_param_defaults = {
          ["GRIP_ENABLE"] = 0,
          ["GRIP_GRAB"] = 1000,
@@ -446,6 +452,38 @@ local config_domains = {
 }
 -- This is a marker for the end of the config_domains; it is used to swap these out for CI testing
 
+-- a list of parameters which can still be set even if we are
+-- filtering which parameter values can bet set.  We also permit the
+-- configuration paramters to be dynamically set.
+local parameters_which_can_be_set = {
+    ["MAV_OPTIONS"] = true,
+    ["PARAM_SET_ENABLE"] = true,
+
+    ["BATT_ARM_MAH"] = true,
+    ["BATT_ARM_VOLT"] = true,
+    ["BATT_FS_CRT_ACT"] = true,
+    ["BATT_FS_LOW_ACT"] = true,
+
+    ["BRD_OPTIONS"] = true,
+    ["COMPASS_USE3"] = true,
+
+    ["FENCE_ACTION"] = true,
+    ["FENCE_ALT_MAX"] = true,
+    ["FENCE_ENABLE"] = true,
+    ["FENCE_RADIUS"] = true,
+    ["FENCE_TYPE"] = true,
+
+    ["LIGHTS_ON"] = true,
+
+    ["LOG_BITMASK"] = true,
+    ["LOG_DISARMED"] = true,
+    ["LOG_FILE_DSRMROT"] = true,
+
+    ["RTL_ALT"] = true,
+    ["RTL_LOIT_TIME"] = true,
+    ["RTL_SPEED"] = true,
+}
+
 local msg_pfx = "CFG: "
 
 -- set up for denying arming when problems occur:
@@ -460,6 +498,12 @@ local function set_aux_auth_passed()
 end
 
 set_aux_auth_failed("Validation pending")
+
+-- initialise our knowledge of the GCS's allow-set-parameters state.
+--   We do not want to fight over setting this GCS state via other
+--   mechanisms (eg. an auxiliary function), so we keep this state
+--   around to track what we last set:
+local gcs_allow_set = gcs:get_allow_param_set()
 
 local function send_text(severity, message)
    gcs:send_text(severity, msg_pfx .. message)
@@ -645,7 +689,16 @@ end
   // @Values: 0:Disabled,1:Enabled
   // @User: Standard
 --]]
-local PARAM_SET_ENABLE = bind_add_param("ENABLE", 1, 1)
+local CFG_ENABLE = bind_add_param("ENABLE", param_index["enable"], 1)
+
+--[[
+  // @Param: CFG_FLTR_PM_SET
+  // @DisplayName: Filter parameter setting
+  // @Description: Disallows setting of parameters outside whitelist
+  // @Values: 0:Do not filter,1:Filter
+  // @User: Standard
+--]]
+local FLT_PM_SET = bind_add_param("FLT_PM_SET", param_index["pm_filter"], 0)
 
 local function add_param_for_domain(domain, index, name, default)
    pname = domain.param_name .. "_" .. name
@@ -658,7 +711,7 @@ for _, domain in pairs(config_domains) do
    if domain_sel_default == nil then
       domain_sel_default = 0
    end
-   domain.sel_param = add_param_for_domain(domain, domain.param_sel_index, "SEL", domain_sel_default)
+   domain.sel_param = add_param_for_domain(domain, param_index[domain.param_name], "SEL", domain_sel_default)
 end
 
 local a_parameter_was_ever_set = false
@@ -741,14 +794,78 @@ local function handle_domains()
    end
 end
 
+-- support for parameter-set-filtering:
+local function should_set_parameter_id(param_id)
+   -- first check the static list:
+   if parameters_which_can_be_set[param_id] ~= nil then
+      return parameters_which_can_be_set[param_id]
+   end
+
+   -- now check to see if this is one of the configuration selection
+   -- parameters:
+   for _, domain in pairs(config_domains) do
+      domain_sel_param_name = string.format("CFG_%s_SEL", domain.param_name)
+      if param_id == domain_sel_param_name then
+         return true
+      end
+   end
+
+   return false
+end
+
+local function handle_param_set(name, value)
+    -- we will not receive packets in here for the wrong system ID /
+    --   component ID; this is handled by ArduPilot's MAVLink routing
+    --   code
+
+    -- check for this specific ID:
+    if not should_set_parameter_id(name) then
+       send_text(3, string.format("param set denied (%s)", name))
+        return
+    end
+
+    param:set_and_save(name, value)
+    gcs:send_text(3, string.format("param set applied"))
+end
+
+local function handle_param_setting()
+   while true do
+      local msg, _ = mavlink:receive_chan()
+      if msg == nil then
+         break
+      end
+
+      local param_value, _, _, param_id, _ = string.unpack("<fBBc16B", string.sub(msg, 13, 36))
+      param_id = string.gsub(param_id, string.char(0), "")
+
+      handle_param_set(param_id, param_value)
+   end
+end
+
 -- update function
 local domains_valid = false
 function update()
-   if PARAM_SET_ENABLE:get() == 0 then
+   if CFG_ENABLE:get() == 0 then
       -- permanently exit
+        if not gcs_allow_set then
+          gcs:set_allow_param_set(true)
+          gcs_allow_set = true
+        end
       send_text(3, string.format("exitting"))
       return
    end
+
+   if gcs_allow_set and FLT_PM_SET:get() == 1 then
+      -- this script is filtering, disallow setting via normal means (once):
+      gcs:set_allow_param_set(false)
+      gcs_allow_set = false
+   elseif not gcs_allow_set and FLT_PM_SET:get() == 0 then
+      -- this script is not filtering, allow setting via normal means (once):
+      gcs:set_allow_param_set(true)
+      gcs_allow_set = true
+   end
+
+   handle_param_setting()
 
    -- do nothing if armed:
    if arming:is_armed() then
