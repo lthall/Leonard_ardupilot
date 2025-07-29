@@ -216,9 +216,6 @@ void Tiltrotor::continuous_update(void)
     // default to inactive
     _motors_active = false;
 
-    // the maximum rate of throttle change
-    float max_change;
-
     if (!quadplane.in_vtol_mode() && (!plane.arming.is_armed_and_safety_off() || !quadplane.assisted_flight)) {
         // we are in pure fixed wing mode. Move the tiltable motors all the way forward and run them as
         // a forward motor
@@ -227,7 +224,8 @@ void Tiltrotor::continuous_update(void)
         const bool disarmed_tilt_up = !plane.arming.is_armed_and_safety_off() && (plane.control_mode != &plane.mode_manual) && quadplane.option_is_set(QuadPlane::Option::DISARMED_TILT_UP);
         slew(disarmed_tilt_up ? 0.0 : get_forward_flight_tilt());
 
-        max_change = tilt_max_change(false);
+        // the maximum rate of throttle change
+        const float max_change = tilt_max_change(false);
 
         float new_throttle = constrain_float(SRV_Channels::get_output_scaled(SRV_Channel::k_throttle)*0.01, 0, 1);
         if (current_tilt < get_fully_forward_tilt()) {
@@ -253,7 +251,8 @@ void Tiltrotor::continuous_update(void)
 
     // remember the throttle level we're using for VTOL flight
     float motors_throttle = motors->get_throttle();
-    max_change = tilt_max_change(motors_throttle<current_throttle);
+    // the maximum rate of throttle change:
+    const float max_change = tilt_max_change(motors_throttle<current_throttle);
     current_throttle = constrain_float(motors_throttle,
                                             current_throttle-max_change,
                                             current_throttle+max_change);

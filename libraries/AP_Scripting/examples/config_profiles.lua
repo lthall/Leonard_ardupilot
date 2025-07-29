@@ -14,7 +14,7 @@
 
 -- far flung future - change parameters on peripherals too
 
-gcs:send_text(6, string.format("CFG: config_profiles v0.2 starting"))
+gcs:send_text(6, string.format("CFG: config_profiles v0.3 starting"))
 
 local SEL_APPLY_DEFAULTS = 0
 local SEL_DO_NOTHING = -1
@@ -456,8 +456,9 @@ local config_domains = {
 -- filtering which parameter values can bet set.  We also permit the
 -- configuration paramters to be dynamically set.
 local parameters_which_can_be_set = {
+    ["CFG_FLT_PM_SET"] = true,
+
     ["MAV_OPTIONS"] = true,
-    ["PARAM_SET_ENABLE"] = true,
 
     ["BATT_ARM_MAH"] = true,
     ["BATT_ARM_VOLT"] = true,
@@ -498,6 +499,13 @@ local function set_aux_auth_passed()
 end
 
 set_aux_auth_failed("Validation pending")
+
+-- initialize MAVLink rx with buffer depth and number of rx message IDs to register
+mavlink:init(5, 1)
+
+-- register message id to receive
+local PARAM_SET_ID = 23
+mavlink:register_rx_msgid(PARAM_SET_ID)
 
 -- initialise our knowledge of the GCS's allow-set-parameters state.
 --   We do not want to fight over setting this GCS state via other
@@ -829,16 +837,29 @@ local function handle_param_set(name, value)
 end
 
 local function handle_param_setting()
+   if gcs_allow_set and FLT_PM_SET:get() == 1 then
+      -- this script is filtering, disallow setting via normal means (once):
+      gcs:set_allow_param_set(false)
+      gcs_allow_set = false
+   elseif not gcs_allow_set and FLT_PM_SET:get() == 0 then
+      -- this script is not filtering, allow setting via normal means (once):
+      gcs:set_allow_param_set(true)
+      gcs_allow_set = true
+   end
+
    while true do
+      -- we consume all mavlink messages even when we won't set parameters
       local msg, _ = mavlink:receive_chan()
       if msg == nil then
          break
       end
 
-      local param_value, _, _, param_id, _ = string.unpack("<fBBc16B", string.sub(msg, 13, 36))
-      param_id = string.gsub(param_id, string.char(0), "")
+      if gcs_allow_set == false then -- we are in change of param setting
+         local param_value, _, _, param_id, _ = string.unpack("<fBBc16B", string.sub(msg, 13, 36))
+         param_id = string.gsub(param_id, string.char(0), "")
 
-      handle_param_set(param_id, param_value)
+         handle_param_set(param_id, param_value)
+      end
    end
 end
 
@@ -853,16 +874,6 @@ function update()
         end
       send_text(3, string.format("exitting"))
       return
-   end
-
-   if gcs_allow_set and FLT_PM_SET:get() == 1 then
-      -- this script is filtering, disallow setting via normal means (once):
-      gcs:set_allow_param_set(false)
-      gcs_allow_set = false
-   elseif not gcs_allow_set and FLT_PM_SET:get() == 0 then
-      -- this script is not filtering, allow setting via normal means (once):
-      gcs:set_allow_param_set(true)
-      gcs_allow_set = true
    end
 
    handle_param_setting()
