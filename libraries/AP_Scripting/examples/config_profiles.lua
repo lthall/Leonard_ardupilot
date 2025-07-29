@@ -352,7 +352,7 @@ local config_domains = {
 
    PAY = {
       param_name = "PAY",
-      param_sel_index = SEL_APPLY_DEFAULTS,
+      param_sel_index = 3,
       all_param_defaults = {
          ["GRIP_ENABLE"] = 0,
          ["GRIP_GRAB"] = 1000,
@@ -400,6 +400,7 @@ local config_domains = {
          ["SERVO9_REVERSED"] = 0,
          ["SERVO9_TRIM"] = 1500,
       },
+      default_sel_value = SEL_APPLY_DEFAULTS,
       profiles = {
          [0] = {
             name = "Gimbal - Hook Slung",
@@ -735,7 +736,7 @@ local function handle_domains()
       ::cd_next_domain::
    end
    if a_parameter_was_ever_set then
-      set_aux_auth_failed("Reboot required for configuration change")
+      set_aux_auth_failed("Reboot needed for config change")
    elseif success then
       set_aux_auth_passed()
    end
@@ -744,7 +745,7 @@ end
 -- update function
 local domains_valid = false
 function update()
-   if not PARAM_SET_ENABLE then
+   if PARAM_SET_ENABLE:get() == 0then
       -- permanently exit
       send_text(3, string.format("exitting"))
       return
