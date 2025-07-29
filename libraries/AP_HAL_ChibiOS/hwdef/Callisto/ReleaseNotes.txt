@@ -1,0 +1,30 @@
+November 21st, 2022 : Callisto 4.3 parameter updates
+November 21st, 2022 : Copter: Payload Place enhancements
+November 13th, 2022 : Callisto 2.2: Version 4.3.0-Cal2.2S
+November 13th, 2022 : AP_Math: Control Tools Enhancments
+November 13th, 2022 : Copter: Add Ship Operations Mode
+September 2nd, 2022 : AP_Math: Control: Add heading input shaping
+November 13th, 2022 : Copter: Release Tie Down on take-off
+November 13th, 2022 : Copter: Add Tie Down Release
+November 13th, 2022 : Copter: Add Take-off vertical speed
+November 6th, 2022 : Callisto 2.2: Version 4.3.0-b1-Cal2.2
+October 31st, 2022: Copter: version to 4.3.0 official
+August 21st, 2022: Copter: V4.2.3-rc3-Cal2.2
+July 28th, 2022: Copter: Fix Payload Place Bug
+July 22nd, 2022: Copter: Payload Place fix takeoff
+August 20th, 2022: Copter: version to 4.2.3-rc3
+November 18th, 2021: Copter: Version ArduCopter V4.0.7 Cal2.2"
+November 18th, 2021: AP_Motors: Add CW X
+May 28th, 2021: Copter: version to 4.0.7 Cal21c
+May 24th, 2021: Copter: Fix Loiter attitude error during Pre-Takeoff
+May 28th, 2021: AC_AttitudeControl: Set yaw rate to zero during arming procedure
+April 15th, 2021: Copter: version to 4.0.7 Cal21b
+April 15th, 2021: AP_GPS: fixed moving baseline Z check for attitude lag (for 4.0)
+March 30th, 2021: Copter: version to 4.0.7 Cal21a
+August 15th, 2020: Copter: add gripper release FS_Option
+March 28th, 2021: Copter: Version Cal21
+February 9th, 2021: Callisto release
+February 8th, 2021: Create LedFlash.lua script to flash arm LED's
+February 8th, 2021: Create Callisto custom build
+January 29th, 2021: ArduCopter V4.0.6 ATUN1
+January 29th, 2021: AC_AutoTune: Tighten up Autotune level requirements
