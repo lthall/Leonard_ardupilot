@@ -9,24 +9,24 @@
 -- verify parameters have been set in the main loop
 -- emit profiles being used once every 60 seconds or so
 
-gcs:send_text(6, string.format("config_profiles v0.1 starting"))
+-- all_param_defaults should not contain any parameter value which is the same as the default value for athat parameter from defaults.parm
+
+gcs:send_text(6, string.format("config_profiles v0.2 starting"))
 
 local must_be_set = "must be set"
 
-auth_id = arming:get_aux_auth_id()
+auth_id = arming:get_aux_auth_id() or 0
 arming:set_aux_auth_failed(auth_id, "Validation pending")
 
 local a_parameter_was_ever_set = false
 
-MODE_DO_NOTHING = 0
-MODE_APPLY_VALUES = 1
-MODE_APPLY_DEFAULTS = 2
+SEL_APPLY_DEFAULTS = 0
+SEL_DO_NOTHING = -1
 
 -- This is a marker for the start of the config_domains; it is used to swap these out for CI testing
 local config_domains = {
    ARMS = {
       param_name = "ARMS",
-      param_mode_index = 6,
       param_sel_index = 7,
       all_param_defaults = {  -- all parameters present in the params for each option
          ["ACRO_BAL_PITCH"] = 1,
@@ -242,7 +242,6 @@ local config_domains = {
 
    BATTERY = {
       param_name = "BAT",
-      param_mode_index = 4,
       param_sel_index = 5,
       all_param_defaults = {
          ["BATT_CAPACITY"] = must_be_set,
@@ -288,7 +287,6 @@ local config_domains = {
 
    PAY = {
       param_name = "PAY",
-      param_mode_index = 2,
       param_sel_index = 3,
       all_param_defaults = {
          ["GRIP_ENABLE"] = 0,
@@ -423,10 +421,10 @@ local function validate_params_in_param_defaults()
    -- Also ensure that it doesn't have the same value as the default
    -- also ensure all defaults are over-ridden in one of the profiles
    for _, domain in pairs(config_domains) do
-      local default_overridden = {}
+--      local default_overridden = {}
       for profile_num, profile in pairs(domain.profiles) do
          for param_name, param_value in pairs(profile.params) do
-            default_overridden[param_name] = true
+--            default_overridden[param_name] = true
             local param_default = domain.all_param_defaults[param_name]
             if param_default == nil then
                send_text(3, string.format("%s exists in %s[%f](%s) but not in %s.all_param_defaults", param_name, domain.param_name, profile_num, profile.name, domain.param_name))
@@ -438,17 +436,17 @@ local function validate_params_in_param_defaults()
             end
          end
       end
-      local failed_defaults_used = false
-      for param_name, _ in pairs(domain.all_param_defaults) do
-         if default_overridden[param_name] == nil then
--- turns out this is a pain as you need to find values to put into all_param_defaults which is annoying
+-- turns out this is a pain as you need to find values to put into all_param_defaults which is annoying:
+--      local failed_defaults_used = false
+--      for param_name, _ in pairs(domain.all_param_defaults) do
+         --if default_overridden[param_name] == nil then
 --            send_text(3, string.format("%s.all_param_defaults contains %s but no profile overrides it", domain.param_name, param_name))
 --            failed_defaults_used = true
-         end
-      end
-      if failed_defaults_used then
-         return false
-      end
+--         end
+--      end
+--      if failed_defaults_used then
+--         return false
+--      end
    end
    return true
 end
@@ -491,26 +489,26 @@ end
 local function validate_domain_attributes()
    -- check direct domain attributes are valid
    for _, domain in pairs(config_domains) do
-      -- check default_mode_value
-      default_mode_value = domain.default_mode_value
-      if default_mode_value ~= nil then
-         if default_mode_value ~= MODE_DO_NOTHING and
-            default_mode_value ~= MODE_APPLY_VALUES and
-            default_mode_value ~= MODE_APPLY_DEFAULTS then
-            send_text(3, string.format("%s.default_mode_value is invalid", domain.param_name))
-            return false
-         end
-      end
-
       -- check default selection is valid
       default_sel_value = domain.default_sel_value
-      if default_sel_value ~= nil then
-         sel = domain.profiles[default_sel_value]
-         if sel == nil then
-            send_text(3, string.format("%s.default_sel_value is invalid", domain.param_name))
-            return false
-         end
+      if default_sel_value == nil then
+         goto good_sel_value
       end
+      if default_sel_value == SEL_DO_NOTHING or default_sel_value == SEL_APPLY_DEFAULTS then
+         goto good_sel_value
+      end
+      
+      sel = domain.profiles[default_sel_value]
+      if sel ~= nil then
+         goto good_sel_value
+      end
+
+      if true then  -- needed to fool lua checker
+         send_text(3, string.format("%s.default_sel_value is invalid", domain.param_name))
+         return false
+      end
+
+      ::good_sel_value::
    end
    return true
 end
@@ -520,12 +518,12 @@ local function validate_apply_defaults_no_must_be_sets()
    -- ensure that if a parameter is marked as must-be-supplied in the
    -- defaults that the domain isn't in "apply defaults" mode
    for _, domain in pairs(config_domains) do
-      mode_param = domain.mode_param:get()
-      if mode_param == nil then
-         send_text(3, string.format("Bad mode parameter for %s", domain.param_name))
+      local sel_value = domain.sel_param:get()
+      if sel_value == nil then
+         send_text(3, string.format("Bad sel parameter for %s", domain.param_name))
          return false
       end
-      if mode_param ~= MODE_APPLY_DEFAULTS then
+      if sel_value ~= SEL_APPLY_DEFAULTS then
          goto vadnn_next_domain
       end
       for param_name, value in pairs(domain.all_param_defaults) do
@@ -593,12 +591,6 @@ local function add_param_for_domain(domain, index, name, default)
 end
 
 for _, domain in pairs(config_domains) do
-   domain_mode_default = domain.default_mode_value
-   if domain_mode_default == nil then
-      domain_mode_default = MODE_APPLY_VALUES
-   end
-   domain.mode_param = add_param_for_domain(domain, domain.param_mode_index, "MODE", domain_mode_default)
-
    domain_sel_default = domain.default_sel_value
    if domain_sel_default == nil then
       domain_sel_default = 0
@@ -609,7 +601,6 @@ end
 -- utility: apply one profile
 local function apply_parameters(domain, params)
    for param_name, new_value in pairs(domain.all_param_defaults) do
-      local x = new_value
       local profile_param_value = params[param_name]
       if profile_param_value ~= nil then
          new_value = profile_param_value
@@ -639,48 +630,42 @@ end
 local function handle_domains()
    local success = true
    for _, domain in pairs(config_domains) do
-      local mode = domain.mode_param:get()
-      local mode_changed = false
-      if mode ~= domain.last_mode then
-         domain.last_mode = mode
-         mode_changed = true
+      local sel_value = domain.sel_param:get()
+      local sel_value_changed = false
+      if sel_value ~= domain.last_sel_value then
+         domain.last_sel_value = sel_value
+         sel_value_changed = true
       end
-      if mode == MODE_DO_NOTHING then
-         if mode_changed then
+
+      if sel_value == SEL_DO_NOTHING then
+         if sel_value_changed then
             send_text(6, string.format("Doing nothing for %s", domain.param_name))
          end
          goto cd_next_domain
       end
 
-      if mode == MODE_APPLY_DEFAULTS then
-         if mode_changed then
+      if sel_value == SEL_APPLY_DEFAULTS then
+         if sel_value_changed then
             send_text(6, string.format("Applying %s defaults", domain.param_name))
          end
          apply_parameters(domain, {})
          goto cd_next_domain
       end
 
-      if mode == MODE_APPLY_VALUES then
-         local profile_id = domain.sel_param:get()
-
-         local profile = domain.profiles[profile_id]
-         if profile == nil then
-            send_text(3, string.format("Invalid profile selected for %s", domain.param_name))
-            arming:set_aux_auth_failed(auth_id, string.format("Invalid profile selected for %s", domain.param_name))
-            success = false
-            goto cd_next_domain
-         end
-         if domain.last_profile_id ~= profile_id or mode_changed then
-            domain.last_profile_id = profile_id
-            send_text(6, string.format("Applying %s profile: %s", domain.param_name, profile.name))
-         end
-         apply_parameters(domain, profile.params)
+      local profile = domain.profiles[sel_value]
+      if profile == nil then
+         send_text(3, string.format("Invalid profile selected for %s", domain.param_name))
+         arming:set_aux_auth_failed(auth_id, string.format("Invalid profile selected for %s", domain.param_name))
+         success = false
          goto cd_next_domain
       end
-      
-      send_text(3, string.format("Invalid mode selected for %s", domain.param_name))
-      arming:set_aux_auth_failed(auth_id, string.format("Invalid mode selected for %s", domain.param_name))
-      success = false
+
+      if domain.last_sel_value ~= sel_value or sel_value_changed then
+         domain.last_sel_value = sel_value
+         send_text(6, string.format("Applying %s profile: %s", domain.param_name, profile.name))
+      end
+      apply_parameters(domain, profile.params)
+      goto cd_next_domain
 
       ::cd_next_domain::
    end
@@ -698,6 +683,11 @@ function update()
       -- permanently exit
       send_text(3, string.format("exitting"))
       return
+   end
+
+   if not auth_id then
+      send_text("auth_id not available")
+      return update, 1000
    end
 
    -- do nothing if armed:
