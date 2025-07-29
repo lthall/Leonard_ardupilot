@@ -11,6 +11,13 @@
 
 -- all_param_defaults should not contain any parameter value which is the same as the default value for athat parameter from defaults.parm
 
+-- roll in the parameter whitelist script (so one script not two)
+-- Change config_profiles: to CFG
+-- Add a mission config for flightmodes, failsafes, WPNav, Loiter, Pilot, PSC parameters.
+-- Backport to the Callisto Branch: https://github.com/lthall/Leonard_ardupilot/commits/20250702_Callisto_4.5.7-9_dev/
+
+-- far flung future - change parameters on peripherals too
+
 gcs:send_text(6, string.format("config_profiles v0.2 starting"))
 
 local must_be_set = "must be set"
