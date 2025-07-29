@@ -40,9 +40,59 @@ local SEL_DO_NOTHING = -1
 local must_be_set = "must be set"
 
 local config_domains = {
+   JOB = {
+      param_name = "JOB",
+      param_sel_index = 6,
+      all_param_defaults = {
+         ["FLTMODE1"] = must_be_set,
+         ["FLTMODE2"] = must_be_set,
+         ["FLTMODE3"] = must_be_set,
+         ["FLTMODE4"] = must_be_set,
+         ["FLTMODE5"] = must_be_set,
+         ["FLTMODE6"] = must_be_set,
+         ["LOG_BITMASK"] = 180223,
+      },
+      default_sel_value = 1,
+      profiles = {
+         [1] = {
+            name = "DeliveryDefault",
+            params = {
+               ["FLTMODE1"] = 2,
+               ["FLTMODE2"] = 2,
+               ["FLTMODE3"] = 5,
+               ["FLTMODE4"] = 5,
+               ["FLTMODE5"] = 6,
+               ["FLTMODE6"] = 6,
+               ["LOG_BITMASK"] = 180222,
+            }
+         },
+         [2] = {
+            name = "FSO",
+            params = {
+               ["FLTMODE1"] = 5,
+               ["FLTMODE2"] = 5,
+               ["FLTMODE3"] = 3,
+               ["FLTMODE4"] = 3,
+               ["FLTMODE5"] = 6,
+               ["FLTMODE6"] = 6,
+            },
+         },
+         [3] = {
+            name = "Testing",
+            params = {
+               ["FLTMODE1"] = 0,
+               ["FLTMODE2"] = 0,
+               ["FLTMODE3"] = 2,
+               ["FLTMODE4"] = 2,
+               ["FLTMODE5"] = 5,
+               ["FLTMODE6"] = 5,
+            },
+         },
+      },
+   },
    ARMS = {
       param_name = "ARMS",
-      param_sel_index = 7,
+      param_sel_index = 5,
       all_param_defaults = {  -- all parameters present in the params for each option
          ["ACRO_BAL_PITCH"] = 1,
          ["ACRO_BAL_ROLL"] = 1,
@@ -257,7 +307,7 @@ local config_domains = {
 
    BATTERY = {
       param_name = "BAT",
-      param_sel_index = 5,
+      param_sel_index = 4,
       all_param_defaults = {
          ["BATT_CAPACITY"] = must_be_set,
          ["BATT_CRT_MAH"] = must_be_set,
@@ -295,14 +345,14 @@ local config_domains = {
                ["BATT_CRT_VOLT"] = 43.75,
                ["BATT_LOW_MAH"] = 24000,
                ["BATT_LOW_VOLT"] = 44.25,
-            }
+            },
          },
       },
    },
 
    PAY = {
       param_name = "PAY",
-      param_sel_index = 3,
+      param_sel_index = SEL_APPLY_DEFAULTS,
       all_param_defaults = {
          ["GRIP_ENABLE"] = 0,
          ["GRIP_GRAB"] = 1000,
@@ -404,10 +454,10 @@ local config_domains = {
                ["SERVO12_FUNCTION"] = 62,      -- 62 = Mount Roll
                ["SERVO13_FUNCTION"] = 58,      -- 58 = Mount Zoom
                ["SERVO14_FUNCTION"] = 57,      -- 57 = Mount Focus
-            }
+            },
          },
       },
-   }
+   },
 }
 -- This is a marker for the end of the config_domains; it is used to swap these out for CI testing
 
