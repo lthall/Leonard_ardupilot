@@ -667,6 +667,7 @@ local function validate_param_profiles()
          end
       end
    end
+   return true
 end
 
 -- validate_config_domains - step through the domain configuration
@@ -797,6 +798,7 @@ local function handle_domains()
 
       local profile = domain.profiles[sel_value]
       if profile == nil then
+         send_text(6, string.format("Invalid profile selected for %s", domain.param_name))
          set_aux_auth_failed(string.format("Invalid profile selected for %s", domain.param_name))
          success = false
          goto cd_next_domain
