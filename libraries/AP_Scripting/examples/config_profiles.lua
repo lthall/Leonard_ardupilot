@@ -392,21 +392,6 @@ local config_domains = {
       },
       default_sel_value = SEL_APPLY_DEFAULTS,
       profiles = {
-         [0] = {
-            name = "Gimbal - Hook Slung",
-            params = {
-               ["GRIP_ENABLE"] = 1,
-               ["RC8_OPTION"] = 19,        -- gripper
-               ["SERVO9_FUNCTION"] = 146,  -- k_rcin7_mapped?!
-               ["SERVO9_REVERSED"] = 1,
-               ["SERVO10_FUNCTION"] = 28,  -- gripper
-               ["SERVO10_TRIM"] = 2000,
-               ["SERVO11_FUNCTION"] = 64,  -- rcin 14
-               ["SERVO12_FUNCTION"] = 63,  -- rcin 13
-               ["SERVO13_FUNCTION"] = 61,  -- rcin 11
-               ["SERVO14_FUNCTION"] = 56,  -- rcin 6
-            }
-         },
          [1] = {
             name = "HookFixed",
             params = {
@@ -446,6 +431,21 @@ local config_domains = {
                ["SERVO13_FUNCTION"] = 58,      -- 58 = Mount Zoom
                ["SERVO14_FUNCTION"] = 57,      -- 57 = Mount Focus
             },
+         },
+         [5] = {
+            name = "Gimbal - Hook Slung",
+            params = {
+               ["GRIP_ENABLE"] = 1,
+               ["RC8_OPTION"] = 19,        -- gripper
+               ["SERVO9_FUNCTION"] = 146,  -- k_rcin7_mapped?!
+               ["SERVO9_REVERSED"] = 1,
+               ["SERVO10_FUNCTION"] = 28,  -- gripper
+               ["SERVO10_TRIM"] = 2000,
+               ["SERVO11_FUNCTION"] = 64,  -- rcin 14
+               ["SERVO12_FUNCTION"] = 63,  -- rcin 13
+               ["SERVO13_FUNCTION"] = 61,  -- rcin 11
+               ["SERVO14_FUNCTION"] = 56,  -- rcin 6
+            }
          },
       },
    },
@@ -654,6 +654,21 @@ local function validate_apply_defaults_no_must_be_sets()
    return true
 end
 
+local function validate_param_profiles()
+   for _, domain in pairs(config_domains) do
+      for profile_num, profile in pairs(domain.profiles) do
+         if profile.name == nil then
+            send_text(3, string.format("%s profile is missing a name", domain.param_name))
+            return false
+         end
+         if profile_num == 0 then
+            send_text(3, string.format("%s profile (%s) has zero index, which conflicts with the domain \"apply defaults\" option", domain.param_name, profile.name))
+            return false
+         end
+      end
+   end
+end
+
 -- validate_config_domains - step through the domain configuration
 -- structure and ensure that no mistake has been made in the setup of
 -- the configuration sets
@@ -664,6 +679,7 @@ local function validate_config_domains()
       validate_must_be_set_parameters,
       validate_apply_defaults_no_must_be_sets,
       validate_domain_attributes,
+      validate_param_profiles,
    }
    for _, validator in pairs(validators) do
       if validator == nil then
