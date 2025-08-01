@@ -403,7 +403,7 @@ local config_domains = {
          ["BATT_LOW_MAH"] = must_be_set,
          ["BATT_LOW_VOLT"] = must_be_set,
       },
-      default_sel_value = 16,
+      default_sel_value = 22,
       profiles = {
          [16] = {
             name = "16Ah",
@@ -464,11 +464,11 @@ local config_domains = {
          ["MNT1_TYPE"] = 0,
          ["MNT1_YAW_MAX"] = 180,
          ["MNT1_YAW_MIN"] = -180,
+         ["RC8_OPTION"] = 0,        -- disabled
          ["RC13_OPTION"] = 0,
          ["RC13_REVERSED"] = 0,
          ["RC14_OPTION"] = 0,
          ["RC14_REVERSED"] = 0,
-         ["RC8_OPTION"] = 0,        -- disabled
          ["SERIAL5_BAUD"] = 115,      -- 115 = 115200 baud
          ["SERIAL5_OPTIONS"] = 0,
          ["SERIAL5_PROTOCOL"] = 2,    -- 2 = MAVLink2
@@ -573,6 +573,16 @@ local parameters_which_can_be_set = {
    ["FENCE_RADIUS"] = true,
    ["FENCE_TOTAL"] = true,
    ["FENCE_TYPE"] = true,
+
+   -- Failsafes
+   ["FLTMODE_CH"] = true,
+   ["FLTMODE_GCSBLOCK"] = true,
+   ["FLTMODE1"] = true,
+   ["FLTMODE2"] = true,
+   ["FLTMODE3"] = true,
+   ["FLTMODE4"] = true,
+   ["FLTMODE5"] = true,
+   ["FLTMODE6"] = true,
 
    -- Failsafes
    ["FS_DR_ENABLE"] = true,
@@ -889,7 +899,6 @@ end
 local function validate_must_be_set_parameters()
    -- ensure that if a parameter has a "must be set" value in the
    -- defaults that every domain defines a value for that default
-   -- also assert that at least one profile has a different value to the others
    for _, domain in pairs(config_domains) do
       for param_name, value in pairs(domain.all_param_defaults) do
          if value ~= must_be_set then
