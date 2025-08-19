@@ -104,13 +104,40 @@ July 10th, 2023 : Copter: Add Tie Down Release
 March 2nd, 2024 : Copter: Payload Place: Add logging
 March 2nd, 2024 : Copter: Payload Place: Payload Place: Add Drop Range
 June 3rd, 2024 : Copter: Payload Place: Add thrust detection threshold filtering
-April 24th, 2023 : Filter: Increase triple notch spacing
+
+January 3rd, 2024 : Version: V4.4.0-Cal3
+January 3rd, 2024 : Callisto: Update VEL_XY_D and RCX_DZ
+December 18th, 2023 : Copter: version to 4.4.4
+December 6th, 2023 : board_types.txt: reserve ID for FreeSpace PowerStack
 September 20th, 2023 : AC_Autotune: Reduce max rates
 September 28th, 2023 : Copter: Update PayLoadPlace code
-December 6th, 2023 : board_types.txt: reserve ID for FreeSpace PowerStack
 July 22nd, 2023 : AP_TemperatureSensor: Add TSYS03 support
-December 18th, 2023 : Copter: version to 4.4.4
 
+June 27th, 2023 : Version: V4.3.7-Cal1S
+June 27th, 2023 : Version: V4.3.7-Cal1
+May 31st, 2023 : Copter: version to 4.3.7
+
+May 8th, 2023 : Version: V4.3.6-Cal3
+March 6th, 2023 : Copter: fix terrain offset reset
+March 4th, 2023 : Copter: Add support for terrain altitude time constant
+March 4th, 2023 : AC_WPNav: Provide terrain altitude for surface tracking
+May 7th, 2023 : Callisto: Increase range finder minimum range
+
+April 24th, 2023 : Version: V4.3.6-Cal2
+April 24th, 2023 : Filter: Increase triple notch spacing
+April 24th, 2023 : Callisto: Update Tune
+April 5th, 2023 : Copter: version to 4.3.6
+
+April 17th, 2023 : Version: V4.3.5-Cal1
+March 1st, 2023 : Copter: version to 4.3.5-rc1
+
+April 15th, 2023 : Version: V4.3.3-Cal2
+March 15th, 2023 : AC_WPNav: Stop parameter changes overriding speeds
+February 7th, 2023 : Update INS_HNTCH_BW
+January 29th, 2023 : Update BAT Parameters
+January 26th, 2023 : AC_WPNav: Fix Corner Acceleration Bug
+
+December 17th, 2022 : Version: V4.3.3-Cal1
 December 13th, 2022 : AP_Gripper: Add Neutral state after init
 December 19th, 2022 : Copter: Use wp_start() in do_nav_wp()
 December 19th, 2022 : Copter: Fix Auto Takeoff when complete_alt_cm is current altitude
