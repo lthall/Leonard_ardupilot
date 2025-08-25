@@ -464,6 +464,18 @@ local config_domains = {
          ["MNT1_TYPE"] = 0,
          ["MNT1_YAW_MAX"] = 180,
          ["MNT1_YAW_MIN"] = -180,
+         ["NET_ENABLE"] = 0,
+         ["NET_OPTIONS"] = 0,
+         ["NET_P1_IP0"] = 192,
+         ["NET_P1_IP1"] = 168,
+         ["NET_P1_IP2"] = 111,
+         ["NET_P1_IP3"] = 15,
+         ["NET_P1_PORT"] = 14550,
+         ["NET_P1_PROTOCOL"] = 2,
+         ["NET_P1_TYPE"] = 2,
+         ["NET_P2_TYPE"] = 0,
+         ["NET_P3_TYPE"] = 0,
+         ["NET_P4_TYPE"] = 0,
          ["RC8_OPTION"] = 0,        -- disabled
          ["RC13_OPTION"] = 0,
          ["RC13_REVERSED"] = 0,
@@ -542,6 +554,30 @@ local config_domains = {
                ["SERVO12_FUNCTION"] = 63,  -- rcin 13
                ["SERVO13_FUNCTION"] = 61,  -- rcin 11
                ["SERVO14_FUNCTION"] = 56,  -- rcin 6
+            }
+         },
+         [10] = {
+            name = "Silvus",
+            params = {
+               ["SERIAL5_BAUD"] = 115,      -- 115 = 115200 baud
+               ["SERIAL5_PROTOCOL"] = 2,    -- 2 = MAVLink2
+            }
+         },
+         [11] = {
+            name = "Skylink",
+            params = {
+               ["NET_ENABLE"] = 1,
+               ["NET_OPTIONS"] = 0,
+               ["NET_P1_IP0"] = 192,
+               ["NET_P1_IP1"] = 168,
+               ["NET_P1_IP2"] = 111,
+               ["NET_P1_IP3"] = 15,
+               ["NET_P1_PORT"] = 14550,
+               ["NET_P1_PROTOCOL"] = 2,
+               ["NET_P1_TYPE"] = 2,
+               ["NET_P2_TYPE"] = 0,
+               ["NET_P3_TYPE"] = 0,
+               ["NET_P4_TYPE"] = 0,
             }
          },
       },
