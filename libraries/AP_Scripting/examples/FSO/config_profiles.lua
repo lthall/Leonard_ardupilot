@@ -37,7 +37,7 @@ local config_domains = {
       all_param_defaults = {
          -- Flight Modes
          ["FLTMODE_CH"] = must_be_set,
-         ["FLTMODE_GCSBLOCK"] = 12232580,
+         ["FLTMODE_GCSBLOCK"] = 12232576,
          ["FLTMODE1"] = must_be_set,
          ["FLTMODE2"] = must_be_set,
          ["FLTMODE3"] = must_be_set,
@@ -911,10 +911,10 @@ local function validate_params_in_param_defaults()
                send_text(3, string.format("%s exists in %s[%f](%s) but not in %s.all_param_defaults", param_name, domain.param_name, profile_num, profile.name, domain.param_name))
                return false
             end
-            if param_default == param_value then
-               send_text(3, string.format("%s in %s[%f](%s) has the same value as %s.all_param_defaults", param_name, domain.param_name, profile_num, profile.name, domain.param_name))
-               return false
-            end
+--            if param_default == param_value then
+--               send_text(3, string.format("%s in %s[%f](%s) has the same value as %s.all_param_defaults", param_name, domain.param_name, profile_num, profile.name, domain.param_name))
+--               return false
+--            end
          end
       end
 -- turns out this is a pain as you need to find values to put into all_param_defaults which is annoying:
