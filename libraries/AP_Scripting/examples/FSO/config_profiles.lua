@@ -37,13 +37,13 @@ local config_domains = {
       all_param_defaults = {
          -- Flight Modes
          ["FLTMODE_CH"] = must_be_set,
-         ["FLTMODE_GCSBLOCK"] = 12232576,
          ["FLTMODE1"] = must_be_set,
          ["FLTMODE2"] = must_be_set,
          ["FLTMODE3"] = must_be_set,
          ["FLTMODE4"] = must_be_set,
          ["FLTMODE5"] = must_be_set,
          ["FLTMODE6"] = must_be_set,
+         ["FLTMODE_GCSBLOCK"] = 12232576,
 
          -- Flight Behavior
          ["ANGLE_MAX"] = 3000,
@@ -71,6 +71,10 @@ local config_domains = {
          ["FS_THR_ENABLE"] = 1,
          ["FS_THR_VALUE"] = 975,
          ["FS_VIBE_ENABLE"] = 1,
+
+         -- Battery Failsafes
+         ["BATT_FS_CRT_ACT"] = 1,
+         ["BATT_FS_LOW_ACT"] = 2,
 
          -- IMU Logging
          ["INS_FAST_SAMPLE"] = 7,
@@ -123,6 +127,9 @@ local config_domains = {
          ["RTL_LOIT_TIME"] = 1000,
          ["RTL_OPTIONS"] = 0,
          ["RTL_SPEED"] = 0,
+         
+         -- Takeoff
+         ["TKOFF_SLEW_TIME"] = 4,
 
          -- Terrain Following
          ["TERRAIN_ENABLE"] = 1,
