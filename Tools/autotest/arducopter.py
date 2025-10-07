@@ -10793,6 +10793,10 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
 
         self.context_pop()
 
+        # disable the script but don't add it to the context so it
+        # doesn't get re-enabled:
+        self.set_parameter('PARAM_SET_ENABLE', 0, add_to_context=False)
+
     def LUAConfigProfile(self):
         '''test the config_profiles.lua example script'''
         self.customise_SITL_commandline(
