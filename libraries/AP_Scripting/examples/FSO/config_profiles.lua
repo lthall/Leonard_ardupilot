@@ -911,7 +911,7 @@ local function validate_params_in_param_defaults()
    for _, domain in pairs(config_domains) do
 --      local default_overridden = {}
       for profile_num, profile in pairs(domain.profiles) do
-         for param_name, param_value in pairs(profile.params) do
+         for param_name, _ in pairs(profile.params) do
  --            default_overridden[param_name] = true
             local param_default = domain.all_param_defaults[param_name]
             if param_default == nil then

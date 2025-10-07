@@ -10733,11 +10733,24 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
 
     def LuaParamSet(self):
         '''test param-set.lua applet'''
-        self.install_applet_script_context("param-set.lua")
         self.set_parameters({
             'SCR_ENABLE': 1,
         })
+
+        self.context_push()
+
+        self.install_applet_script_context("param-set.lua")
         self.reboot_sitl()
+
+        # collect original parameter values for everything other than
+        # SCR_ENABLE and PARAM_SET_ENABLE.  This resolves an issue at
+        # the end of the test where the popped context wants to set
+        # PARAM_SET_ENABLE back to its original value (enabled!),
+        # which can cause problems resetting
+        orig_parameter_values = self.get_parameters([
+            'RTL_ALT',
+            'DISARM_DELAY',
+        ])
 
         self.wait_ready_to_arm()  # scripts will be ready by now!
         self.start_subtest("set RTL_ALT freely")
@@ -10772,8 +10785,17 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
         self.reboot_sitl()
         self.assert_parameter_value('DISARM_DELAY', 111)
 
-        # very bad things happen if we don't turn things off at the end..
-        self.set_parameter("PARAM_SET_ENABLE", 0)
+        # set parameters to their original value so the following
+        # context pop should only need to set PARAM_SET_ENABLE back to
+        # its default value of 1.  That prevents permission errors
+        # created by param-set.lua!
+        self.set_parameters(orig_parameter_values)
+
+        self.context_pop()
+
+        # disable the script but don't add it to the context so it
+        # doesn't get re-enabled:
+        self.set_parameter('PARAM_SET_ENABLE', 0, add_to_context=False)
 
     def LUAConfigProfile(self):
         '''test the config_profiles.lua example script'''
