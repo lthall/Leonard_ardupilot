@@ -1,3 +1,6 @@
+October 8th, 2025 : Callisto: V4.5.7-C2.Xr12
+October 8th, 2025 : RC_Channel: Do not assume gripper should be released on init.
+
 October 8th, 2025 : Callisto: V4.5.7-C2.Xr11
 October 8th, 2025 : Callisto: Param: SCR_VM_I_COUNT,20000
 August 25th, 2025 : AP_Logger: be 'in expected delay' when doing log transfer to avoid the monitor thread's wrath when the main thread has not run for 1.9 seconds
