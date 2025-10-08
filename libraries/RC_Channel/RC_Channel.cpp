@@ -630,6 +630,9 @@ void RC_Channel::init_aux_function(const aux_func_t ch_option, const AuxSwitchPo
     case AUX_FUNC::COMPASS_LEARN:
     case AUX_FUNC::DISARM:
     case AUX_FUNC::DO_NOTHING:
+#if AP_GRIPPER_ENABLED
+    case AUX_FUNC::GRIPPER:
+#endif
     case AUX_FUNC::LANDING_GEAR:
     case AUX_FUNC::LOST_VEHICLE_SOUND:
     case AUX_FUNC::RELAY:
@@ -677,9 +680,6 @@ void RC_Channel::init_aux_function(const aux_func_t ch_option, const AuxSwitchPo
     case AUX_FUNC::FENCE:
     case AUX_FUNC::GPS_DISABLE:
     case AUX_FUNC::GPS_DISABLE_YAW:
-#if AP_GRIPPER_ENABLED
-    case AUX_FUNC::GRIPPER:
-#endif
 #if AP_INERTIALSENSOR_KILL_IMU_ENABLED
     case AUX_FUNC::KILL_IMU1:
     case AUX_FUNC::KILL_IMU2:
