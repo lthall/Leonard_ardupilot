@@ -48,16 +48,6 @@ local config_domains = {
          -- Flight Behavior
          ["ANGLE_MAX"] = 3000,
 
-         -- Geofence
-         ["FENCE_ACTION"] = 1,
-         ["FENCE_ALT_MAX"] = 100,
-         ["FENCE_ALT_MIN"] = -10,
-         ["FENCE_ENABLE"] = 1,
-         ["FENCE_MARGIN"] = 2,
-         ["FENCE_RADIUS"] = 300,
-         ["FENCE_TOTAL"] = 0,
-         ["FENCE_TYPE"] = 7,
-
          -- Failsafes
          ["FS_CRASH_CHECK"] = 1,
          ["FS_DR_ENABLE"] = 2,
@@ -90,7 +80,6 @@ local config_domains = {
 
          -- Logging
          ["LOG_BITMASK"] = 180222,
-         ["LOG_DISARMED"] = 0,
          ["LOG_FILE_DSRMROT"] = 0,
 
          -- Loiter Mode
