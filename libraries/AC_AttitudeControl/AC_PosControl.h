@@ -587,7 +587,7 @@ public:
 
     // Returns measured vertical (Up) acceleration in m/s² (Earth frame, gravity-compensated).
     // Positive = upward acceleration.
-    float get_measured_accel_U_mss() const { return -(_ahrs.get_accel_ef().z + GRAVITY_MSS); }
+    float get_estimate_accel_U_mss() const { return -(_ahrs.get_accel_ef().z + GRAVITY_MSS); }
 
     // Returns true if the requested forward pitch is limited by the configured tilt constraint.
     bool get_fwd_pitch_is_limited() const;
@@ -697,8 +697,8 @@ protected:
     AP_Float        _lean_angle_max_deg;    // Maximum autopilot commanded angle (in degrees). Set to zero for Angle Max
     AP_Float        _shaping_jerk_ne_msss;  // Jerk limit of the ne kinematic path generation in m/s³ used to determine how quickly the aircraft varies the acceleration target
     AP_Float        _shaping_jerk_u_msss;   // Jerk limit of the u kinematic path generation in m/s³ used to determine how quickly the aircraft varies the acceleration target
-    AC_P_2D         _p_pos_ne_m;            // XY axis position controller to convert target distance (cm) to target velocity (cm/s)
-    AC_P_1D         _p_pos_u_m;             // Z axis position controller to convert target altitude (cm) to target climb rate (cm/s)
+    AC_P_2D         _p_pos_ne_m;            // XY axis position controller to convert target distance (m) to target velocity (m/s)
+    AC_P_1D         _p_pos_u_m;             // Z axis position controller to convert target altitude (m) to target climb rate (m/s)
     AC_PID_2D       _pid_vel_ne_cm;         // XY axis velocity controller to convert target velocity (cm/s) to target acceleration (cm/s²)
     AC_PID_Basic    _pid_vel_u_cm;          // Z axis velocity controller to convert target climb rate (cm/s) to target acceleration (cm/s²)
     AC_PID          _pid_accel_u_cm_to_kt;  // Z axis acceleration controller to convert target acceleration (cm/s²) to throttle output (0 to 1000)

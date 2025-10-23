@@ -870,7 +870,7 @@ void AC_PosControl::init_U_controller()
     _pid_vel_u_cm.reset_filter();
     _pid_vel_u_cm.set_integrator(0.0f);
 
-    _accel_target_neu_mss.z = constrain_float(get_measured_accel_U_mss(), -_accel_max_u_mss, _accel_max_u_mss);
+    _accel_target_neu_mss.z = constrain_float(get_estimate_accel_U_mss(), -_accel_max_u_mss, _accel_max_u_mss);
     _accel_desired_neu_mss.z = _accel_target_neu_mss.z - (_accel_offset_neu_mss.z + _accel_terrain_u_mss);
     _pid_accel_u_cm_to_kt.reset_filter();
 
@@ -878,7 +878,7 @@ void AC_PosControl::init_U_controller()
     // Remove the expected P term due to _accel_desired_neu_mss.z being constrained to _accel_max_u_mss
     // Remove the expected FF term due to non-zero _accel_target_neu_mss.z
     _pid_accel_u_cm_to_kt.set_integrator((_attitude_control.get_throttle_in() - _motors.get_throttle_hover()) * 10.0 * 100.0
-        - _pid_accel_u_cm_to_kt.kP() * (_accel_target_neu_mss.z - get_measured_accel_U_mss()) * 100.0
+        - _pid_accel_u_cm_to_kt.kP() * (_accel_target_neu_mss.z - get_estimate_accel_U_mss()) * 100.0
         - _pid_accel_u_cm_to_kt.ff() * _accel_target_neu_mss.z * 100.0);
 
     // initialise ekf z reset handler
@@ -1085,7 +1085,7 @@ void AC_PosControl::update_U_controller()
     // Acceleration Controller
 
     // Gravity-compensated vertical acceleration measurement (positive = up)
-    const float measured_accel_u_mss = get_measured_accel_U_mss();
+    const float measured_accel_u_mss = get_estimate_accel_U_mss();
 
     // Ensure integrator can produce enough thrust to overcome hover throttle
     if (_motors.get_throttle_hover() * 1000.0 > _pid_accel_u_cm_to_kt.imax()) {
@@ -1508,7 +1508,7 @@ void AC_PosControl::write_log()
         // Log Down-axis position control (PSCD)
         Write_PSCD(-_pos_desired_neu_m.z, -_pos_target_neu_m.z, -_pos_estimate_neu_m.z,
                    -_vel_desired_neu_ms.z, -_vel_target_neu_ms.z, -_vel_estimate_neu_ms.z,
-                   -_accel_desired_neu_mss.z, -_accel_target_neu_mss.z, -get_measured_accel_U_mss());
+                   -_accel_desired_neu_mss.z, -_accel_target_neu_mss.z, -get_estimate_accel_U_mss());
 
         // log down and terrain offsets if they are being used
         if (!is_zero(_pos_offset_neu_m.z)) {
