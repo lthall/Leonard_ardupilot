@@ -276,6 +276,7 @@ bool AC_WPNav::set_wp_destination_loc(const Location& destination, float arc_rad
 
 // Sets the next waypoint destination using a Location object.
 // Converts global coordinates to NEU position and preloads the trajectory.
+// Arc_rad specifies the signed arc angle in radians for an ARC_WAYPOINT segment (0 for straight path)
 // Returns false if conversion fails or terrain data is unavailable.
 bool AC_WPNav::set_wp_destination_next_loc(const Location& destination, float arc_rad)
 {
