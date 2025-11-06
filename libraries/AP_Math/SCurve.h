@@ -105,6 +105,9 @@ private:
     // return the position, velocity and acceleration vectors relative to the origin at a specified time along the path
     void move_from_time_pos_vel_accel(float t, Vector3p &pos, Vector3f &vel, Vector3f &accel);
 
+    // project the straight-line S-curve motion profile onto the active track segment
+    // converts scalar S-curve kinematics (A1, V1, P1) into 3D position, velocity and acceleration
+    // along either a circular arc or straight segment
     void project_scurve_onto_track(float scurve_A1, float scurve_V1, float scurve_P1, Vector3p &pos, Vector3f &vel, Vector3f &accel);
 
     // get desired maximum speed along track
@@ -223,8 +226,11 @@ private:
     bool is_arc_segment;    // true if this segment is a circular arc, false if straight line
     Vector3f seg_delta;     // total displacement vector from start to end point (NEU frame)
     float seg_length;       // 3D scalar length of the path (arc length + vertical component)
-    float arc_angle_rad;    // signed central angle of the arc [rad] (+CCW, -CW), 0 = straight
-    float arc_length_ne;    // horizontal arc length along the circle (R * |theta|)
-    float arc_radius_ne;    // arc radius
-    Vector2f arc_center_ne; // center of the circle in local NE plane, relative to start point
+
+    struct {
+        float angle_rad;    // signed central angle of the arc [rad] (+CCW, -CW), 0 = straight
+        float length_ne;    // horizontal arc length along the circle (R * |theta|)
+        float radius_ne;    // arc radius
+        Vector2f center_ne; // center of the circle in local NE plane, relative to start point
+    } arc;
 };

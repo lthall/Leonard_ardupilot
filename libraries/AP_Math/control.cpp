@@ -573,12 +573,15 @@ float kinematic_limit(Vector3f direction, float max_xy, float max_z_pos, float m
         return 0.0;
     }
 
-    const float mag_xy = direction.xy().length();
+    const float segment_length_xy = direction.xy().length();
     
-    return kinematic_limit(mag_xy, direction.z, max_xy, max_z_pos, max_z_neg);
+    return kinematic_limit(segment_length_xy, direction.z, max_xy, max_z_pos, max_z_neg);
 }
 
-float kinematic_limit(float mag_xy, float mag_z, float max_xy, float max_z_pos, float max_z_neg)
+// compute the maximum allowed magnitude along a direction defined by segment_length_xy and segment_length_z components
+// constrained by independent horizontal (max_xy) and vertical (max_z_pos/max_z_neg) limits
+// returns the maximum achievable magnitude without exceeding any axis limit
+float kinematic_limit(float segment_length_xy, float segment_length_z, float max_xy, float max_z_pos, float max_z_neg)
 {
     // Reject zero-length direction vectors or undefined limits
     if (is_zero(max_xy) || is_zero(max_z_pos) || is_zero(max_z_neg)) {
@@ -589,38 +592,38 @@ float kinematic_limit(float mag_xy, float mag_z, float max_xy, float max_z_pos, 
     max_z_pos = fabsf(max_z_pos);
     max_z_neg = fabsf(max_z_neg);
 
-    const float length = safe_sqrt(sq(mag_xy) + sq(mag_z));
-    mag_xy /= length;
-    mag_z /= length;
+    const float length = safe_sqrt(sq(segment_length_xy) + sq(segment_length_z));
+    segment_length_xy /= length;
+    segment_length_z /= length;
 
-    if (is_zero(mag_xy)) {
+    if (is_zero(segment_length_xy)) {
         // Pure vertical motion
-        return is_positive(mag_z) ? max_z_pos : max_z_neg;
+        return is_positive(segment_length_z) ? max_z_pos : max_z_neg;
     }
 
-    if (is_zero(mag_z)) {
+    if (is_zero(segment_length_z)) {
         // Pure horizontal motion
         return max_xy;
     }
 
     // Compute vertical-to-horizontal slope of desired direction
-    const float slope = mag_z/mag_xy;
+    const float slope = segment_length_z/segment_length_xy;
     if (is_positive(slope)) {
         // Ascending: check if slope is within limits
         if (fabsf(slope) < max_z_pos/max_xy) {
-            return max_xy/mag_xy;
+            return max_xy/segment_length_xy;
         }
         // Vertical limit dominates in upward direction
-        return fabsf(max_z_pos/mag_z);
+        return fabsf(max_z_pos/segment_length_z);
     }
 
     // Descending: check if slope is within limits
     if (fabsf(slope) < max_z_neg/max_xy) {
-        return max_xy/mag_xy;
+        return max_xy/segment_length_xy;
     }
 
     // Vertical limit dominates in downward direction
-    return fabsf(max_z_neg/mag_z);
+    return fabsf(max_z_neg/segment_length_z);
 }
 
 // Applies an exponential curve to a normalized input in the range [-1, 1].
