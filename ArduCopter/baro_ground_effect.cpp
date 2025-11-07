@@ -18,8 +18,7 @@ void Copter::update_ground_effect_detector(void)
 
     if (pos_control->is_active_NE()) {
         Vector3f vel_target_neu_ms = pos_control->get_vel_target_NEU_ms();
-        vel_target_neu_ms.z = 0.0f;
-        xy_des_speed_ms = vel_target_neu_ms.length();
+        xy_des_speed_ms = vel_target_neu_ms.xy().length();
     }
 
     // takeoff logic
