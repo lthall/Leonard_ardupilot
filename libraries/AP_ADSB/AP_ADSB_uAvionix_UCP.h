@@ -57,6 +57,9 @@ private:
     bool hostTransmit(uint8_t *buffer, uint16_t length);
     uint16_t gdl90Transmit(GDL90_TX_MESSAGE &message, const uint16_t length);
     static bool parseByte(const uint8_t data, GDL90_RX_MESSAGE &msg, GDL90_RX_STATUS &status);
+    // Minimal GDL-90 (Traffic Report only)
+    void handle_gdl90_traffic_report(const uint8_t *payload, uint16_t len);
+
 
     struct {
         uint32_t last_msg_ms;
