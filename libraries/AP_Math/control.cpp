@@ -566,7 +566,7 @@ float stopping_distance(float velocity, float p, float accel_max)
 // - `direction` should be a non-zero vector indicating desired direction of travel.
 // - Limits: max_xy, max_z_pos (upward), max_z_neg (downward)
 // Returns the maximum achievable magnitude in that direction without violating any axis constraint.
-float kinematic_limit(Vector3f direction, float max_xy, float max_z_pos, float max_z_neg)
+float kinematic_limit(Vector3f direction, float max_xy, float max_z_neg, float max_z_pos)
 {
     // Reject zero-length direction vectors or undefined limits
     if (is_zero(direction.length_squared()) || is_zero(max_xy) || is_zero(max_z_pos) || is_zero(max_z_neg)) {
@@ -627,10 +627,9 @@ float input_expo(float input, float expo)
 }
 
 // Converts a lean angle (radians) to horizontal acceleration in m/s².
-// Assumes flat Earth and small angle approximation: a = g * tan(θ)
 float angle_rad_to_accel_mss(float angle_rad)
 {
-    // Convert lean angle to horizontal acceleration assuming flat-Earth and small-angle
+    // Convert lean angle to horizontal acceleration
     return GRAVITY_MSS * tanf(angle_rad);
 }
 
