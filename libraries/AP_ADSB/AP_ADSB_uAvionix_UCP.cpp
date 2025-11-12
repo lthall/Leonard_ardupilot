@@ -48,7 +48,6 @@ bool AP_ADSB_uAvionix_UCP::detect()
     return AP::serialmanager().have_serial(AP_SerialManager::SerialProtocol_ADSB, 0);
 }
 
-
 // Init, called once after class is constructed
 bool AP_ADSB_uAvionix_UCP::init()
 {
@@ -61,7 +60,6 @@ bool AP_ADSB_uAvionix_UCP::init()
     request_msg(GDL90_ID_TRANSPONDER_CONFIG);
     return true;
 }
-
 
 void AP_ADSB_uAvionix_UCP::update()
 {
@@ -86,7 +84,7 @@ void AP_ADSB_uAvionix_UCP::update()
         }
     } // while nbytes
 
-   if (now_ms - run_state.last_packet_Transponder_Control_ms >= 1000) {
+    if (now_ms - run_state.last_packet_Transponder_Control_ms >= 1000) {
         run_state.last_packet_Transponder_Control_ms = now_ms;
         send_Transponder_Control();
     }
@@ -96,7 +94,7 @@ void AP_ADSB_uAvionix_UCP::update()
         send_GPS_Data();
     }
 
-    // if the transponder has stopped giving us the data needed to 
+    // if the transponder has stopped giving us the data needed to
     // fill the transponder status mavlink message, reset that data.
     if ((now_ms - run_state.last_packet_Transponder_Status_ms >= 10000 && run_state.last_packet_Transponder_Status_ms != 0)
         && (now_ms - run_state.last_packet_Transponder_Heartbeat_ms >= 10000 && run_state.last_packet_Transponder_Heartbeat_ms != 0)
@@ -106,10 +104,18 @@ void AP_ADSB_uAvionix_UCP::update()
     }
 }
 
-
 void AP_ADSB_uAvionix_UCP::handle_msg(const GDL90_RX_MESSAGE &msg)
 {
-    switch(msg.messageId) {
+    switch (msg.messageId) {
+    // --- Plain GDL-90 Traffic Report (kept inside the same switch style) ---
+    case GDL90_Traffic_Report:
+        // Accept standard Traffic (27-byte payload) and tolerate GDL-90+ extensions:
+        // rx.status.length = 1 (id) + payload (≥27) + 2 (CRC)
+        if (rx.status.length >= (1U + 27U + 2U)) {
+            handle_gdl90_traffic_report(&msg.raw[1], 27);
+        }
+        break;
+
     case GDL90_ID_HEARTBEAT: {
         // The Heartbeat message provides real-time indications of the status and operation of the
         // transponder. The message will be transmitted with a period of one second for the UCP
@@ -148,28 +154,45 @@ void AP_ADSB_uAvionix_UCP::handle_msg(const GDL90_RX_MESSAGE &msg)
 
         }
         break;
-
     case GDL90_ID_IDENTIFICATION:
-        // The Identification message contains information used to identify the connected device. The
-        // Identification message will be transmitted with a period of one second regardless of data status
-        // or update for the UCP protocol and will be transmitted upon request for the UCP-HD protocol.
-        if (memcmp(&rx.decoded.identification, msg.raw, sizeof(rx.decoded.identification)) != 0) {
-            memcpy(&rx.decoded.identification, msg.raw, sizeof(rx.decoded.identification));
+    {
+        const bool changed = (memcmp(&rx.decoded.identification, msg.raw,
+                                    sizeof(rx.decoded.identification)) != 0);
+        if (!changed) {
+            break; // nothing changed this time
+        }
+        memcpy(&rx.decoded.identification, msg.raw, sizeof(rx.decoded.identification));
 
-            // Firmware Part Number (not null terminated, but null padded if part number is less than 15 characters).
-            // Copy into a temporary string that is 1 char longer so we ensure it's null terminated
-            const uint8_t str_len = sizeof(rx.decoded.identification.primaryFwPartNumber);
-            char primaryFwPartNumber[str_len+1];
-            memcpy(&primaryFwPartNumber, rx.decoded.identification.primaryFwPartNumber, str_len);
-            primaryFwPartNumber[str_len] = 0;
-            
-            GCS_SEND_TEXT(MAV_SEVERITY_DEBUG,"ADSB:Detected %s v%u.%u.%u SN:%u %s",
-                get_hardware_name(rx.decoded.identification.primary.hwId),
-                (unsigned)rx.decoded.identification.primary.fwMajorVersion,
-                (unsigned)rx.decoded.identification.primary.fwMinorVersion,
-                (unsigned)rx.decoded.identification.primary.fwBuildVersion,
-                (unsigned)rx.decoded.identification.primary.serialNumber,
-                primaryFwPartNumber);
+        // Build a stable key from fields that should not flap each second
+        const auto &id = rx.decoded.identification;
+        struct IdentKey {
+            uint8_t  hwId;
+            uint8_t  fwMaj, fwMin, fwBld;
+            uint32_t serial;
+            char     pn[16]; // primaryFwPartNumber (not null-terminated on wire)
+        };
+        static IdentKey last{};
+        static bool have_last = false;
+
+        IdentKey cur{};
+        cur.hwId  = id.primary.hwId;
+        cur.fwMaj = id.primary.fwMajorVersion;
+        cur.fwMin = id.primary.fwMinorVersion;
+        cur.fwBld = id.primary.fwBuildVersion;
+        cur.serial = id.primary.serialNumber;
+        memcpy(cur.pn, id.primaryFwPartNumber, sizeof(cur.pn));
+
+        if (!have_last || memcmp(&cur, &last, sizeof(cur)) != 0) {
+            last = cur; have_last = true;
+
+            char pn_str[17]; memcpy(pn_str, cur.pn, 16); pn_str[16] = 0;
+
+            GCS_SEND_TEXT(MAV_SEVERITY_INFO,
+                "ADSB:Detected %s v%u.%u.%u SN:%u %s",
+                get_hardware_name(cur.hwId),
+                (unsigned)cur.fwMaj, (unsigned)cur.fwMin, (unsigned)cur.fwBld,
+                (unsigned)cur.serial, pn_str);
+            }
         }
         break;
 
@@ -208,7 +231,7 @@ void AP_ADSB_uAvionix_UCP::handle_msg(const GDL90_RX_MESSAGE &msg)
         } else {
             _frontend.out_state.tx_status.state &= ~UAVIONIX_ADSB_OUT_STATUS_STATE_IDENT_ACTIVE;
         }
-        
+
         if (rx.decoded.transponder_status.modeAEnabled) {
             _frontend.out_state.tx_status.state |= UAVIONIX_ADSB_OUT_STATUS_STATE_MODE_A_ENABLED;
         } else {
@@ -264,12 +287,12 @@ void AP_ADSB_uAvionix_UCP::handle_msg(const GDL90_RX_MESSAGE &msg)
     case GDL90_ID_MESSAGE_REQUEST:
         // not handled, outbound only
         break;
+
     default:
         //GCS_SEND_TEXT(MAV_SEVERITY_DEBUG,"ADSB:Unknown msg %d", (int)msg.messageId);
         break;
     }
 }
-
 
 const char* AP_ADSB_uAvionix_UCP::get_hardware_name(const uint8_t hwId)
 {
@@ -282,6 +305,7 @@ const char* AP_ADSB_uAvionix_UCP::get_hardware_name(const uint8_t hwId)
         case 0x26: //return "Ping200Z/Ping200X";    // (uncertified). Let's fallthrough and use Ping200X
         case 0x2F: return "Ping200X";               // (certified)
         case 0x30: return "TailBeaconX";            // (certified)
+        case 0x39: return "ZPX microIFF";            // (certified)
     } // switch hwId
     return "Unknown HW";
 }
@@ -294,7 +318,7 @@ void AP_ADSB_uAvionix_UCP::send_Transponder_Control()
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
     // when using the simulator, always declare we're on the ground to help
-    // inhibit chaos if this ias actually being broadcasted on real hardware
+    // inhibit chaos if this is actually being broadcast on real hardware
     msg.airGroundState =  ADSB_ON_GROUND;
 #elif AP_ADSB_UAVIONIX_DETECT_GROUNDSTATE
     msg.airGroundState =  _frontend.out_state.is_flying ? ADSB_AIRBORNE_SUBSONIC : ADSB_ON_GROUND;
@@ -336,7 +360,6 @@ void AP_ADSB_uAvionix_UCP::send_Transponder_Control()
 
     gdl90Transmit((GDL90_TX_MESSAGE&)msg, sizeof(msg));
 }
-
 
 void AP_ADSB_uAvionix_UCP::send_GPS_Data()
 {
@@ -387,7 +410,6 @@ void AP_ADSB_uAvionix_UCP::send_GPS_Data()
     gdl90Transmit((GDL90_TX_MESSAGE&)msg, sizeof(msg));
 }
 
-
 bool AP_ADSB_uAvionix_UCP::hostTransmit(uint8_t *buffer, uint16_t length)
 {
     if (_port == nullptr || _port->txspace() < length) {
@@ -396,7 +418,6 @@ bool AP_ADSB_uAvionix_UCP::hostTransmit(uint8_t *buffer, uint16_t length)
     _port->write(buffer, length);
     return true;
 }
-
 
 bool AP_ADSB_uAvionix_UCP::request_msg(const GDL90_MESSAGE_ID msg_id)
 {
@@ -408,7 +429,6 @@ bool AP_ADSB_uAvionix_UCP::request_msg(const GDL90_MESSAGE_ID msg_id)
     return gdl90Transmit((GDL90_TX_MESSAGE&)msg, sizeof(msg)) != 0;
 }
 
-
 uint16_t AP_ADSB_uAvionix_UCP::gdl90Transmit(GDL90_TX_MESSAGE &message, const uint16_t length)
 {
     uint8_t gdl90FrameBuffer[GDL90_TX_MAX_FRAME_LENGTH] {};
@@ -418,14 +438,14 @@ uint16_t AP_ADSB_uAvionix_UCP::gdl90Transmit(GDL90_TX_MESSAGE &message, const ui
     // Set flag byte in frame buffer
     gdl90FrameBuffer[0] = GDL90_FLAG_BYTE;
     uint16_t frameIndex = 1;
-    
+
     // Copy and stuff all payload bytes into frame buffer
     for (uint16_t i = 0; i < length+2; i++) {
         // Check for overflow of frame buffer
         if (frameIndex >= GDL90_TX_MAX_FRAME_LENGTH) {
             return 0;
         }
-        
+
         uint8_t data;
         // Append CRC to payload
         if (i == length) {
@@ -433,7 +453,7 @@ uint16_t AP_ADSB_uAvionix_UCP::gdl90Transmit(GDL90_TX_MESSAGE &message, const ui
         } else if (i == length+1) {
             data = HIGHBYTE(frameCrc);
         } else {
-            data = message.raw[i];    
+            data = message.raw[i];
         }
 
         if (data == GDL90_FLAG_BYTE || data == GDL90_CONTROL_ESCAPE_BYTE) {
@@ -441,7 +461,7 @@ uint16_t AP_ADSB_uAvionix_UCP::gdl90Transmit(GDL90_TX_MESSAGE &message, const ui
             if (frameIndex + 2 > GDL90_TX_MAX_FRAME_LENGTH) {
               return 0;
             }
-            
+
             // Set control break and stuff this byte
             gdl90FrameBuffer[frameIndex++] = GDL90_CONTROL_ESCAPE_BYTE;
             gdl90FrameBuffer[frameIndex++] = data ^ GDL90_STUFF_BYTE;
@@ -449,7 +469,7 @@ uint16_t AP_ADSB_uAvionix_UCP::gdl90Transmit(GDL90_TX_MESSAGE &message, const ui
             gdl90FrameBuffer[frameIndex++] = data;
         }
     }
-    
+
     // Add end of frame indication
     gdl90FrameBuffer[frameIndex++] = GDL90_FLAG_BYTE;
 
@@ -457,10 +477,9 @@ uint16_t AP_ADSB_uAvionix_UCP::gdl90Transmit(GDL90_TX_MESSAGE &message, const ui
     if (hostTransmit(gdl90FrameBuffer, frameIndex)) {
         return frameIndex;
     }
-    
+
     return 0;
 }
-
 
 bool AP_ADSB_uAvionix_UCP::parseByte(const uint8_t data, GDL90_RX_MESSAGE &msg, GDL90_RX_STATUS &status)
 {
@@ -515,5 +534,126 @@ bool AP_ADSB_uAvionix_UCP::parseByte(const uint8_t data, GDL90_RX_MESSAGE &msg, 
     return false;
 }
 
-#endif // HAL_ADSB_UCP_ENABLED
+// Decode a GDL-90 “Traffic Report” (0x14) from a 27-byte payload and forward as MAVLink ADSB_VEHICLE.
+// Caller has already verified framing/CRC; `p` points to the 27-byte payload (ID already stripped).
+// Field mappings follow the GDL-90 ICD:
+//  - Lat/Lon: 24-bit signed semicircles → degrees → degE7
+//  - Altitude: 12-bit code in 25 ft steps with −1000 ft offset (0xFFF = invalid) → millimetres
+//  - Ground speed: 12-bit knots (0xFFF = unavailable) → cm/s
+//  - Vertical speed: signed 12-bit in 64 fpm (0x800 = unavailable) → cm/s
+//  - Track/heading: wrap_360(track byte p[16] * 360/256) → centidegrees
+// Light gating only: ignore frames with all-zero lat/lon bytes, or NIC==0 && NACp==0.
+// Callsign "********" is treated as empty. ADSB_FLAGS are set only for fields we consider valid.
+void AP_ADSB_uAvionix_UCP::handle_gdl90_traffic_report(const uint8_t *p, uint16_t len)
+{
+    if (p == nullptr || len != 27) {
+        return; // must be exactly 27 payload bytes for a standard Traffic Report
+    }
 
+    // ---- Helpers / constants -------------------------------------------------
+    auto semi24_to_deg = [](int32_t s)->double {
+        if (s & 0x00800000) { s |= 0xFF000000; }          // sign-extend 24→32
+        return double(s) * (180.0 / (1 << 23));           // semicircles → degrees
+    };
+    constexpr float kDegPerTrackCount = 360.0f / 256.0f;  // track byte → degrees
+    constexpr float kKtToCms          = 51.444f;          // knots → cm/s
+    constexpr float k64fpmToCms       = 32.512f;          // (64 fpm) → cm/s
+    constexpr float kFtToMm           = 304.8f;           // feet → millimeters
+
+    // ---- Byte-level extraction (names mirror ICD tables) --------------------
+    const uint8_t  status_addr_type     = p[0]; (void)status_addr_type; // not used here
+    const uint32_t icao_addr_24         = (uint32_t(p[1])<<16) | (uint32_t(p[2])<<8) | uint32_t(p[3]);
+
+    const int32_t  lat_sem24            = (int32_t(p[4])<<16) | (int32_t(p[5])<<8) | int32_t(p[6]); // signed
+    const int32_t  lon_sem24            = (int32_t(p[7])<<16) | (int32_t(p[8])<<8) | int32_t(p[9]); // signed
+    const double   lat_deg              = semi24_to_deg(lat_sem24);
+    const double   lon_deg              = semi24_to_deg(lon_sem24);
+
+    const uint16_t altitude_code_25ft   = ( (uint16_t(p[10])<<4) | (p[11]>>4) ) & 0x0FFF;           // 0xFFF=invalid
+    const int32_t  altitude_ft          = (altitude_code_25ft == 0x0FFF) ? INT32_MAX
+                                                                          : int32_t(altitude_code_25ft) * 25 - 1000;
+
+    const uint8_t  misc_nibble          = p[11] & 0x0F;   // bit[1..0] indicates track/heading kind
+    const uint8_t  track_kind           = misc_nibble & 0x03; // 0=invalid, 1=TrueTrack, 2=MagHeading, 3=TrueHeading
+
+    const uint8_t  nic_nacp             = p[12];
+    const uint8_t  nic                  = (nic_nacp >> 4) & 0x0F;
+    const uint8_t  nacp                 =  nic_nacp       & 0x0F;
+
+    const uint16_t gs_knots_code_12b    = ( (uint16_t(p[13])<<4) | (p[14]>>4) ) & 0x0FFF;           // 0xFFF=unavail
+    int16_t        vs_64fpm_code_12b    = ( (int16_t)(p[14] & 0x0F) << 8 ) | int16_t(p[15]);        // 0x800=unavail
+    if (vs_64fpm_code_12b & 0x0800) { vs_64fpm_code_12b |= 0xF000; } // sign-extend 12→16
+
+    const uint8_t  track_byte           = p[16];          // 0..255 → 0..360 degrees
+    const uint8_t  emitter_category     = p[17];
+
+    char callsign_ascii[9]{};
+    memcpy(callsign_ascii, &p[18], 8);                    // space-padded ASCII
+
+    // ---- Light data hygiene (not “hardening”; behaviour stays the same) -----
+    const bool coords_all_zero = ((p[4] | p[5] | p[6] | p[7] | p[8] | p[9]) == 0);
+    if (coords_all_zero || (nic == 0 && nacp == 0)) {
+        // Obvious placeholders/self-test frames → ignore.
+        return;
+    }
+    if (memcmp(callsign_ascii, "********", 8) == 0) {
+        // Treat masked callsign as empty so UI doesn’t present it as a real callsign.
+        callsign_ascii[0] = 0;
+    }
+
+    // ---- Build MAVLink ADSB_VEHICLE (units per MAVLink common.xml) ----------
+    mavlink_adsb_vehicle_t v{};
+    v.ICAO_address  = icao_addr_24; // may be zero if device privacy-masks; still useful with valid coords
+
+    // Position (degE7) and altitude (mm ASL)
+    v.lat           = (lat_deg  <= -90 || lat_deg  >= 90)  ? INT32_MAX : int32_t(llround(lat_deg * 1e7));
+    v.lon           = (lon_deg  <= -180|| lon_deg  >= 180) ? INT32_MAX : int32_t(llround(lon_deg * 1e7));
+    v.altitude      = (altitude_ft == INT32_MAX) ? INT32_MAX : int32_t(llround(altitude_ft * kFtToMm));
+    v.altitude_type = ADSB_ALTITUDE_TYPE_PRESSURE_QNH;
+
+    // Heading: use wrap_360 for ArduPilot-style normalization, then centidegrees
+    if (track_kind == 0) {
+        v.heading = UINT16_MAX; // invalid
+    } else {
+        const float deg = wrap_360(float(track_byte) * kDegPerTrackCount);
+        int32_t cdeg = int32_t(deg * 100.0f);             // truncation matches common style here
+        v.heading = uint16_t(cdeg % 36000);
+    }
+
+    // Speeds (cm/s). Preserve unavailability sentinels.
+    v.hor_velocity  = (gs_knots_code_12b == 0x0FFF) ? UINT16_MAX
+                                                    : uint16_t(lround(gs_knots_code_12b * kKtToCms));
+    v.ver_velocity  = (vs_64fpm_code_12b == 0x0800) ? INT16_MAX
+                                                    : int16_t(lround(vs_64fpm_code_12b * k64fpmToCms));
+
+    // Callsign / emitter
+    memcpy(v.callsign, callsign_ascii, 8);
+    v.callsign[8]   = 0;
+    v.emitter_type  = emitter_category;
+    v.squawk        = 0;
+    v.tslc          = 0;
+
+    // Validity flags (use MAVLink enum values; no local #defines)
+    uint16_t flags = 0;
+    const bool coords_ok = (v.lat != INT32_MAX && v.lon != INT32_MAX);
+    const bool alt_ok    = (v.altitude != INT32_MAX);
+    const bool hdg_ok    = (v.heading  != UINT16_MAX);
+    const bool vel_ok    = (v.hor_velocity != UINT16_MAX) || (v.ver_velocity != INT16_MAX);
+    const bool cs_ok     = (v.callsign[0] != 0);
+
+    if (coords_ok) flags |= ADSB_FLAGS_VALID_COORDS;
+    if (alt_ok)    flags |= ADSB_FLAGS_VALID_ALTITUDE;
+    if (hdg_ok)    flags |= ADSB_FLAGS_VALID_HEADING;
+    if (vel_ok)    flags |= ADSB_FLAGS_VALID_VELOCITY;
+    if (cs_ok)     flags |= ADSB_FLAGS_VALID_CALLSIGN;
+
+    v.flags = flags;
+
+    // ---- Forward via the existing ADS-B frontend (unchanged behaviour) ------
+    AP_ADSB::adsb_vehicle_t av{};
+    av.info = v;
+    av.last_update_ms = AP_HAL::millis();
+    _frontend.handle_adsb_vehicle(av);
+}
+
+#endif // HAL_ADSB_UCP_ENABLED
