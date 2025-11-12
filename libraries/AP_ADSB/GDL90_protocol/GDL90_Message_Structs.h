@@ -28,6 +28,7 @@ typedef enum __attribute__((__packed__))
   GDL90_ID_HEARTBEAT                  = 0,
   GDL90_ID_OWNSHIP_REPORT             = 10,     // 0x0A
   GDL90_ID_OWNSHIP_GEOMETRIC_ALTITUDE = 11,     // 0x0B
+  GDL90_Traffic_Report                = 20,     // 0x14
   GDL90_ID_IDENTIFICATION             = 37,     // 0x25
   GDL90_ID_SENSOR_MESSAGE             = 40,     // 0x28
   GDL90_ID_TRANSPONDER_CONFIG         = 43,     // 0x2B
