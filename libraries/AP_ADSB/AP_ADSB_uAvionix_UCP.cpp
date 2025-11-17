@@ -544,6 +544,8 @@ bool AP_ADSB_uAvionix_UCP::parseByte(const uint8_t data, GDL90_RX_MESSAGE &msg, 
 //  - Track/heading: wrap_360(track byte p[16] * 360/256) → centidegrees
 // Light gating only: ignore frames with all-zero lat/lon bytes, or NIC==0 && NACp==0.
 // Callsign "********" is treated as empty. ADSB_FLAGS are set only for fields we consider valid.
+// Reuse/merge an existing vehicle (by ICAO) like Sagetech does, so we don’t
+// clear unrelated fields when the current message is partial.
 void AP_ADSB_uAvionix_UCP::handle_gdl90_traffic_report(const uint8_t *p, uint16_t len)
 {
     if (p == nullptr || len != 27) {
@@ -552,8 +554,8 @@ void AP_ADSB_uAvionix_UCP::handle_gdl90_traffic_report(const uint8_t *p, uint16_
 
     // ---- Helpers / constants -------------------------------------------------
     auto semi24_to_deg = [](int32_t s)->double {
-        if (s & 0x00800000) { s |= 0xFF000000; }          // sign-extend 24→32
-        return double(s) * (180.0 / (1 << 23));           // semicircles → degrees
+        if (s & 0x00800000) { s |= 0xFF000000; }   // sign-extend 24→32
+        return double(s) * (180.0 / (1 << 23));    // semicircles → degrees
     };
     constexpr float kDegPerTrackCount = 360.0f / 256.0f;  // track byte → degrees
     constexpr float kKtToCms          = 51.444f;          // knots → cm/s
@@ -561,99 +563,121 @@ void AP_ADSB_uAvionix_UCP::handle_gdl90_traffic_report(const uint8_t *p, uint16_
     constexpr float kFtToMm           = 304.8f;           // feet → millimeters
 
     // ---- Byte-level extraction (names mirror ICD tables) --------------------
-    const uint8_t  status_addr_type     = p[0]; (void)status_addr_type; // not used here
-    const uint32_t icao_addr_24         = (uint32_t(p[1])<<16) | (uint32_t(p[2])<<8) | uint32_t(p[3]);
+    const uint32_t icao_addr_24       = (uint32_t(p[1])<<16) | (uint32_t(p[2])<<8) | uint32_t(p[3]);
 
-    const int32_t  lat_sem24            = (int32_t(p[4])<<16) | (int32_t(p[5])<<8) | int32_t(p[6]); // signed
-    const int32_t  lon_sem24            = (int32_t(p[7])<<16) | (int32_t(p[8])<<8) | int32_t(p[9]); // signed
-    const double   lat_deg              = semi24_to_deg(lat_sem24);
-    const double   lon_deg              = semi24_to_deg(lon_sem24);
+    const int32_t  lat_sem24          = (int32_t(p[4])<<16) | (int32_t(p[5])<<8) | int32_t(p[6]); // signed
+    const int32_t  lon_sem24          = (int32_t(p[7])<<16) | (int32_t(p[8])<<8) | int32_t(p[9]); // signed
+    const double   lat_deg            = semi24_to_deg(lat_sem24);
+    const double   lon_deg            = semi24_to_deg(lon_sem24);
 
-    const uint16_t altitude_code_25ft   = ( (uint16_t(p[10])<<4) | (p[11]>>4) ) & 0x0FFF;           // 0xFFF=invalid
-    const int32_t  altitude_ft          = (altitude_code_25ft == 0x0FFF) ? INT32_MAX
-                                                                          : int32_t(altitude_code_25ft) * 25 - 1000;
+    const uint16_t altitude_code_25ft = ( (uint16_t(p[10])<<4) | (p[11]>>4) ) & 0x0FFF;           // 0xFFF=invalid
+    const int32_t  altitude_ft        = (altitude_code_25ft == 0x0FFF) ? INT32_MAX
+                                                                        : int32_t(altitude_code_25ft) * 25 - 1000;
 
-    const uint8_t  misc_nibble          = p[11] & 0x0F;   // bit[1..0] indicates track/heading kind
-    const uint8_t  track_kind           = misc_nibble & 0x03; // 0=invalid, 1=TrueTrack, 2=MagHeading, 3=TrueHeading
+    const uint8_t  misc_nibble        = p[11] & 0x0F;   // bit[1..0] indicates track/heading kind
+    const uint8_t  track_kind         = misc_nibble & 0x03; // 0=invalid, 1=TrueTrack, 2=MagHeading, 3=TrueHeading
 
-    const uint8_t  nic_nacp             = p[12];
-    const uint8_t  nic                  = (nic_nacp >> 4) & 0x0F;
-    const uint8_t  nacp                 =  nic_nacp       & 0x0F;
+    const uint8_t  nic_nacp           = p[12];
+    const uint8_t  nic                = (nic_nacp >> 4) & 0x0F;
+    const uint8_t  nacp               =  nic_nacp       & 0x0F;
 
-    const uint16_t gs_knots_code_12b    = ( (uint16_t(p[13])<<4) | (p[14]>>4) ) & 0x0FFF;           // 0xFFF=unavail
-    int16_t        vs_64fpm_code_12b    = ( (int16_t)(p[14] & 0x0F) << 8 ) | int16_t(p[15]);        // 0x800=unavail
+    const uint16_t gs_knots_code_12b  = ( (uint16_t(p[13])<<4) | (p[14]>>4) ) & 0x0FFF;           // 0xFFF=unavail
+    int16_t        vs_64fpm_code_12b  = ( (int16_t)(p[14] & 0x0F) << 8 ) | int16_t(p[15]);        // 0x800=unavail
     if (vs_64fpm_code_12b & 0x0800) { vs_64fpm_code_12b |= 0xF000; } // sign-extend 12→16
 
-    const uint8_t  track_byte           = p[16];          // 0..255 → 0..360 degrees
-    const uint8_t  emitter_category     = p[17];
+    const uint8_t  track_byte         = p[16];          // 0..255 → 0..360 degrees
+    const uint8_t  emitter_category   = p[17];
 
     char callsign_ascii[9]{};
-    memcpy(callsign_ascii, &p[18], 8);                    // space-padded ASCII
+    memcpy(callsign_ascii, &p[18], 8);                  // space-padded ASCII
 
-    // ---- Light data hygiene (not “hardening”; behaviour stays the same) -----
+    // Obvious placeholder/self-test frames → ignore
     const bool coords_all_zero = ((p[4] | p[5] | p[6] | p[7] | p[8] | p[9]) == 0);
     if (coords_all_zero || (nic == 0 && nacp == 0)) {
-        // Obvious placeholders/self-test frames → ignore.
         return;
     }
+    // We don’t create a table entry for ICAO==0 (privacy/test); this avoids churn under key 0.
+    if (icao_addr_24 == 0) {
+        return;
+    }
+    // Treat masked callsign as empty so UI doesn’t present it as a real callsign.
     if (memcmp(callsign_ascii, "********", 8) == 0) {
-        // Treat masked callsign as empty so UI doesn’t present it as a real callsign.
         callsign_ascii[0] = 0;
     }
 
-    // ---- Build MAVLink ADSB_VEHICLE (units per MAVLink common.xml) ----------
-    mavlink_adsb_vehicle_t v{};
-    v.ICAO_address  = icao_addr_24; // may be zero if device privacy-masks; still useful with valid coords
+    // ---- Compute decoded values + validity booleans -------------------------
+    const bool coords_valid = (lat_deg > -90.0 && lat_deg < 90.0 &&
+                               lon_deg > -180.0 && lon_deg < 180.0);
+    const int32_t lat_e7    = coords_valid ? int32_t(llround(lat_deg * 1e7)) : INT32_MAX;
+    const int32_t lon_e7    = coords_valid ? int32_t(llround(lon_deg * 1e7)) : INT32_MAX;
 
-    // Position (degE7) and altitude (mm ASL)
-    v.lat           = (lat_deg  <= -90 || lat_deg  >= 90)  ? INT32_MAX : int32_t(llround(lat_deg * 1e7));
-    v.lon           = (lon_deg  <= -180|| lon_deg  >= 180) ? INT32_MAX : int32_t(llround(lon_deg * 1e7));
-    v.altitude      = (altitude_ft == INT32_MAX) ? INT32_MAX : int32_t(llround(altitude_ft * kFtToMm));
-    v.altitude_type = ADSB_ALTITUDE_TYPE_PRESSURE_QNH;
+    const bool alt_valid    = (altitude_ft != INT32_MAX);
+    const int32_t alt_mm    = alt_valid ? int32_t(llround(altitude_ft * kFtToMm)) : INT32_MAX;
 
-    // Heading: use wrap_360 for ArduPilot-style normalization, then centidegrees
-    if (track_kind == 0) {
-        v.heading = UINT16_MAX; // invalid
-    } else {
+    const bool hdg_valid    = (track_kind != 0);
+    uint16_t heading_cdeg   = UINT16_MAX;
+    if (hdg_valid) {
         const float deg = wrap_360(float(track_byte) * kDegPerTrackCount);
-        int32_t cdeg = int32_t(deg * 100.0f);             // truncation matches common style here
-        v.heading = uint16_t(cdeg % 36000);
+        heading_cdeg = uint16_t(int32_t(deg * 100.0f) % 36000);
     }
 
-    // Speeds (cm/s). Preserve unavailability sentinels.
-    v.hor_velocity  = (gs_knots_code_12b == 0x0FFF) ? UINT16_MAX
-                                                    : uint16_t(lround(gs_knots_code_12b * kKtToCms));
-    v.ver_velocity  = (vs_64fpm_code_12b == 0x0800) ? INT16_MAX
-                                                    : int16_t(lround(vs_64fpm_code_12b * k64fpmToCms));
+    const bool hvel_valid   = (gs_knots_code_12b != 0x0FFF);
+    const uint16_t hor_cms  = hvel_valid ? uint16_t(lround(gs_knots_code_12b * kKtToCms))
+                                         : UINT16_MAX;
 
-    // Callsign / emitter
-    memcpy(v.callsign, callsign_ascii, 8);
-    v.callsign[8]   = 0;
-    v.emitter_type  = emitter_category;
-    v.squawk        = 0;
-    v.tslc          = 0;
+    const bool vvel_valid   = (vs_64fpm_code_12b != 0x0800);
+    const int16_t  ver_cms  = vvel_valid ? int16_t(lround(vs_64fpm_code_12b * k64fpmToCms))
+                                         : INT16_MAX;
 
-    // Validity flags (use MAVLink enum values; no local #defines)
-    uint16_t flags = 0;
-    const bool coords_ok = (v.lat != INT32_MAX && v.lon != INT32_MAX);
-    const bool alt_ok    = (v.altitude != INT32_MAX);
-    const bool hdg_ok    = (v.heading  != UINT16_MAX);
-    const bool vel_ok    = (v.hor_velocity != UINT16_MAX) || (v.ver_velocity != INT16_MAX);
-    const bool cs_ok     = (v.callsign[0] != 0);
+    const bool cs_valid     = (callsign_ascii[0] != 0);
 
-    if (coords_ok) flags |= ADSB_FLAGS_VALID_COORDS;
-    if (alt_ok)    flags |= ADSB_FLAGS_VALID_ALTITUDE;
-    if (hdg_ok)    flags |= ADSB_FLAGS_VALID_HEADING;
-    if (vel_ok)    flags |= ADSB_FLAGS_VALID_VELOCITY;
-    if (cs_ok)     flags |= ADSB_FLAGS_VALID_CALLSIGN;
+    // ---- Reuse/merge existing vehicle like Sagetech does --------------------
+    AP_ADSB::adsb_vehicle_t vehicle;
+    const bool have_existing = _frontend.get_vehicle_by_ICAO(icao_addr_24, vehicle);
+    if (!have_existing) {
+        memset(&vehicle, 0, sizeof(vehicle));
+        vehicle.info.ICAO_address = icao_addr_24;
+    }
 
-    v.flags = flags;
+    // Position
+    if (coords_valid) {
+        vehicle.info.lat = lat_e7;
+        vehicle.info.lon = lon_e7;
+        vehicle.info.flags |= ADSB_FLAGS_VALID_COORDS;
+    }
 
-    // ---- Forward via the existing ADS-B frontend (unchanged behaviour) ------
-    AP_ADSB::adsb_vehicle_t av{};
-    av.info = v;
-    av.last_update_ms = AP_HAL::millis();
-    _frontend.handle_adsb_vehicle(av);
+    // Altitude (GDL-90 Traffic → pressure/QNH per ICD)
+    if (alt_valid) {
+        vehicle.info.altitude      = alt_mm;
+        vehicle.info.altitude_type = ADSB_ALTITUDE_TYPE_PRESSURE_QNH;
+        vehicle.info.flags        |= ADSB_FLAGS_VALID_ALTITUDE;
+    }
+
+    // Heading
+    if (hdg_valid) {
+        vehicle.info.heading = heading_cdeg;
+        vehicle.info.flags  |= ADSB_FLAGS_VALID_HEADING;
+    }
+
+    // Velocities
+    if (hvel_valid || vvel_valid) {
+        if (hvel_valid) vehicle.info.hor_velocity = hor_cms;
+        if (vvel_valid) vehicle.info.ver_velocity = ver_cms;
+        vehicle.info.flags |= ADSB_FLAGS_VALID_VELOCITY;
+    }
+
+    // Callsign (only overwrite if this frame has a usable one)
+    if (cs_valid) {
+        memcpy(vehicle.info.callsign, callsign_ascii, sizeof(vehicle.info.callsign));
+        vehicle.info.flags |= ADSB_FLAGS_VALID_CALLSIGN;
+    }
+
+    // Emitter category: harmless to refresh each packet
+    vehicle.info.emitter_type = emitter_category;
+
+    // Stamp + forward
+    vehicle.last_update_ms = AP_HAL::millis();
+    _frontend.handle_adsb_vehicle(vehicle);
 }
 
 #endif // HAL_ADSB_UCP_ENABLED
