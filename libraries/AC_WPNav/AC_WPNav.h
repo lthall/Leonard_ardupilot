@@ -92,37 +92,37 @@ public:
     // Updates the vertical controller with the new descent rate limit.
     void set_speed_down_ms(float speed_down_ms);
 
-    // Returns the default horizontal speed in cm/s used during waypoint navigation.
+    // Returns the default horizontal speed in cm/s used during waypoint navigation as a positive value.
     // See get_default_speed_NE_ms() for full details.
     float get_default_speed_NE_cms() const { return get_default_speed_NE_ms() * 100.0; }
 
-    // Returns the default horizontal speed in m/s used during waypoint navigation.
+    // Returns the default horizontal speed in m/s used during waypoint navigation as a positive value.
     // Derived from the WPNAV_SPEED parameter.
-    float get_default_speed_NE_ms() const { return _wp_speed_cms * 0.01; }
+    float get_default_speed_NE_ms() const { return fabsf(_wp_speed_cms) * 0.01; }
 
-    // Returns the default climb speed in cm/s used during waypoint navigation.
+    // Returns the default climb speed in cm/s used during waypoint navigation as a positive value.
     // See get_default_speed_up_ms() for full details.
     float get_default_speed_up_cms() const { return get_default_speed_up_ms() * 100.0; }
 
-    // Returns the default climb speed in m/s used during waypoint navigation.
+    // Returns the default climb speed in m/s used during waypoint navigation as a positive value.
     // Derived from the WPNAV_SPEED_UP parameter.
-    float get_default_speed_up_ms() const { return _wp_speed_up_cms * 0.01; }
+    float get_default_speed_up_ms() const { return fabsf(_wp_speed_up_cms) * 0.01; }
 
-    // Returns the default descent rate in cm/s used during waypoint navigation.
+    // Returns the default descent rate in cm/s used during waypoint navigation as a positive value.
     // Always positive. See get_default_speed_down_ms() for full details.
     float get_default_speed_down_cms() const { return get_default_speed_down_ms() * 100.0; }
 
-    // Returns the default descent rate in m/s used during waypoint navigation.
+    // Returns the default descent rate in m/s used during waypoint navigation as a positive value.
     // Derived from the WPNAV_SPEED_DN parameter. Always positive.
-    float get_default_speed_down_ms() const { return fabsf(_wp_speed_down_cms * 0.01); }
+    float get_default_speed_down_ms() const { return fabsf(_wp_speed_down_cms) * 0.01; }
 
-    // Returns the vertical acceleration in cm/s² used during waypoint navigation.
+    // Returns the vertical acceleration in cm/s² used during waypoint navigation as a positive value.
     // Always positive. See get_accel_U_mss() for full details.
     float get_accel_U_cmss() const { return get_accel_U_mss() * 100.0; }
 
-    // Returns the vertical acceleration in m/s² used during waypoint navigation.
+    // Returns the vertical acceleration in m/s² used during waypoint navigation as a positive value.
     // Derived from the WPNAV_ACCEL_Z parameter. Always positive.
-    float get_accel_U_mss() const { return _wp_accel_z_cmss * 0.01; }
+    float get_accel_U_mss() const { return fabsf(_wp_accel_z_cmss) * 0.01; }
 
     // Returns the horizontal acceleration in cm/s² used during waypoint navigation.
     // See get_wp_acceleration_mss() for full details.
