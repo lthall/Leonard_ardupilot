@@ -1023,17 +1023,17 @@ GCS_Copter &Mode::gcs() const
 
 float Mode::get_pilot_speed_up_ms() const
 {
-    return g.pilot_speed_up_cms * 0.01;
+    return abs(g.pilot_speed_up_cms) * 0.01;
 }
 
 float Mode::get_pilot_speed_dn_ms() const
 {
-    return copter.get_pilot_speed_dn() * 0.01;
+    return abs(copter.get_pilot_speed_dn()) * 0.01;
 }
 
 float Mode::get_pilot_accel_U_mss() const
 {
-    return g.pilot_accel_u_cmss * 0.01;
+    return abs(g.pilot_accel_u_cmss) * 0.01;
 }
 
 // Return stopping point as a location with above origin alt frame
