@@ -417,6 +417,7 @@ float AC_PosControl::pos_terrain_U_scaler_m(float pos_terrain_u_m, float pos_ter
 
 // Sets maximum horizontal speed (cm/s) and acceleration (cm/s²) for NE-axis shaping.
 // Can be called anytime; transitions are handled smoothly.
+// All arguments should be positive.
 // See set_max_speed_accel_NE_m() for full details.
 void AC_PosControl::set_max_speed_accel_NE_cm(float speed_ne_cms, float accel_ne_cmss)
 {
@@ -425,10 +426,11 @@ void AC_PosControl::set_max_speed_accel_NE_cm(float speed_ne_cms, float accel_ne
 
 // Sets maximum horizontal speed (m/s) and acceleration (m/s²) for NE-axis shaping.
 // These values constrain the kinematic trajectory used by the lateral controller.
+// All arguments should be positive.
 void AC_PosControl::set_max_speed_accel_NE_m(float speed_ne_ms, float accel_ne_mss)
 {
-    _vel_max_ne_ms = speed_ne_ms;
-    _accel_max_ne_mss = accel_ne_mss;
+    _vel_max_ne_ms = fabsf(speed_ne_ms);
+    _accel_max_ne_mss = fabsf(accel_ne_mss);
 
     // ensure the horizontal jerk is less than the vehicle is capable of
     const float jerk_max_msss = MIN(_attitude_control.get_ang_vel_roll_max_rads(), _attitude_control.get_ang_vel_pitch_max_rads()) * GRAVITY_MSS;
@@ -450,6 +452,7 @@ void AC_PosControl::set_max_speed_accel_NE_m(float speed_ne_ms, float accel_ne_m
 
 // Sets horizontal correction limits for velocity (cm/s) and acceleration (cm/s²).
 // Should be called only during initialization to avoid control discontinuities.
+// All arguments should be positive.
 // See set_correction_speed_accel_NE_m() for full details.
 void AC_PosControl::set_correction_speed_accel_NE_cm(float speed_ne_cms, float accel_ne_cmss)
 {
@@ -458,8 +461,10 @@ void AC_PosControl::set_correction_speed_accel_NE_cm(float speed_ne_cms, float a
 
 // Sets horizontal correction limits for velocity (m/s) and acceleration (m/s²).
 // These values constrain the PID correction path, not the desired trajectory.
+// All arguments should be positive.
 void AC_PosControl::set_correction_speed_accel_NE_m(float speed_ne_ms, float accel_ne_mss)
 {
+    // limits that are not positive are ignored
     _p_pos_ne_m.set_limits(speed_ne_ms, accel_ne_mss, 0.0f);
 }
 
@@ -754,23 +759,23 @@ void AC_PosControl::update_NE_controller()
 
 // Sets maximum climb/descent rate (cm/s) and vertical acceleration (cm/s²) for the U-axis.
 // See set_max_speed_accel_U_m() for full details.
-// All values should be positive.
-void AC_PosControl::set_max_speed_accel_U_cm(float vel_max_down_cms, float vel_max_up_cms, float accel_max_u_cmss)
+// All values must be positive.
+void AC_PosControl::set_max_speed_accel_U_cm(float decent_speed_max_cms, float climb_speed_max_cms, float accel_max_u_cmss)
 {
-    set_max_speed_accel_U_m(vel_max_down_cms * 0.01, vel_max_up_cms * 0.01, accel_max_u_cmss * 0.01);
+    set_max_speed_accel_U_m(decent_speed_max_cms * 0.01, climb_speed_max_cms * 0.01, accel_max_u_cmss * 0.01);
 }
 
 // Sets maximum climb/descent rate (m/s) and vertical acceleration (m/s²) for the U-axis.
 // These values are used for jerk-limited kinematic shaping of the vertical trajectory.
-// All values should be positive.
-void AC_PosControl::set_max_speed_accel_U_m(float vel_max_down_ms, float vel_max_up_ms, float accel_max_u_mss)
+// All values must be positive.
+void AC_PosControl::set_max_speed_accel_U_m(float decent_speed_max_ms, float climb_speed_max_ms, float accel_max_u_mss)
 {
     // sanity check and update
-    if (is_positive(vel_max_down_ms)) {
-        _vel_max_down_ms = vel_max_down_ms;
+    if (is_positive(decent_speed_max_ms)) {
+        _vel_max_down_ms = decent_speed_max_ms;
     }
-    if (is_positive(vel_max_up_ms)) {
-        _vel_max_up_ms = vel_max_up_ms;
+    if (is_positive(climb_speed_max_ms)) {
+        _vel_max_up_ms = climb_speed_max_ms;
     }
     if (is_positive(accel_max_u_mss)) {
         _accel_max_u_mss = accel_max_u_mss;
@@ -789,19 +794,19 @@ void AC_PosControl::set_max_speed_accel_U_m(float vel_max_down_ms, float vel_max
 // Sets vertical correction velocity and acceleration limits (cm/s, cm/s²).
 // Should only be called during initialization to avoid discontinuities.
 // See set_correction_speed_accel_U_m() for full details.
-// All values should be positive.
-void AC_PosControl::set_correction_speed_accel_U_cm(float vel_max_down_cms, float vel_max_up_cms, float accel_max_u_cmss)
+// All values must be positive.
+void AC_PosControl::set_correction_speed_accel_U_cm(float decent_speed_max_cms, float climb_speed_max_cms, float accel_max_u_cmss)
 {
-    set_correction_speed_accel_U_m(vel_max_down_cms * 0.01, vel_max_up_cms * 0.01, accel_max_u_cmss * 0.01);
+    set_correction_speed_accel_U_m(decent_speed_max_cms * 0.01, climb_speed_max_cms * 0.01, accel_max_u_cmss * 0.01);
 }
 
 // Sets vertical correction velocity and acceleration limits (m/s, m/s²).
 // These values constrain the correction output of the PID controller.
-// All values should be positive.
-void AC_PosControl::set_correction_speed_accel_U_m(float vel_max_down_ms, float vel_max_up_ms, float accel_max_u_mss)
+// All values must be positive.
+void AC_PosControl::set_correction_speed_accel_U_m(float decent_speed_max_ms, float climb_speed_max_ms, float accel_max_u_mss)
 {
     // define maximum position error and maximum first and second differential limits
-    _p_pos_u_m.set_limits(-fabsf(vel_max_down_ms), vel_max_up_ms, accel_max_u_mss, 0.0f);
+    _p_pos_u_m.set_limits(-fabsf(decent_speed_max_ms), climb_speed_max_ms, accel_max_u_mss, 0.0f);
 }
 
 // Initializes U-axis controller to current position, velocity, and acceleration, disallowing descent.
