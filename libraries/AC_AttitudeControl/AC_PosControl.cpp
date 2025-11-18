@@ -1279,55 +1279,55 @@ void AC_PosControl::init_offsets_U()
 // Sets additional position, velocity, and acceleration offsets in meters (NED frame) for scripting.
 // Offsets are added to the controller’s internal target.
 // Used in LUA
-bool AC_PosControl::set_posvelaccel_offset(const Vector3f &pos_offset_NED_m, const Vector3f &vel_offset_NED_ms, const Vector3f &accel_offset_NED_mss)
+bool AC_PosControl::set_posvelaccel_offset(const Vector3f &pos_offset_ned_m, const Vector3f &vel_offset_ned_ms, const Vector3f &accel_offset_ned_mss)
 {
     // Convert NED inputs to NEU frame: Z is inverted
-    set_posvelaccel_offset_target_NE_m(pos_offset_NED_m.topostype().xy(), vel_offset_NED_ms.xy(), accel_offset_NED_mss.xy());
-    set_posvelaccel_offset_target_U_m(-pos_offset_NED_m.topostype().z, -vel_offset_NED_ms.z, -accel_offset_NED_mss.z);
+    set_posvelaccel_offset_target_NE_m(pos_offset_ned_m.topostype().xy(), vel_offset_ned_ms.xy(), accel_offset_ned_mss.xy());
+    set_posvelaccel_offset_target_U_m(-pos_offset_ned_m.topostype().z, -vel_offset_ned_ms.z, -accel_offset_ned_mss.z);
     return true;
 }
 
 // Retrieves current scripted offsets in meters (NED frame).
 // Used in LUA
-bool AC_PosControl::get_posvelaccel_offset(Vector3f &pos_offset_NED_m, Vector3f &vel_offset_NED_ms, Vector3f &accel_offset_NED_mss)
+bool AC_PosControl::get_posvelaccel_offset(Vector3f &pos_offset_ned_m, Vector3f &vel_offset_ned_ms, Vector3f &accel_offset_ned_mss)
 {
     // Convert from internal NEU to NED by inverting Z
-    pos_offset_NED_m.xy() = _pos_offset_target_neu_m.xy().tofloat();
-    pos_offset_NED_m.z = -_pos_offset_target_neu_m.z;
+    pos_offset_ned_m.xy() = _pos_offset_target_neu_m.xy().tofloat();
+    pos_offset_ned_m.z = -_pos_offset_target_neu_m.z;
 
-    vel_offset_NED_ms.xy() = _vel_offset_target_neu_ms.xy();
-    vel_offset_NED_ms.z = -_vel_offset_target_neu_ms.z;
+    vel_offset_ned_ms.xy() = _vel_offset_target_neu_ms.xy();
+    vel_offset_ned_ms.z = -_vel_offset_target_neu_ms.z;
 
-    accel_offset_NED_mss.xy() = _accel_offset_target_neu_mss.xy();
-    accel_offset_NED_mss.z = -_accel_offset_target_neu_mss.z;
+    accel_offset_ned_mss.xy() = _accel_offset_target_neu_mss.xy();
+    accel_offset_ned_mss.z = -_accel_offset_target_neu_mss.z;
     return true;
 }
 
 // Retrieves current target velocity (NED frame, m/s) including any scripted offset.
 // Used in LUA
-bool AC_PosControl::get_vel_target(Vector3f &vel_target_NED_ms)
+bool AC_PosControl::get_vel_target(Vector3f &vel_target_ned_ms)
 {
     if (!is_active_NE() || !is_active_U()) {
         return false;
     }
 
     // Convert NEU → NED by inverting Z
-    vel_target_NED_ms.xy() = _vel_target_neu_ms.xy();
-    vel_target_NED_ms.z = -_vel_target_neu_ms.z;
+    vel_target_ned_ms.xy() = _vel_target_neu_ms.xy();
+    vel_target_ned_ms.z = -_vel_target_neu_ms.z;
     return true;
 }
 
 // Retrieves current target acceleration (NED frame, m/s²) including any scripted offset.
 // Used in LUA
-bool AC_PosControl::get_accel_target(Vector3f &accel_target_NED_mss)
+bool AC_PosControl::get_accel_target(Vector3f &accel_target_ned_mss)
 {
     if (!is_active_NE() || !is_active_U()) {
         return false;
     }
 
     // Convert NEU → NED by inverting Z
-    accel_target_NED_mss.xy() = _accel_target_neu_mss.xy();
-    accel_target_NED_mss.z = -_accel_target_neu_mss.z;
+    accel_target_ned_mss.xy() = _accel_target_neu_mss.xy();
+    accel_target_ned_mss.z = -_accel_target_neu_mss.z;
     return true;
 }
 #endif

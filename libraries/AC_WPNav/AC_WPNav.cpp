@@ -426,20 +426,20 @@ bool AC_WPNav::set_wp_destination_next_NEU_m(const Vector3p& destination_neu_m, 
 
 // Sets waypoint destination using a NED position vector in meters from EKF origin.
 // Converts internally to NEU. Terrain following is not used.
-bool AC_WPNav::set_wp_destination_NED_m(const Vector3p& destination_NED_m)
+bool AC_WPNav::set_wp_destination_NED_m(const Vector3p& destination_ned_m)
 {
     // convert NED to NEU by inverting the Z axis
     // terrain following is not used (altitude is relative to EKF origin)
-    return set_wp_destination_NEU_m(Vector3p{destination_NED_m.x, destination_NED_m.y, -destination_NED_m.z}, false);
+    return set_wp_destination_NEU_m(Vector3p{destination_ned_m.x, destination_ned_m.y, -destination_ned_m.z}, false);
 }
 
 // Sets the next waypoint destination using a NED position vector in meters from EKF origin.
 // Converts to NEU internally. Terrain following is not applied.
-bool AC_WPNav::set_wp_destination_next_NED_m(const Vector3p& destination_NED_m)
+bool AC_WPNav::set_wp_destination_next_NED_m(const Vector3p& destination_ned_m)
 {
     // convert NED to NEU by inverting the Z axis
     // terrain following is not used (altitude is relative to EKF origin)
-    return set_wp_destination_next_NEU_m(Vector3p{destination_NED_m.x, destination_NED_m.y, -destination_NED_m.z}, false);
+    return set_wp_destination_next_NEU_m(Vector3p{destination_ned_m.x, destination_ned_m.y, -destination_ned_m.z}, false);
 }
 
 // Computes the horizontal stopping point in NE frame, returned in centimeters.

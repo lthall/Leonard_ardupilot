@@ -1625,7 +1625,7 @@ private:
 
     // backup last popped point so that it can be restored to the path
     // if vehicle exits SmartRTL mode before reaching home. invalid if zero
-    Vector3p dest_NED_backup;
+    Vector3p dest_backup_ned_m;
 };
 
 

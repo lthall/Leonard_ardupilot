@@ -36,12 +36,12 @@ bool ModeSmartRTL::init(bool ignore_checks)
 void ModeSmartRTL::exit()
 {
     // restore last point if we hadn't reached it
-    if (smart_rtl_state == SubMode::PATH_FOLLOW && !dest_NED_backup.is_zero()) {
-        if (!g2.smart_rtl.add_point(dest_NED_backup)) {
+    if (smart_rtl_state == SubMode::PATH_FOLLOW && !dest_backup_ned_m.is_zero()) {
+        if (!g2.smart_rtl.add_point(dest_backup_ned_m)) {
             GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "SmartRTL: lost one point");
         }
     }
-    dest_NED_backup.zero();
+    dest_backup_ned_m.zero();
 
     g2.smart_rtl.cancel_request_for_thorough_cleanup();
 }
@@ -93,34 +93,34 @@ void ModeSmartRTL::path_follow_run()
     if (wp_nav->reached_wp_destination()) {
 
         // clear destination backup so that it cannot be restored
-        dest_NED_backup.zero();
+        dest_backup_ned_m.zero();
 
         // this pop_point can fail if the IO task currently has the
         // path semaphore.
-        Vector3p dest_NED;
-        if (g2.smart_rtl.pop_point(dest_NED)) {
+        Vector3p dest_ned;
+        if (g2.smart_rtl.pop_point(dest_ned)) {
             // backup destination in case we exit smart_rtl mode and need to restore it to the path
-            dest_NED_backup = dest_NED;
+            dest_backup_ned_m = dest_ned;
             path_follow_last_pop_fail_ms = 0;
             if (g2.smart_rtl.get_num_points() == 0) {
                 // this is the very last point, add 2m to the target alt and move to pre-land state
-                dest_NED.z -= 2.0f;
+                dest_ned.z -= 2.0f;
                 smart_rtl_state = SubMode::PRELAND_POSITION;
-                wp_nav->set_wp_destination_NED_m(dest_NED);
+                wp_nav->set_wp_destination_NED_m(dest_ned);
             } else {
                 // peek at the next point.  this can fail if the IO task currently has the path semaphore
-                Vector3p next_dest_NED;
-                if (g2.smart_rtl.peek_point(next_dest_NED)) {
-                    wp_nav->set_wp_destination_NED_m(dest_NED);
+                Vector3p next_dest_ned;
+                if (g2.smart_rtl.peek_point(next_dest_ned)) {
+                    wp_nav->set_wp_destination_NED_m(dest_ned);
                     if (g2.smart_rtl.get_num_points() == 1) {
                         // this is the very last point, add 2m to the target alt
-                        next_dest_NED.z -= 2.0f;
+                        next_dest_ned.z -= 2.0f;
                     }
-                    wp_nav->set_wp_destination_next_NED_m(next_dest_NED);
+                    wp_nav->set_wp_destination_next_NED_m(next_dest_ned);
                 } else {
                     // this can only happen if peek failed to take the semaphore
                     // send next point anyway which will cause the vehicle to slow at the next point
-                    wp_nav->set_wp_destination_NED_m(dest_NED);
+                    wp_nav->set_wp_destination_NED_m(dest_ned);
                     INTERNAL_ERROR(AP_InternalError::error_t::flow_of_control);
                 }
             }

@@ -198,11 +198,11 @@ public:
 
     // Sets waypoint destination using a NED position vector in meters from EKF origin.
     // Converts internally to NEU. Terrain following is not used.
-    bool set_wp_destination_NED_m(const Vector3p& destination_NED_m);
+    bool set_wp_destination_NED_m(const Vector3p& destination_ned_m);
 
     // Sets the next waypoint destination using a NED position vector in meters from EKF origin.
     // Converts to NEU internally. Terrain following is not applied.
-    bool set_wp_destination_next_NED_m(const Vector3p& destination_NED_m);
+    bool set_wp_destination_next_NED_m(const Vector3p& destination_ned_m);
 
     // Computes the horizontal stopping point in NE frame, returned in centimeters.
     // See get_wp_stopping_point_NE_m() for full details.

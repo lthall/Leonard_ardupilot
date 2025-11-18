@@ -454,20 +454,20 @@ public:
     // Sets additional position, velocity, and acceleration offsets in meters (NED frame) for scripting.
     // Offsets are added to the controller’s internal target.
     // Used in LUA
-    bool set_posvelaccel_offset(const Vector3f &pos_offset_NED_m, const Vector3f &vel_offset_NED_ms, const Vector3f &accel_offset_NED_mss);
+    bool set_posvelaccel_offset(const Vector3f &pos_offset_ned_m, const Vector3f &vel_offset_ned_ms, const Vector3f &accel_offset_ned_mss);
 
     // Retrieves current scripted offsets in meters (NED frame).
     // Used in LUA
 
-    bool get_posvelaccel_offset(Vector3f &pos_offset_NED_m, Vector3f &vel_offset_NED_ms, Vector3f &accel_offset_NED_mss);
+    bool get_posvelaccel_offset(Vector3f &pos_offset_ned_m, Vector3f &vel_offset_ned_ms, Vector3f &accel_offset_ned_mss);
 
     // Retrieves current target velocity (NED frame, m/s) including any scripted offset.
     // Used in LUA
-    bool get_vel_target(Vector3f &vel_target_NED_ms);
+    bool get_vel_target(Vector3f &vel_target_ned_ms);
 
     // Retrieves current target acceleration (NED frame, m/s²) including any scripted offset.
     // Used in LUA
-    bool get_accel_target(Vector3f &accel_target_NED_mss);
+    bool get_accel_target(Vector3f &accel_target_ned_mss);
 #endif
 
     // Sets NE offset targets in meters, m/s, and m/s².
