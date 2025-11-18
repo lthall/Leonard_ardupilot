@@ -153,11 +153,23 @@ void Sub::rotate_body_frame_to_NE(float &x, float &y)
     y = ne_y;
 }
 
-// It will return the PILOT_SPEED_DN value if non zero, otherwise if zero it returns the PILOT_SPEED_UP value.
+// It will return the PILOT_SPEED_DN value if non zero, otherwise if zero it returns the PILOT_SPEED_UP as a positive value.
 uint16_t Sub::get_pilot_speed_dn() const
 {
     if (g.pilot_speed_dn == 0) {
         return abs(g.pilot_speed_up);
     }
     return abs(g.pilot_speed_dn);
+}
+
+// It returns the PILOT_SPEED_UP as a positive value.
+uint16_t Sub::get_pilot_speed_up() const
+{
+    return abs(g.pilot_speed_up);
+}
+
+// It returns the PILOT_ACCEL_Z as a positive value.
+uint16_t Sub::get_pilot_accel_z() const
+{
+    return abs(g.pilot_accel_z);
 }

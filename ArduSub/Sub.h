@@ -575,6 +575,8 @@ private:
     void stats_update();
 
     uint16_t get_pilot_speed_dn() const;
+    uint16_t get_pilot_speed_up() const;
+    uint16_t get_pilot_accel_z() const;
 
     void convert_old_parameters(void);
     bool handle_do_motor_test(mavlink_command_int_t command);
