@@ -1021,7 +1021,8 @@ void QuadPlane::run_z_controller(void)
     }
     if ((now - last_pidz_active_ms) > 20 || !pos_control->is_active_U()) {
         // set vertical speed and acceleration limits
-        pos_control->set_max_speed_accel_U_m(get_pilot_velocity_z_max_dn_m(), pilot_speed_z_max_up_ms, pilot_accel_z_mss);
+        // All limits must be positive
+        pos_control->set_max_speed_accel_U_m(get_pilot_velocity_z_max_dn_m(), get_pilot_velocity_z_max_up_m(), get_pilot_accel_z_mss());
 
         // initialise the vertical position controller
         if (!tailsitter.enabled()) {
@@ -1074,7 +1075,8 @@ void QuadPlane::hold_hover(float target_climb_rate_cms)
     set_desired_spool_state(AP_Motors::DesiredSpoolState::THROTTLE_UNLIMITED);
 
     // set vertical speed and acceleration limits
-    pos_control->set_max_speed_accel_U_m(get_pilot_velocity_z_max_dn_m(), pilot_speed_z_max_up_ms, pilot_accel_z_mss);
+    // All limits must be positive
+    pos_control->set_max_speed_accel_U_m(get_pilot_velocity_z_max_dn_m(), get_pilot_velocity_z_max_up_m(), get_pilot_accel_z_mss());
 
     // call attitude controller
     multicopter_attitude_rate_update(get_desired_yaw_rate_cds(false));
@@ -3074,8 +3076,9 @@ void QuadPlane::setup_target_position(void)
     poscontrol.target_neu_m.z = (plane.next_WP_loc.alt - origin.alt) * 0.01;
 
     // set vertical speed and acceleration limits
-    pos_control->set_max_speed_accel_U_m(get_pilot_velocity_z_max_dn_m(), pilot_speed_z_max_up_ms, pilot_accel_z_mss);
-    pos_control->set_correction_speed_accel_U_m(get_pilot_velocity_z_max_dn_m(), pilot_speed_z_max_up_ms, pilot_accel_z_mss);
+    // All limits must be positive
+    pos_control->set_max_speed_accel_U_m(get_pilot_velocity_z_max_dn_m(), get_pilot_velocity_z_max_up_m(), get_pilot_accel_z_mss());
+    pos_control->set_correction_speed_accel_U_m(get_pilot_velocity_z_max_dn_m(), get_pilot_velocity_z_max_up_m(), get_pilot_accel_z_mss());
 }
 
 /*
@@ -3325,8 +3328,9 @@ bool QuadPlane::do_vtol_takeoff(const AP_Mission::Mission_Command& cmd)
     throttle_wait = false;
 
     // set vertical speed and acceleration limits
-    pos_control->set_max_speed_accel_U_m(get_pilot_velocity_z_max_dn_m(), pilot_speed_z_max_up_ms, pilot_accel_z_mss);
-    pos_control->set_correction_speed_accel_U_m(get_pilot_velocity_z_max_dn_m(), pilot_speed_z_max_up_ms, pilot_accel_z_mss);
+    // All limits must be positive
+    pos_control->set_max_speed_accel_U_m(get_pilot_velocity_z_max_dn_m(), get_pilot_velocity_z_max_up_m(), get_pilot_accel_z_mss());
+    pos_control->set_correction_speed_accel_U_m(get_pilot_velocity_z_max_dn_m(), get_pilot_velocity_z_max_up_m(), get_pilot_accel_z_mss());
 
     // initialise the vertical position controller
     pos_control->init_U_controller();
@@ -4232,8 +4236,8 @@ bool SLT_Transition::show_vtol_view() const
 }
 
 /*
-  return the PILOT_VELZ_MAX_DN value if non zero, otherwise returns the PILOT_VELZ_MAX value.
-  return is in cm/s
+  return the PILOT_VELZ_MAX_DN value if non zero, otherwise returns the PILOT_VELZ_MAX value as a positive value.
+  return is in m/s
 */
 uint16_t QuadPlane::get_pilot_velocity_z_max_dn_m() const
 {
@@ -4241,6 +4245,24 @@ uint16_t QuadPlane::get_pilot_velocity_z_max_dn_m() const
         return abs(pilot_speed_z_max_up_ms);
     }
     return abs(pilot_speed_z_max_dn_ms);
+}
+
+/*
+  returns the PILOT_SPD_UP value as a positive value..
+  return is in m/s
+*/
+uint16_t QuadPlane::get_pilot_velocity_z_max_up_m() const
+{
+    return abs(pilot_speed_z_max_up_ms);
+}
+
+/*
+  returns the PILOT_ACCEL_Z value as a positive value..
+  return is in m/s^2
+*/
+uint16_t QuadPlane::get_pilot_accel_z_mss() const
+{
+    return abs(pilot_accel_z_mss);
 }
 
 /*
