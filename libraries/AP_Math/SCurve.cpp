@@ -53,7 +53,7 @@ void SCurve::init()
     num_segs = SEG_INIT;
     add_segment(num_segs, 0.0f, SegmentType::CONSTANT_JERK, 0.0f, 0.0f, 0.0f, 0.0f);
 
-    is_arc_segment = false;
+    is_arc_segment = false; 
     seg_delta.zero();
     seg_length = 0.0;
     arc = {};
@@ -67,6 +67,14 @@ void SCurve::calculate_track(const Vector3p &origin, const Vector3p &destination
                              float snap_maximum, float jerk_maximum)
 {
     init();
+
+    // Validate motion-limit inputs.
+    // All speed/accel/jerk/snap limits must be positive; accel_c must not be negative.
+    // Invalid arguments trigger INTERNAL_ERROR and abort path generation.
+    if (!is_positive(speed_xy) || !is_positive(speed_up) || !is_positive(speed_down) || !is_positive(accel_xy) || !is_positive(accel_z) || !is_positive(snap_maximum) || !is_positive(jerk_maximum) || is_negative(accel_c)) {
+        INTERNAL_ERROR(AP_InternalError::error_t::invalid_arg_or_result);
+        return;
+    }
 
     // leave track as zero length if origin and destination are equal or if the new track length squared is zero
     seg_delta = (destination - origin).tofloat();
@@ -147,6 +155,14 @@ void SCurve::calculate_track(const Vector3p &origin, const Vector3p &destination
 // set maximum velocity and re-calculate the path using these limits
 void SCurve::set_speed_max(float speed_xy, float speed_up, float speed_down)
 {
+    // Validate motion-limit inputs.
+    // All speed limits must be positive;
+    // Invalid arguments trigger INTERNAL_ERROR and abort path generation.
+    if (!is_positive(speed_xy) || !is_positive(speed_up) || !is_positive(speed_down)) {
+        INTERNAL_ERROR(AP_InternalError::error_t::invalid_arg_or_result);
+        return;
+    }
+
     // return immediately if zero length path
     if (num_segs != segments_max) {
         return;
@@ -386,6 +402,14 @@ float SCurve::set_origin_speed_max(float speed)
         return 0.0f;
     }
 
+    // Validate motion-limit input.
+    // speed limit must be positive;
+    // Invalid arguments trigger INTERNAL_ERROR and abort path generation.
+    if (!is_positive(speed)) {
+        INTERNAL_ERROR(AP_InternalError::error_t::invalid_arg_or_result);
+        return segment[SEG_INIT].end_vel;
+    }
+
     // avoid re-calculating if unnecessary
     if (is_equal(segment[SEG_INIT].end_vel, speed)) {
         return speed;
@@ -462,6 +486,14 @@ float SCurve::set_origin_speed_max(float speed)
 // set the maximum vehicle speed at the destination
 void SCurve::set_destination_speed_max(float speed)
 {
+    // Validate motion-limit input.
+    // speed limit must be positive;
+    // Invalid arguments trigger INTERNAL_ERROR and abort path generation.
+    if (!is_positive(speed)) {
+        INTERNAL_ERROR(AP_InternalError::error_t::invalid_arg_or_result);
+        return;
+    }
+
     // if path is zero length then all speeds must be zero
     if (num_segs != segments_max) {
         return;
@@ -1119,16 +1151,6 @@ void SCurve::set_kinematic_limits(const Vector3p &origin, const Vector3p &destin
                                   float speed_xy, float speed_up, float speed_down,
                                   float accel_xy, float accel_z)
 {
-    if (is_negative(speed_xy) || is_negative(speed_up) || is_negative(speed_down) || is_negative(accel_xy) || is_negative(accel_z)) {
-        INTERNAL_ERROR(AP_InternalError::error_t::invalid_arg_or_result);
-        // ensure arguments are positive
-        speed_xy = fabsf(speed_xy);
-        speed_up = fabsf(speed_up);
-        speed_down = fabsf(speed_down);
-        accel_xy = fabsf(accel_xy);
-        accel_z = fabsf(accel_z);
-    }
-
     Vector3f direction = (destination - origin).tofloat();
     const float track_speed_max = kinematic_limit(direction, speed_xy, speed_up, speed_down);
     const float track_accel_max = kinematic_limit(direction, accel_xy, accel_z, accel_z);
