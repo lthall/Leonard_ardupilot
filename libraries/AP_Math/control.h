@@ -151,6 +151,10 @@ Vector2f sqrt_controller(const Vector2f& error, float p, float second_ord_lim, f
 // - Handles both linear and square-root regions of the controller response.
 float inv_sqrt_controller(float output, float p, float D_max);
 
+// Square-root controller implied acceleration command (feedforward) using actual closing rate.
+// - Computes the acceleration command implied by the sqrt_controller() velocity envelope, using the chain rule.
+float sqrt_controller_accel(float error, float v_env, float v_state, float p, float second_ord_lim);
+
 // Calculates stopping distance required to reduce a velocity to zero using a square-root controller.
 // - Uses the inverse of the `sqrt_controller()` response curve.
 // - Inputs: velocity, P gain, and max deceleration (`accel_max`)

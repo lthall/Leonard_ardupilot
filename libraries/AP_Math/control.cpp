@@ -296,32 +296,28 @@ void shape_pos_vel_accel(postype_t pos_input, float vel_input, float accel_input
     // manages the approach to the setpoint. Therefore the acceleration is in the opposite
     // direction to the position error.
     float accel_tc_max;
-    float KPv;
+    float KP;
     if (is_positive(pos_error)) {
-        accel_tc_max = -0.5 * accel_min;
-        KPv = 0.5 * jerk_max / (-accel_min);
+        accel_tc_max = -accel_min;
+        KP = jerk_max / (-accel_min);
     } else {
-        accel_tc_max = 0.5 * accel_max;
-        KPv = 0.5 * jerk_max / accel_max;
+        accel_tc_max = accel_max;
+        KP = jerk_max / accel_max;
     }
 
     // velocity to correct position
-    float vel_target = sqrt_controller(pos_error, KPv, accel_tc_max, dt);
-
-    // limit velocity between vel_min and vel_max
-    if (is_negative(vel_min) || is_positive(vel_max)) {
-        vel_target = constrain_float(vel_target, vel_min, vel_max);
-    }
+    float vel_target = sqrt_controller(pos_error, KP, accel_tc_max, dt);
+    float vel_corr = vel - vel_input;
+    float accel_corr = sqrt_controller_accel(pos_error, vel_target, vel_corr, KP, accel_tc_max);
+    accel_corr = constrain_float(accel_corr, accel_min, accel_max);
+    accel_corr = constrain_float(accel_corr, MIN(0.0, KP * (vel_min - vel_corr)), MAX(0.0, KP * (vel_max - vel_corr)));
 
     // velocity correction with input velocity
     vel_target += vel_input;
 
-    // Constrain total velocity if limiting is enabled and the velocity range is valid (non-zero and min < max)
-    if (limit_total && (vel_max > vel_min)) {
-        vel_target = constrain_float(vel_target, vel_min, vel_max);
-    }
-
-    shape_vel_accel(vel_target, accel_input, vel, accel, accel_min, accel_max, jerk_max, dt, limit_total);
+    accel = KP * (vel_target - vel) + accel_corr;
+    accel = constrain_float(accel, accel_min, accel_max);
+    accel = constrain_float(accel, MIN(0.0, KP * (vel_min - vel)), MAX(0.0, KP * (vel_max - vel)));
 }
 
 // Computes a jerk-limited acceleration profile to move toward a position and velocity target in 2D.
@@ -549,6 +545,49 @@ float inv_sqrt_controller(float output, float p, float D_max)
     const float linear_dist = D_max / sq(p);
     const float stopping_dist = (linear_dist * 0.5f) + sq(output) / (2.0 * D_max);
     return is_positive(output) ? stopping_dist : -stopping_dist;
+}
+
+// Square-root controller implied acceleration command (feedforward) using actual closing rate.
+// - Computes the acceleration command implied by the sqrt_controller() velocity envelope, using the chain rule.
+// - For a fixed target: error = x_target - x, and error_dot = -v_state (since x_dot = v_state).
+// - In the linear region of sqrt_controller(): v_env = p*error  => dv_env/d(error) = p
+// - In the sqrt region of sqrt_controller():   v_env ≈ sign(error)*sqrt(2*a_lim*(|error|-linear_dist/2))
+//                                              => dv_env/d(error) = a_lim / v_env   (for nonzero v_env)
+// - Therefore:
+//     linear region: a_cmd = -p * v_state
+//     sqrt region:   a_cmd = -(a_lim / v_env) * v_state
+// Notes:
+// - If `second_ord_lim` <= 0, the envelope is linear everywhere.
+// - If `p` == 0, the envelope is pure sqrt everywhere (use sqrt-region expression).
+float sqrt_controller_accel(float error, float v_env, float v_state, float p, float second_ord_lim)
+{
+    // If no second-order limit, envelope is linear everywhere (v_env ~ p*error).
+    if (is_negative(second_ord_lim) || is_zero(second_ord_lim)) {
+        return -p * v_state;
+    }
+
+    // If no P gain but second-order limit exists, envelope is pure sqrt everywhere.
+    // Use sqrt-region expression, guarded against divide-by-zero on v_env.
+    if (is_zero(p)) {
+        if (is_zero(v_env)) {
+            return 0.0f;
+        }
+        return -(second_ord_lim / v_env) * v_state;
+    }
+
+    // Both P and second-order limit defined — match sqrt_controller() region selection.
+    const float linear_dist = second_ord_lim / sq(p);
+
+    if (fabsf(error) <= linear_dist) {
+        // Inside linear region.
+        return -p * v_state;
+    }
+
+    // Outside linear region (sqrt branch). Guard divide-by-zero on v_env.
+    if (is_zero(v_env)) {
+        return 0.0f;
+    }
+    return -(second_ord_lim / v_env) * v_state;
 }
 
 // Calculates stopping distance required to reduce a velocity to zero using a square-root controller.
