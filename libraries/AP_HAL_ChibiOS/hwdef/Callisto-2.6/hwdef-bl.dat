@@ -1,0 +1,50 @@
+# hw definition file for processing by chibios_hwdef.py
+# FSO Callisto 1.0 bootloader (STM32H753ZITx)
+
+# MCU class and specific type
+MCU STM32H7xx STM32H743xx
+
+# crystal frequency
+OSCILLATOR_HZ 16000000
+
+# board ID for firmware load
+APJ_BOARD_ID AP_HW_FSO_POWER_STACK
+
+# bootloader is installed at zero offset
+FLASH_RESERVE_START_KB 0
+
+# the location where the bootloader will put the firmware
+FLASH_BOOTLOADER_LOAD_KB 128
+
+# flash size
+FLASH_SIZE_KB 2048
+
+env OPTIMIZE -Os
+
+# order of UARTs (and USB)
+SERIAL_ORDER OTG1 UART1
+
+# default to all pins low to avoid ESD issues
+DEFAULTGPIO OUTPUT LOW PULLDOWN
+
+# USB
+PA11 OTG_FS_DM OTG1
+PA12 OTG_FS_DP OTG1
+
+# pins for SWD debugging
+PA13 JTMS-SWDIO SWD
+PA14 JTCK-SWCLK SWD
+
+# Uart 1
+PA9 USART1_TX USART1
+PA10 USART1_RX USART1
+
+# LEDs
+PC13 LED_RED OUTPUT HIGH # red
+PC14 LED_ACTIVITY OUTPUT HIGH # green
+PC15 LED_BOOTLOADER OUTPUT HIGH # blue
+
+define HAL_LED_ON 1
+
+define HAL_USE_EMPTY_STORAGE 1
+define HAL_STORAGE_SIZE 16384
