@@ -1,0 +1,357 @@
+# ============================================================
+# Overview
+# ============================================================
+# hw definition file for processing by chibios_hwdef.py
+# for the FSO Callisto 1.1 hardware
+#
+# Design notes:
+# - STM32H7 (H743)
+# - No IO MCU
+# - Ethernet RMII with LAN8742A (PHY provides REF_CLK to MCU)
+# - 3x ICM-45686 IMUs on separate SPI buses
+# - FRAM (MB85RS1MTPN) for parameter storage
+# - USB CDC on OTG1 OTG2
+# - SDMMC2 for microSD logging
+# - UARTs:
+#   - With flow control: UART4, UART7
+#   - Without flow control: USART3, UART5, UART8 (SBUS out)
+#   - RX-only: USART1 (SBUS in)
+
+# ============================================================
+# MCU, clocks, and build identity
+# ============================================================
+
+MCU STM32H7xx STM32H743xx
+
+# crystal frequency
+OSCILLATOR_HZ 16000000
+
+# ChibiOS system timer
+STM32_ST_USE_TIMER 12
+
+# board ID for firmware load (verify this matches the Callisto autopilot target)
+APJ_BOARD_ID AP_HW_FSO_POWER_STACK
+
+FLASH_RESERVE_START_KB 128
+
+# flash size
+FLASH_SIZE_KB 2048
+
+env OPTIMIZE -O2
+
+# ============================================================
+# Global GPIO defaults
+# ============================================================
+
+# Default all GPIOs to OUTPUT LOW with pulldown to avoid floating pins and unintended enables at boot.
+DEFAULTGPIO OUTPUT LOW PULLDOWN
+
+# ============================================================
+# LEDs
+# ============================================================
+
+# red LED marked as B/E
+PF5     LED_RED     OUTPUT  GPIO(90)    LOW
+
+# green LED marked as PWR.
+PF4     LED_GREEN   OUTPUT  GPIO(91)    LOW
+
+# blue LED marked as ACT
+PF3     LED_BLUE    OUTPUT  GPIO(92)    LOW
+
+define HAL_GPIO_LED_ON 1
+
+# Board LED GPIO indices (HAL_GPIO_A/B/C_LED_PIN)
+define HAL_GPIO_A_LED_PIN 90
+define HAL_GPIO_B_LED_PIN 91
+define HAL_GPIO_C_LED_PIN 92
+
+# ============================================================
+# IMU Heater
+# ============================================================
+
+# HEATER_EN drives the IMU heater power switch (LOW = off at boot).
+PG0 HEATER_EN OUTPUT LOW GPIO(80)
+define HAL_HEATER_GPIO_PIN 80
+
+# IMU heater control defaults
+define HAL_HAVE_IMU_HEATER 1
+define HAL_IMU_TEMP_DEFAULT 45
+define HAL_IMUHEAT_P_DEFAULT 50
+define HAL_IMUHEAT_I_DEFAULT 0.07
+
+# ============================================================
+# ADC – board and rail voltages
+# ============================================================
+
+# 3V3 rail sense inputs (via divider; SCALE(2) implies /2 effective scaling)
+PA4     SCALED3_V3V3    ADC1    SCALE(2)
+PA5     SCALED4_V3V3    ADC1    SCALE(2)
+
+# 5V and servo-rail sense inputs (via divider; SCALE(2) implies /2 effective scaling)
+
+todo: Test board voltage
+
+PF11     VDD_5V_SENS                ADC1    SCALE(2)
+PF12     FMU_SERVORAIL_VCC_SENS     ADC1    SCALE(2)
+
+# ============================================================
+# Power-good / brick validity flags
+# ============================================================
+
+# *_nVALID are active-low validity flags (polarity per hardware design).
+
+todo: test nValid
+
+PG1     VDD_BRICK_nVALID    INPUT   PULLUP
+PE7     VDD_BRICK2_nVALID   INPUT   PULLUP
+PE8     VDD_BRICK3_nVALID   INPUT   PULLUP
+
+# ============================================================
+# Debug / programming interface
+# ============================================================
+
+PA13    JTMS-SWDIO  SWD
+PA14    JTCK-SWCLK  SWD
+
+# ============================================================
+# USB OTG FS
+# ============================================================
+
+PA11    OTG_FS_DM   OTG1
+PA12    OTG_FS_DP   OTG1
+
+# VBUS sense/drive (confirm polarity and external circuitry; currently INPUT OPENDRAIN)
+PA9 VBUS INPUT OPENDRAIN
+
+# ============================================================
+# Serial port ordering and defaults
+# ============================================================
+
+# SERIAL_ORDER is indexed from SERIAL0 (first entry maps to SERIAL0).
+SERIAL_ORDER OTG1 USART1 EMPTY USART3 UART4 UART5 EMPTY UART7 UART8 OTG2
+
+# USART3 - Internal radio / internal MAVLink
+PC10    USART3_TX   USART3
+PC11    USART3_RX   USART3
+
+# UART4 - Internal radio (RFD900x), RTS/CTS
+PD0     UART4_RX    UART4
+PD1     UART4_TX    UART4
+PA15    UART4_RTS   UART4
+PB0     UART4_CTS   UART4
+
+# UART5 - Extra internal serial (no DMA)
+PC12    UART5_TX    UART5    NODMA
+PD2     UART5_RX    UART5    NODMA
+
+# UART7 - Payload serial (D-Sub), RTS/CTS
+PF6     UART7_RX    UART7
+PF7     UART7_TX    UART7
+PF8     UART7_RTS   UART7
+PF9     UART7_CTS   UART7
+
+# UART8 - SBUS output (D-Sub)
+
+todo: Test SBUS output
+
+PE0     UART8_RX    UART8
+PE1     UART8_TX    UART8
+
+# Under SERIAL0 indexing, UART8 maps to SERIAL8.
+define DEFAULT_SERIAL8_PROTOCOL SerialProtocol_Sbus1
+
+# ============================================================
+# RC input
+# ============================================================
+
+todo: Test RC input SBUS and PPM
+
+# USART1 RX-only SBUS input (maps to SERIAL1 in SERIAL_ORDER above)
+PB7     USART1_RX   USART1
+
+# Timer-based RC input (optional / legacy / fallback)
+PA3     TIM5_CH4    TIM5    RCININT     PULLDOWN
+
+# Under SERIAL0 indexing, USART1 maps to SERIAL1.
+define DEFAULT_SERIAL1_PROTOCOL SerialProtocol_RCIN
+
+# ============================================================
+# PWM outputs
+# ============================================================
+
+# NOTE: PWM(n) indices are globally unique and define ArduPilot servo channel ordering.
+# Ensure indices remain unique across timers to avoid output aliasing.
+
+PD12    TIM4_CH1    TIM4    PWM(1)  GPIO(50)    NODMA
+PD13    TIM4_CH2    TIM4    PWM(2)  GPIO(51)    NODMA
+PD14    TIM4_CH3    TIM4    PWM(3)  GPIO(52)    NODMA
+PD15    TIM4_CH4    TIM4    PWM(4)  GPIO(53)    NODMA
+
+PC6     TIM8_CH1    TIM8    PWM(1)  GPIO(54)    NODMA
+PC7     TIM8_CH2    TIM8    PWM(2)  GPIO(55)    NODMA
+PC8     TIM8_CH3    TIM8    PWM(3)  GPIO(56)    NODMA
+PC9     TIM8_CH4    TIM8    PWM(4)  GPIO(57)    NODMA
+
+PE9     TIM1_CH1    TIM1    PWM(9)  GPIO(60)
+PE11    TIM1_CH2    TIM1    PWM(10) GPIO(61)
+PE13    TIM1_CH3    TIM1    PWM(11) GPIO(62)
+PE14    TIM1_CH4    TIM1    PWM(12) GPIO(63)
+
+PA6     TIM3_CH1    TIM3    PWM(13) GPIO(64)    NODMA
+PB1     TIM3_CH4    TIM3    PWM(14) GPIO(65)    NODMA
+
+# PWM output for buzzer
+PB10    TIM2_CH3    TIM2    GPIO(75)    ALARM
+
+# ============================================================
+# Ethernet (RMII, LAN8742A)
+# ============================================================
+
+PC1     ETH_MDC             ETH1
+PA2     ETH_MDIO            ETH1
+PC4     ETH_RMII_RXD0       ETH1
+PC5     ETH_RMII_RXD1       ETH1
+PB11    ETH_RMII_TX_EN      ETH1
+PB12    ETH_RMII_TXD0       ETH1
+PB13    ETH_RMII_TXD1       ETH1
+PA7     ETH_RMII_CRS_DV     ETH1
+
+# REF_CLK driven by LAN8742A to MCU (RMII)
+PA1     ETH_RMII_REF_CLK    ETH1
+
+# Ethernet PHY power enable (define polarity per hardware design; HIGH at boot per current default)
+PF2 Ethernet_PWR_EN OUTPUT HIGH
+
+define BOARD_PHY_ID  MII_LAN8742A_ID
+define BOARD_PHY_RMII
+
+# ============================================================
+# SPI buses and devices
+# ============================================================
+
+# SPI1 - ICM-45686 IMU
+PG11    SPI1_SCK    SPI1
+PD7     SPI1_MOSI   SPI1
+PG9     SPI1_MISO   SPI1
+PD4     SP1_CS      CS
+PD5     SP1_DRDY1   INPUT    # DRDY (data-ready) from IMU
+
+# SPI2 - ICM-45686 IMU
+PD3     SPI2_SCK    SPI2
+PC2     SPI2_MISO   SPI2
+PC3     SPI2_MOSI   SPI2
+PA10    SP2_CS      CS
+PA8     SP2_DRDY1   INPUT    # DRDY (data-ready) from IMU
+
+# SPI6 - ICM-45686 IMU
+PG13    SPI6_SCK    SPI6
+PG12    SPI6_MISO   SPI6
+PG14    SPI6_MOSI   SPI6
+PG15    SP6_CS      CS
+PG10    SP6_DRDY    INPUT    # DRDY (data-ready) from IMU
+
+# SPI4 - FRAM (MB85RS1MTPN)
+PE2     SPI4_SCK    SPI4
+PE5     SPI4_MISO   SPI4
+PE6     SPI4_MOSI   SPI4
+PC13    SP4_CS      CS
+
+# ============================================================
+# CAN buses
+# ============================================================
+
+PB8     CAN1_RX     CAN1
+PB9     CAN1_TX     CAN1
+
+PB5     CAN2_RX     CAN2
+PB6     CAN2_TX     CAN2
+
+# CAN transceiver silent/standby controls (polarity per hardware design; LOW at boot per current default)
+PE3     GPIO_CAN1_SILENT    OUTPUT  PUSHPULL    SPEED_LOW   LOW     GPIO(70)
+PE4     GPIO_CAN2_SILENT    OUTPUT  PUSHPULL    SPEED_LOW   LOW     GPIO(71)
+
+# ============================================================
+# I2C buses
+# ============================================================
+
+# I2C2 (internal sensors: mag + baro)
+PF0     I2C2_SDA    I2C2
+PF1     I2C2_SCL    I2C2
+
+# I2C4 (external expansion)
+PF14    I2C4_SCL    I2C4
+PF15    I2C4_SDA    I2C4
+
+# order of I2C buses (I2C index 0 = I2C2)
+I2C_ORDER   I2C2    I2C4
+define HAL_I2C_INTERNAL_MASK 1   # bit0 marks I2C index 0 (I2C2) as internal
+
+# ============================================================
+# Sensors
+# ============================================================
+
+# Barometer MS5611 on I2C2 (I2C index 0)
+BARO    MS5611  I2C:0:0x76
+
+# Enable compass probing (runtime detection/driver selection)
+define AP_COMPASS_PROBING_ENABLED 1
+
+# Compass MMC5XX3 on I2C2 (I2C index 0)
+COMPASS     MMC5XX3     I2C:0:0x30  false   ROTATION_ROLL_180_YAW_270
+
+# ============================================================
+# IMU device table and bindings
+# ============================================================
+
+# SPI mode/speeds per IMU requirements (2 MHz init, 16 MHz runtime)
+SPIDEV  icm45686-1  SPI1    DEVID1  SP1_CS  MODE3   2*MHZ   16*MHZ
+SPIDEV  icm45686-2  SPI2    DEVID1  SP2_CS  MODE3   2*MHZ   16*MHZ
+SPIDEV  icm45686-3  SPI6    DEVID1  SP6_CS  MODE3   2*MHZ   16*MHZ
+
+IMU     Invensensev3    SPI:icm45686-1  ROTATION_ROLL_180
+IMU     Invensensev3    SPI:icm45686-2  ROTATION_ROLL_180
+IMU     Invensensev3    SPI:icm45686-3  ROTATION_ROLL_180
+
+define HAL_INS_HIGHRES_SAMPLE 7
+define HAL_DEFAULT_INS_FAST_SAMPLE 7
+
+# ============================================================
+# Storage
+# ============================================================
+
+# FRAM parameter storage on SPI4 (MB85RS1MTPN)
+SPIDEV  ramtron     SPI4    DEVID1  SP4_CS  MODE3   8*MHZ   8*MHZ
+
+# define HAL_USE_EMPTY_STORAGE 1
+
+# microSD support (SDMMC2)
+PD6     SDMMC2_CK   SDMMC2
+PA0     SDMMC2_CMD  SDMMC2
+PB14    SDMMC2_D0   SDMMC2
+PB15    SDMMC2_D1   SDMMC2
+PB3     SDMMC2_D2   SDMMC2
+PB4     SDMMC2_D3   SDMMC2
+
+define FATFS_HAL_DEVICE SDCD2
+
+# ============================================================
+# Storage and filesystem
+# ============================================================
+
+define HAL_STORAGE_SIZE 32768
+define HAL_WITH_RAMTRON 1
+
+# enable FAT filesystem support (requires a microSD defined via SDMMC)
+define HAL_OS_FATFS_IO 1
+
+# ============================================================
+# Build and DMA policy
+# ============================================================
+
+# build ABIN for flash-from-bootloader support
+env BUILD_ABIN True
+
+# Avoid DMA channel sharing on IMU SPI buses to reduce jitter/contention.
+DMA_NOSHARE SPI1* SPI2* SPI6*
+DMA_PRIORITY SPI1* SPI2* SPI6* SPI4* UART4 UART7 USART3
