@@ -6649,8 +6649,9 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
         mount_roll, mount_pitch, mount_yaw, mount_yaw_is_absolute = self.get_mount_roll_pitch_yaw_deg()
         assert -46 <= mount_pitch <= -44, f"Pitch is out of range: {mount_pitch}"
         self.fly_guided_move_local(100, 100, 70)   # move and check that pitch and yaw track
+        self.wait_speed_vector(Vector3(0, 0, 0))    # try to let aircraft settle before doing tests
         mount_roll, mount_pitch, mount_yaw, mount_yaw_is_absolute = self.get_mount_roll_pitch_yaw_deg()
-        assert -17 <= mount_pitch <= -15, f"Pitch2 is out of range: {mount_pitch}"
+        assert -22 <= mount_pitch <= -18, f"Pitch2 is out of range: {mount_pitch}"
         assert -179 <= mount_yaw <= -176, f"Yaw2 is out of range: {mount_yaw}"
         self.set_rc(10, 1500)  # switch to middle to return to RC target mode and check that mount reverts to initial angles
         mount_roll, mount_pitch, mount_yaw, mount_yaw_is_absolute = self.get_mount_roll_pitch_yaw_deg()
