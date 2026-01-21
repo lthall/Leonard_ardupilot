@@ -1,3 +1,3 @@
 include ../Callisto/hwdef.inc
 
-define AP_CUSTOM_FIRMWARE_STRING "ArduCopter V4.5.7-C2.4r12"
+define AP_CUSTOM_FIRMWARE_STRING "ArduCopter V4.5.7-C2.4r13"
