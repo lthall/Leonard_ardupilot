@@ -11,7 +11,7 @@
 --   far flung future - change parameters on peripherals too
 
 
-gcs:send_text(6, string.format("CFG: Ship Ops config_profiles v1.0 starting"))
+gcs:send_text(6, string.format("CFG: Ship Ops config_profiles v1.5 starting"))
 
 local SEL_APPLY_DEFAULTS = 0
 local SEL_DO_NOTHING = -1
@@ -47,6 +47,7 @@ local config_domains = {
 
          -- Flight Behavior
          ["ANGLE_MAX"] = 3000,
+         ["ATC_SLEW_YAW"] = 6000,
 
          -- Geofence
          ["FENCE_ACTION"] = 1,
@@ -90,7 +91,6 @@ local config_domains = {
 
          -- Logging
          ["LOG_BITMASK"] = 180222,
-         ["LOG_DISARMED"] = 0,
          ["LOG_FILE_DSRMROT"] = 0,
 
          -- Loiter Mode
@@ -128,7 +128,12 @@ local config_domains = {
          ["RTL_OPTIONS"] = 0,
          ["RTL_SPEED"] = 0,
          
-         -- Takeoff
+         -- RFD900x Serial Port
+         ["SERIAL1_BAUD"] = 57,
+         ["SERIAL1_OPTIONS"] = 0,
+         ["SERIAL1_PROTOCOL"] = 2,
+
+		 -- Takeoff
          ["TKOFF_SLEW_TIME"] = 4,
 
          -- Terrain Following
@@ -229,7 +234,6 @@ local config_domains = {
          ["ATC_RAT_YAW_IMAX"] = 0.5,
          ["ATC_RAT_YAW_P"] = 0.5,
          ["ATC_RAT_YAW_SMAX"] = 50,
-         ["ATC_SLEW_YAW"] = 6000,
          ["ATC_THR_MIX_MAN"] = 0.1,
          ["ATC_THR_MIX_MAX"] = 2,
          ["ATC_THR_MIX_MIN"] = 0.1,
@@ -351,32 +355,44 @@ local config_domains = {
          [75] = {
             name = "Callisto 75",
             params = {
+               ["ATC_ACCEL_P_MAX"] = 25000,
+               ["ATC_ACCEL_R_MAX"] = 25000,
                ["ATC_ANG_YAW_P"] = 4.0,
+               ["ATC_RATE_P_MAX"] = 120,
+               ["ATC_RATE_R_MAX"] = 120,
                ["ATC_RAT_PIT_D"] = 0.004,
+               ["ATC_RAT_PIT_FLTT"] = 10.0,
                ["ATC_RAT_PIT_FLTD"] = 10.0,
                ["ATC_RAT_PIT_I"] = 0.09,
                ["ATC_RAT_PIT_P"] = 0.09,
                ["ATC_RAT_RLL_D"] = 0.004,
+               ["ATC_RAT_RLL_FLTT"] = 10.0,
                ["ATC_RAT_RLL_FLTD"] = 10.0,
                ["ATC_RAT_RLL_I"] = 0.09,
                ["ATC_RAT_RLL_P"] = 0.09,
+               ["ATC_RAT_YAW_D"] = 0.01,
+               ["ATC_RAT_YAW_I"] = 0.025,
+               ["ATC_RAT_YAW_P"] = 0.25,
+               ["INS_ACCEL_FILTER"] = 5.0,
                ["INS_GYRO_FILTER"] = 20.0,
-               ["INS_HNTC2_BW"] = 16.0,
-               ["INS_HNTC2_FREQ"] = 32.0,
-               ["INS_HNTC2_OPTS"] = 0.0,
+               ["INS_HNTC2_BW"] = 10.0,
+               ["INS_HNTC2_FREQ"] = 20.0,
+               ["INS_HNTC2_HMNCS"] = 3,
+               ["INS_HNTC2_OPTS"] = 16,
                ["INS_HNTCH_ATT"] = 80.0,
-               ["INS_HNTCH_BW"] = 11.0,
+               ["INS_HNTCH_BW"] = 11.75,
                ["INS_HNTCH_FM_RAT"] = 0.9,
-               ["INS_HNTCH_FREQ"] = 22.0,
+               ["INS_HNTCH_FREQ"] = 23.5,
                ["INS_HNTCH_HMNCS"] = 11.0,
                ["INS_HNTCH_OPTS"] = 20.0,
-               ["INS_HNTCH_REF"] = 0.07,
+               ["INS_HNTCH_REF"] = 0.09,
                ["MOT_BAT_CURR_MAX"] = 240.0,
                ["MOT_PWM_MAX"] = 2000.0,
                ["MOT_PWM_MIN"] = 1000.0,
                ["MOT_SPIN_ARM"] = 0.15,
                ["MOT_SPIN_MAX"] = 0.95,
                ["MOT_SPIN_MIN"] = 0.2,
+               ["MOT_SPOOL_TIME"] = 2.0,
                ["MOT_THST_EXPO"] = 0.55,
                ["MOT_THST_HOVER"] = 0.2,
                ["PSC_ACCZ_I"] = 0.25,
