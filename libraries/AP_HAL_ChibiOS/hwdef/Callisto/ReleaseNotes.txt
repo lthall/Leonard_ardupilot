@@ -1,3 +1,9 @@
+October 8th, 2025 : Callisto: V4.5.7-C2.Xr13
+December 18th, 2025 : Callisto: 2.4 Param: remove BATT_SERIAL_NUM
+December 18th, 2025 : LUA: config_profiles_FSO_1.5
+October 13th, 2024 : AP_HAL_ChibiOS: increase the number of memory regions for crashdump
+December 14th, 2024 : AP_CANManager: fixed critical race in log_text()
+
 October 8th, 2025 : Callisto: V4.5.7-C2.Xr12
 October 8th, 2025 : RC_Channel: Do not assume gripper should be released on init.
 
