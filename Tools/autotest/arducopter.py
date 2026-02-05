@@ -5594,11 +5594,14 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
                 break
 
     def send_set_position_target_global_int(self, lat, lon, alt):
+        return self.send_set_position_target_global_int(lat, lon, alt, mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT_INT)
+
+    def send_set_position_target(self, lat, lon, alt, frame):
         self.mav.mav.set_position_target_global_int_send(
             0, # timestamp
             1, # target system_id
             1, # target component id
-            mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT_INT,
+            frame,
             MAV_POS_TARGET_TYPE_MASK.POS_ONLY, # mask specifying use-only-lat-lon-alt
             lat, # lat
             lon, # lon
@@ -11779,6 +11782,88 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
         self.wait_disarmed()
         self.reboot_sitl()
 
+    def upload_rally_points_from_locations(self, locs):
+        items = [self.create_MISSION_ITEM_INT(
+            mavutil.mavlink.MAV_CMD_NAV_RALLY_POINT,
+            x=int(loc.lat*1e7),
+            y=int(loc.lng*1e7),
+            z=loc.alt,
+            frame=mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT,
+            mission_type=mavutil.mavlink.MAV_MISSION_TYPE_RALLY,
+        ) for loc in locs]
+        self.correct_wp_seq_numbers(items)
+        self.check_rally_upload_download(items)
+
+    def RTL_ALT_FINAL_M_terrain_alt(self):
+        '''Test RTL with RTL_ALT_FINAL_M to rally point well above home'''
+
+        rtl_alt_final_m = 10
+        self.set_parameters({
+            "TERRAIN_ENABLE": 1,
+            "RTL_ALT_TYPE": 1,  # 1 is terrain
+            "RTL_ALT_M": 20,
+            "RTL_ALT_FINAL_M": rtl_alt_final_m,
+        })
+        self.install_terrain_handlers_context()
+        self.reboot_sitl()
+
+        rally_loc = mavutil.location(
+            -35.37327174,
+            149.15118922,
+            653.3
+        )
+        self.upload_rally_points_from_locations([rally_loc])
+
+        self.takeoff(20, mode='GUIDED')
+
+        self.send_set_position_target(
+            int(rally_loc.lat*1e7),
+            int(rally_loc.lng*1e7),
+            20,
+            mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT
+        )
+        self.wait_distance_to_location(rally_loc, 3, 50, timeout=300)
+
+        self.change_mode('RTL')
+        self.wait_distance_to_location(rally_loc, 0, 1)
+
+        self.progress(f"Wait for hovering {rtl_alt_final_m}m above terrain")
+        self.wait_altitude(
+            rtl_alt_final_m-1,
+            rtl_alt_final_m+1,
+            altitude_source="TERRAIN_REPORT.current_height",
+            timeout=120,
+        )
+
+        self.progress("Moving away and setting up to land")
+        self.change_mode('GUIDED')
+
+        self.send_set_position_target(
+            int(SITL_START_LOCATION.lat*1e7),
+            int(SITL_START_LOCATION.lng*1e7),
+            20,
+            mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT
+        )
+        # we have to go away a fair bit so we are below the final alt
+        self.wait_distance_to_location(rally_loc, 200, 300, timeout=300)
+
+        self.set_parameters({
+            "RTL_ALT_FINAL_M": 0,
+        })
+
+        self.change_mode('RTL')
+
+        self.wait_distance_to_location(rally_loc, 0, 1, timeout=300)
+
+        self.progress("Waiting for descent rate of LAND_SPD_MS")
+        self.wait_descent_rate(
+            self.get_parameter('LAND_SPD_MS'),
+            minimum_duration=5,
+            timeout=240,
+        )
+
+        self.wait_disarmed()
+
     def RTL_ALT_FINAL_M(self):
         '''Test RTL with RTL_ALT_FINAL_M'''
         self.progress("arm the vehicle and takeoff in Guided")
@@ -15754,6 +15839,7 @@ return update, 1000
             self.GSF_reset,
             self.AP_Avoidance,
             self.RTL_ALT_FINAL_M,
+            self.RTL_ALT_FINAL_M_terrain_alt,
             self.SMART_RTL,
             self.SMART_RTL_EnterLeave,
             self.SMART_RTL_Repeat,
