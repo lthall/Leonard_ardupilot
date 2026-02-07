@@ -11810,7 +11810,7 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
         rally_loc = mavutil.location(
             -35.37327174,
             149.15118922,
-            653.3
+            70
         )
         self.upload_rally_points_from_locations([rally_loc])
 
