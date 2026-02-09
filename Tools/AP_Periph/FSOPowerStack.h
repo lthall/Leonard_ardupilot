@@ -1,6 +1,6 @@
 #pragma once
 
-#ifdef HAL_PERIPH_ENABLE_FSO_POWER_STACK
+#if AP_PERIPH_FSO_POWERSTACK_ENABLED
 
 #include <AP_DAC/AP_DAC.h>
 
@@ -244,6 +244,6 @@ private:
     bool done_late_init;
 };
 
-#endif // HAL_PERIPH_ENABLE_FSO_POWER_STACK
+#endif // AP_PERIPH_FSO_POWERSTACK_ENABLED
 
 

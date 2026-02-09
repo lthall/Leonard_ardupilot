@@ -15,7 +15,7 @@
 
 #include "AP_Periph.h"
 
-#ifdef HAL_PERIPH_ENABLE_FSO_POWER_STACK
+#if AP_PERIPH_FSO_POWERSTACK_ENABLED
 
 #include <dronecan_msgs.h>
 
@@ -1649,5 +1649,5 @@ void FSOPowerStack::update(bool battery_read)
     report_errors();
 }
 
-#endif  // HAL_PERIPH_ENABLE_FSO_POWER_STACK
+#endif  // AP_PERIPH_FSO_POWERSTACK_ENABLED
 

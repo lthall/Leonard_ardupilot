@@ -50,11 +50,6 @@
 #endif
 #include <AP_AHRS/AP_AHRS.h>
 
-#ifdef HAL_PERIPH_ENABLE_FSO_POWER_STACK
-#include "FSOPowerStack.h"
-#endif
-#include <AP_DAC/AP_DAC.h>
-
 #if AP_PERIPH_RELAY_ENABLED
 #if AP_PERIPH_PWM_HARDPOINT_ENABLED
     #error "Relay and PWM_HARDPOINT both use hardpoint message"
@@ -110,6 +105,15 @@
 #ifndef AP_SIM_PARAM_ENABLED
 #define AP_SIM_PARAM_ENABLED AP_SIM_ENABLED
 #endif
+
+#ifndef AP_PERIPH_FSO_POWERSTACK_ENABLED
+#define AP_PERIPH_FSO_POWERSTACK_ENABLED 0
+#endif  // AP_PERIPH_FSO_POWERSTACK_ENABLED
+
+#if AP_PERIPH_FSO_POWERSTACK_ENABLED
+#include "FSOPowerStack.h"
+#endif  // AP_PERIPH_FSO_POWERSTACK_ENABLED
+#include <AP_DAC/AP_DAC.h>
 
 #if defined(HAL_PERIPH_LISTEN_FOR_SERIAL_UART_REBOOT_CMD_PORT) && !defined(HAL_DEBUG_BUILD) && !defined(HAL_PERIPH_LISTEN_FOR_SERIAL_UART_REBOOT_NON_DEBUG)
 /* this checking for reboot can lose bytes on GPS modules and other
@@ -398,10 +402,10 @@ public:
     BattBalance battery_balance;
 #endif
 
-#ifdef HAL_PERIPH_ENABLE_FSO_POWER_STACK
+#if AP_PERIPH_FSO_POWERSTACK_ENABLED
     FSOPowerStack FSO_power_stack;
-#endif
-    
+#endif  // AP_PERIPH_FSO_POWERSTACK_ENABLED
+
 #if AP_PERIPH_BATTERY_TAG_ENABLED
     BatteryTag battery_tag;
 #endif
