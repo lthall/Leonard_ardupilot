@@ -54,8 +54,9 @@
 #define FSO_SWITCH_OFF_TIME_MS              1000    // Minimum press time to turn off
 #define FSO_LOOP_TIME_MS                    100     // Loop time in ms, must be the same as battery read period
 
-#define FSO_ERROR_MSG_INTERVAL              10000    // Interval of current and temperature error messages
-#define FSO_ERROR_FAN_MSG_INTERVAL          300000  // Interval of fan RPM error messages
+#define FSO_MAIN_ERROR_MSG_INTERVAL         5000    // Interval of main temperature error messages
+#define FSO_ERROR_FAN_MSG_INTERVAL          10000   // Interval of fan RPM error messages
+#define FSO_ERROR_MSG_INTERVAL              15000   // Interval of current and temperature error messages
 
 extern const AP_HAL::HAL &hal;
 
@@ -351,27 +352,39 @@ void FSOPowerStack::debug_msg(void)
 void FSOPowerStack::report_errors(void)
 {
     uint32_t now_ms = AP_HAL::millis();
-    if (now_ms - last_report_errors_ms < FSO_ERROR_MSG_INTERVAL) {
-        return;
-    }
-
     auto &batt = AP::battery();
 
-    float main_temp;
-    if (batt.get_temperature(main_temp, 3)) {
-        if (main_temp > FSO_MAIN_TEMPERATURE_MAX) {
-            GCS_SEND_TEXT(MAV_SEVERITY_CRITICAL, "POWER STACK OVER TEMPERATURE: %.2f deg", main_temp);
-            last_report_errors_ms = now_ms;
+    if (now_ms - last_main_report_errors_ms > FSO_MAIN_ERROR_MSG_INTERVAL) {
+        float main_temp;
+        if (batt.get_temperature(main_temp, 10)) {
+            if (main_temp > FSO_MAIN_TEMPERATURE_MAX) {
+                GCS_SEND_TEXT(MAV_SEVERITY_CRITICAL, "POWER STACK OVER TEMPERATURE: %.2f deg", main_temp);
+                last_main_report_errors_ms = now_ms;
+            }
         }
     }
 
-    float   payload_1_temp;
-    if (batt.get_temperature(payload_1_temp, 3)) {
-        if ((payload_1_temp > MIN(bec_temperature_max, FSO_BEC_HC_TEMPERATURE_MAX) - 5.0)
-                && payload_BEC_1_on == true) {
-            GCS_SEND_TEXT(MAV_SEVERITY_CRITICAL, "BEC 1 temp warning: %.2f deg", payload_1_temp);
-            last_report_errors_ms = now_ms;
+    if (now_ms - last_fan_error_ms > FSO_ERROR_FAN_MSG_INTERVAL) {
+        if (fans[0].freq_hz < fan_1_min_Hz) {
+            GCS_SEND_TEXT(MAV_SEVERITY_CRITICAL, "Fan 1 failure");
+            last_fan_error_ms = now_ms;
         }
+        if (fans[1].freq_hz < fan_2_min_Hz){
+            GCS_SEND_TEXT(MAV_SEVERITY_CRITICAL, "Fan 2 failure");
+            last_fan_error_ms = now_ms;
+        }
+        if (fans[2].freq_hz < fan_3_min_Hz){
+            GCS_SEND_TEXT(MAV_SEVERITY_CRITICAL, "Fan 3 failure");
+            last_fan_error_ms = now_ms;
+        }
+        if (fans[3].freq_hz < fan_4_min_Hz){
+            GCS_SEND_TEXT(MAV_SEVERITY_CRITICAL, "Fan 4 failure");
+            last_fan_error_ms = now_ms;
+        }
+    }
+
+    if (now_ms - last_report_errors_ms < FSO_ERROR_MSG_INTERVAL) {
+        return;
     }
 
     float   payload_2_temp;
@@ -437,26 +450,6 @@ void FSOPowerStack::report_errors(void)
     if (!h16pro_fault()){
         GCS_SEND_TEXT(MAV_SEVERITY_INFO, "H16 Pro power fault");
         last_report_errors_ms = now_ms;
-    }
-
-    if (now_ms - last_fan_error_ms < FSO_ERROR_FAN_MSG_INTERVAL) {
-        return;
-    }
-    if (fans[0].freq_hz < fan_1_min_Hz) {
-        GCS_SEND_TEXT(MAV_SEVERITY_CRITICAL, "Fan 1 failure");
-        last_fan_error_ms = now_ms;
-    }
-    if (fans[1].freq_hz < fan_2_min_Hz){
-        GCS_SEND_TEXT(MAV_SEVERITY_CRITICAL, "Fan 2 failure");
-        last_fan_error_ms = now_ms;
-    }
-    if (fans[2].freq_hz < fan_3_min_Hz){
-        GCS_SEND_TEXT(MAV_SEVERITY_CRITICAL, "Fan 3 failure");
-        last_fan_error_ms = now_ms;
-    }
-    if (fans[3].freq_hz < fan_4_min_Hz){
-        GCS_SEND_TEXT(MAV_SEVERITY_CRITICAL, "Fan 4 failure");
-        last_fan_error_ms = now_ms;
     }
 }
 
