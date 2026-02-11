@@ -23,13 +23,11 @@
 #define FSO_PAYLOAD_1_VOLT_DEFAULT          12.0    // Default voltage setting of Payload BEC 1
 #define FSO_PAYLOAD_2_VOLT_DEFAULT          5.0     // Default voltage setting of Payload BEC 2
 #define FSO_FAN_ERROR_HZ_MIN                100.0   // Minimum tachometer reading for the standard fan
-#define FSO_OPTIONS_DEFAULT                 4       // Default options: PAYLOAD_HV OFF PAYLOAD_BEC ON
+#define FSO_OPTIONS_DEFAULT                 2       // Default options: DEBUG OFF PAYLOAD_BEC ON
 
-#define FSO_OVER_CURRENT_TC                 1.0     // Maximum current of the HV payload output
+#define FSO_OVER_CURRENT_TC                 1.0     // Time constant for over current filter
 #define FSO_PAYLOAD_BEC_CURRENT_MAX         10.0    // Maximum current of the payload BEC's
 #define FSO_PAYLOAD_BEC_CURRENT_FUSE        11.25   // Maximum current of the payload BEC's
-#define FSO_PAYLOAD_HV_CURRENT_MAX          25.0    // Maximum current of the HV payload output
-#define FSO_PAYLOAD_HV_CURRENT_FUSE         27.5    // Maximum current of the HV payload output
 #define FSO_INTERNAL_BEC_HC_CURRENT_MAX     5.0     // Maximum current of the high current internal BEC
 #define FSO_INTERNAL_BEC_CURRENT_MAX        1.75    // Maximum current of the low current internal BEC's
 
@@ -59,7 +57,7 @@ const AP_Param::GroupInfo FSOPowerStack::var_info[] {
     // @Param: _OPTIONS
     // @DisplayName: FSO Options
     // @Description: FSO Options
-    // @Bitmask: 0:Debug, 1:PAYLOAD_HV_ON, 2:PAYLOAD_BEC_ON
+    // @Bitmask: 0:Debug, 1:PAYLOAD_BEC_ON
     AP_GROUPINFO("_OPTIONS", 2, FSOPowerStack, options, FSO_OPTIONS_DEFAULT),
 
     // @Param: _BAT_OFF_MAX
@@ -92,65 +90,59 @@ const AP_Param::GroupInfo FSOPowerStack::var_info[] {
     // @Range: 0 10
     AP_GROUPINFO("_BEC2_AMP_LIM", 7, FSOPowerStack, payload_2_current_max, FSO_PAYLOAD_BEC_CURRENT_MAX),
 
-    // @Param: _HV_AMP_LIM
-    // @DisplayName: Payload HV current limit
-    // @Description: Payload HV current limit in Amps
-    // @Range: 0 25
-    AP_GROUPINFO("_HV_AMP_LIM", 8, FSOPowerStack, payload_HV_current_max, FSO_PAYLOAD_HV_CURRENT_MAX),
-
     // @Param: _BEC_TEMP_LIM
     // @DisplayName: Maximum temperature of BEC circuits
     // @Description: Maximum temperature of BEC circuits before shutdown or warning
     // @Range: 0 100
-    AP_GROUPINFO("_BEC_TEMP_LIM", 9, FSOPowerStack, bec_temperature_max, FSO_BEC_HC_TEMPERATURE_MAX),
+    AP_GROUPINFO("_BEC_TEMP_LIM", 8, FSOPowerStack, bec_temperature_max, FSO_BEC_HC_TEMPERATURE_MAX),
 
     // @Param: _FAN_1_MIN
     // @DisplayName: Fan 1 tachometer Alarm
     // @Description: Alarm threshold for minimum fan 1 tachometer in Hz
     // @Range: 0 200
-    AP_GROUPINFO("_FAN_1_MIN", 10, FSOPowerStack, fan_1_min_Hz, FSO_FAN_ERROR_HZ_MIN),
+    AP_GROUPINFO("_FAN_1_MIN", 9, FSOPowerStack, fan_1_min_Hz, FSO_FAN_ERROR_HZ_MIN),
 
     // @Param: _FAN_2_MIN
     // @DisplayName: Fan 2 tachometer Alarm
     // @Description: Alarm threshold for minimum fan 2 tachometer in Hz
     // @Range: 0 200
-    AP_GROUPINFO("_FAN_2_MIN", 11, FSOPowerStack, fan_2_min_Hz, 0.0),
+    AP_GROUPINFO("_FAN_2_MIN", 10, FSOPowerStack, fan_2_min_Hz, 0.0),
 
     // @Param: _FAN_3_MIN
     // @DisplayName: Fan 3 tachometer Alarm
     // @Description: Alarm threshold for minimum fan 3 tachometer in Hz
     // @Range: 0 200
-    AP_GROUPINFO("_FAN_3_MIN", 12, FSOPowerStack, fan_3_min_Hz, 0.0),
+    AP_GROUPINFO("_FAN_3_MIN", 11, FSOPowerStack, fan_3_min_Hz, 0.0),
 
     // @Param: _FAN_4_MIN
     // @DisplayName: Fan 4 tachometer Alarm
     // @Description: Alarm threshold for minimum fan 4 tachometer in Hz
     // @Range: 0 200
-    AP_GROUPINFO("_FAN_4_MIN", 13, FSOPowerStack, fan_4_min_Hz, FSO_FAN_ERROR_HZ_MIN),
+    AP_GROUPINFO("_FAN_4_MIN", 12, FSOPowerStack, fan_4_min_Hz, FSO_FAN_ERROR_HZ_MIN),
 
     // @Param: _CAL_P1C1
     // @DisplayName: Payload 1 Coefficient 1
     // @Description: Payload 1 Coefficient 1
     // @Range: 0 10
-    AP_GROUPINFO("_CAL_P1C1", 14, FSOPowerStack, cal_payload_P1c1, FSO_C1_DEFAULT),
+    AP_GROUPINFO("_CAL_P1C1", 13, FSOPowerStack, cal_payload_P1c1, FSO_C1_DEFAULT),
 
     // @Param: _CAL_P1C2
     // @DisplayName: Payload 1 Coefficient 2
     // @Description: Payload 1 Coefficient 2
     // @Range: 0 10
-    AP_GROUPINFO("_CAL_P1C2", 15, FSOPowerStack, cal_payload_P1c2, FSO_C2_DEFAULT),
+    AP_GROUPINFO("_CAL_P1C2", 14, FSOPowerStack, cal_payload_P1c2, FSO_C2_DEFAULT),
 
     // @Param: _CAL_P2C1
     // @DisplayName: Payload 2 Coefficient 1
     // @Description: Payload 2 Coefficient 1
     // @Range: 0 10
-    AP_GROUPINFO("_CAL_P2C1", 16, FSOPowerStack, cal_payload_P2c1, FSO_C1_DEFAULT),
+    AP_GROUPINFO("_CAL_P2C1", 15, FSOPowerStack, cal_payload_P2c1, FSO_C1_DEFAULT),
 
     // @Param: _CAL_P2C2
     // @DisplayName: Payload 2 Coefficient 2
     // @Description: Payload 2 Coefficient 2
     // @Range: 0 10
-    AP_GROUPINFO("_CAL_P2C2", 17, FSOPowerStack, cal_payload_P2c2, FSO_C2_DEFAULT),
+    AP_GROUPINFO("_CAL_P2C2", 16, FSOPowerStack, cal_payload_P2c2, FSO_C2_DEFAULT),
 
     AP_GROUPEND
 };
@@ -215,7 +207,6 @@ void FSOPowerStack::init()
     }
 
     float over_current_tc = FSO_OVER_CURRENT_TC;
-    payload_HV_current_filter.set_cutoff_frequency(1.0/over_current_tc);
     payload_1_current_filter.set_cutoff_frequency(1.0/over_current_tc);
     payload_2_current_filter.set_cutoff_frequency(1.0/over_current_tc);
 
@@ -228,11 +219,6 @@ void FSOPowerStack::init()
 void FSOPowerStack::late_init()
 {
     periph.dac.init();
-    if (option_is_set(Option::PAYLOAD_HV_ON)) {
-        set_HV_payload_on();
-    } else {
-        set_HV_payload_off();
-    }
     if (option_is_set(Option::PAYLOAD_BEC_ON)) {
         set_payload_BEC_1_on();
         set_payload_BEC_2_on();
@@ -290,36 +276,34 @@ void FSOPowerStack::debug_msg(void)
 
     auto &batt = AP::battery();
 
-    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Volt - B1:%.1f, B2:%.1f, PHV:%.1f, P1:%.2f, P2:%.2f, IHC:%.2f, I1:%.2f, I2:%.2f, O:%.2f",
-                  batt.voltage(0), batt.voltage(1), batt.voltage(2), batt.voltage(3),
+    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Volt - B1:%.1f, B2:%.1f, P1:%.2f, P2:%.2f, IHC:%.2f, I1:%.2f, I2:%.2f, O:%.2f",
+                  batt.voltage(0), batt.voltage(1), batt.voltage(3),
                   batt.voltage(4), batt.voltage(5), batt.voltage(6), batt.voltage(7), batt.voltage(8));
 
     float B1_C = nanf("");
     float B2_C = nanf("");
-    float PHV_C = nanf("");
     float P1_C = nanf("");
     float P2_C = nanf("");
     float IHC_C = nanf("");
     float I1_C = nanf("");
     float I2_C = nanf("");
-    if (batt.current_amps(B1_C, 0) || batt.current_amps(B2_C, 1) || batt.current_amps(PHV_C, 2) || batt.current_amps(P1_C, 3) || batt.current_amps(P2_C, 4) || batt.current_amps(IHC_C, 5) || batt.current_amps(I1_C, 6) || batt.current_amps(I2_C, 7)) {
-    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Current - B1:%.4f, B2:%.4f, PHV:%.2f, P1:%.2f, P2:%.2f, IHC:%.2f, I1:%.2f, I2:%.2f",
-                  B1_C, B2_C, PHV_C, P1_C, P2_C, IHC_C, I1_C, I2_C);
+    if (batt.current_amps(B1_C, 0) || batt.current_amps(B2_C, 1) || batt.current_amps(P1_C, 3) || batt.current_amps(P2_C, 4) || batt.current_amps(IHC_C, 5) || batt.current_amps(I1_C, 6) || batt.current_amps(I2_C, 7)) {
+    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Current - B1:%.4f, B2:%.4f, P1:%.2f, P2:%.2f, IHC:%.2f, I1:%.2f, I2:%.2f",
+                  B1_C, B2_C, P1_C, P2_C, IHC_C, I1_C, I2_C);
     }
-    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Current Limit - PHV:%.2f, P1:%.2f, P2:%.2f,  IHC:%.2f, I1:%.2f, I2:%.2f",
-                  payload_HV_current_filter.get(), payload_1_current_filter.get(), payload_2_current_filter.get(),
+    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Current Limit - P1:%.2f, P2:%.2f,  IHC:%.2f, I1:%.2f, I2:%.2f",
+                  payload_1_current_filter.get(), payload_2_current_filter.get(),
                   internal_HC_current_filter.get(), internal_1_current_filter.get(), internal_2_current_filter.get());
 
     float main_temp;
-    float PHV_temp;
     float P1_temp;
     float P2_temp;
     float IHC_temp;
     float I1_temp;
     float I2_temp;
-    if (batt.get_temperature(main_temp, 9) && batt.get_temperature(PHV_temp, 2) && batt.get_temperature(P1_temp, 3) && batt.get_temperature(P2_temp, 4) && batt.get_temperature(IHC_temp, 5) && batt.get_temperature(I1_temp, 6) && batt.get_temperature(I2_temp, 7)) {
-        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Temp - M:%.1f, PHV:%.1f P1:%.1f, P2:%.1f, IHC:%.1f, I1:%.1f, I2:%.1f",
-                    main_temp, PHV_temp, P1_temp, P2_temp, IHC_temp, I1_temp, I2_temp);
+    if (batt.get_temperature(main_temp, 9) && batt.get_temperature(P1_temp, 3) && batt.get_temperature(P2_temp, 4) && batt.get_temperature(IHC_temp, 5) && batt.get_temperature(I1_temp, 6) && batt.get_temperature(I2_temp, 7)) {
+        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Temp - M:%.1f, P1:%.1f, P2:%.1f, IHC:%.1f, I1:%.1f, I2:%.1f",
+                    main_temp, P1_temp, P2_temp, IHC_temp, I1_temp, I2_temp);
     }
     GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Fans - F1: %.0f, F2: %.0f, F3: %.0f, F4: %.0f",
                     fans[0].freq_hz, fans[1].freq_hz, fans[2].freq_hz, fans[3].freq_hz);
@@ -505,72 +489,6 @@ void FSOPowerStack::update_main_power()
     }
 }
 
-void FSOPowerStack::update_payload_HV_power()
-{
-    uint32_t now_ms = AP_HAL::millis();
-    auto &batt = AP::battery();
-    
-    float payload_HV_current;
-    if (batt.current_amps(payload_HV_current, 2)) {
-        if ((payload_HV_current > FSO_PAYLOAD_HV_CURRENT_FUSE)
-                && (payload_HV_state != ShutDown)) {
-            payload_HV_state = ShutDown;
-            GCS_SEND_TEXT(MAV_SEVERITY_CRITICAL, "HV fuse shutdown: %.2f A", payload_HV_current);
-        }
-        payload_HV_current_filter.apply(payload_HV_current, 0.001 * FSO_LOOP_TIME_MS);
-        if ((payload_HV_current_filter.get() > MIN(payload_HV_current_max, FSO_PAYLOAD_HV_CURRENT_MAX))
-                && (payload_HV_state != ShutDown)) {
-            payload_HV_state = ShutDown;
-            GCS_SEND_TEXT(MAV_SEVERITY_CRITICAL, "HV over current shutdown: %.2f A", payload_HV_current_filter.get());
-        }
-    }
-    
-    // Payload Turn On State Machine
-    switch (payload_HV_state) {
-
-    case TurnOnState::Off:
-        if (payload_HV_on == true) {
-            payload_HV_state = TurnOnState::PreChargeStart;
-        }
-        break;
-
-    case TurnOnState::PreChargeStart:
-        // Turn on Payload HV pre-charge
-        set_payload_HV_PC_on();
-        start_payload_HV_precharge_ms = now_ms;
-        payload_HV_state = TurnOnState::PreCharge;
-        break;
-
-    case TurnOnState::PreCharge:
-        if (MAX(batt.voltage(0), batt.voltage(1)) - batt.voltage(2) < FSO_OUT_VOLTS_DIFF_MAX) {
-            // Turn off payload HV pre-charge
-            set_payload_HV_PC_off();
-            // Turn on payload HV switch
-            set_payload_HV_SW_on();
-            GCS_SEND_TEXT(MAV_SEVERITY_INFO, "HV Power On");
-            payload_HV_state = TurnOnState::On;
-        } else if (now_ms - start_payload_HV_precharge_ms > FSO_PRECHARGE_TIMEOUT_MS) {
-            GCS_SEND_TEXT(MAV_SEVERITY_CRITICAL, "HV pre-charge failure, dV: %.2f", MAX(batt.voltage(0), batt.voltage(1)) - batt.voltage(2));
-            payload_HV_state = ShutDown;
-        }
-        break;
-
-    case TurnOnState::On:
-        if (payload_HV_on == false) {
-            payload_HV_state = TurnOnState::ShutDown;
-        }
-        break;
-
-    case TurnOnState::ShutDown:
-        // Turn off payload HV pre-charge
-        set_payload_HV_PC_off();
-        // Turn off payload HV switch
-        set_payload_HV_SW_off();
-        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "HV Power Off");
-        payload_HV_state = TurnOnState::Off;
-        break;
-    }
-}
 
 void FSOPowerStack::update_payload_BEC()
 {
@@ -656,8 +574,6 @@ void FSOPowerStack::update(bool battery_read)
 
     update_main_power();
 
-    update_payload_HV_power();
-
     if (!battery_read) {
         // run at 10Hz after battery read
         return;
@@ -669,13 +585,6 @@ void FSOPowerStack::update(bool battery_read)
     } else {
         set_LED_1_off();
         set_main_off();
-    }
-    if (!option_is_set(Option::PAYLOAD_HV_ON)) {
-        if (main_state == TurnOnState::On) {
-            set_HV_payload_on();
-        } else {
-            set_HV_payload_off();
-        }
     }
     if (!option_is_set(Option::PAYLOAD_BEC_ON)) {
         if (main_state == TurnOnState::On) {

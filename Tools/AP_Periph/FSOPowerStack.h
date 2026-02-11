@@ -18,8 +18,7 @@ private:
 
     enum class Option : uint32_t {
         DEBUG               = 0,
-        PAYLOAD_HV_ON       = 1,
-        PAYLOAD_BEC_ON      = 2
+        PAYLOAD_BEC_ON      = 1
     };
 
     bool option_is_set(Option option) {
@@ -30,7 +29,6 @@ private:
     AP_Float battery_diff_max;
     AP_Float payload_1_voltage;
     AP_Float payload_2_voltage;
-    AP_Float payload_HV_current_max;
     AP_Float payload_1_current_max;
     AP_Float payload_2_current_max;
     AP_Float bec_temperature_max;
@@ -91,21 +89,14 @@ private:
 
     void update_switches();
     void update_main_power();
-    void update_payload_HV_power();
     void update_payload_BEC();
     void update_DAC();
 
     void set_main_on(){main_on = true;}
     void set_main_off(){main_on = false;}
-    
+
     bool main_is_on(){return main_state == TurnOnState::On;}
     bool main_is_off(){return main_state == TurnOnState::Off;}
-
-    void set_HV_payload_on(){payload_HV_on = true;}
-    void set_HV_payload_off(){payload_HV_on = false;}
-    
-    bool HV_payload_is_on(){return payload_HV_state == TurnOnState::On;}
-    bool HV_payload_is_off(){return payload_HV_state == TurnOnState::Off;}
 
     void set_switch_1_on(){switch_1_on = true;}
     void set_switch_1_off(){switch_1_on = false;}
@@ -127,12 +118,6 @@ private:
 
     void set_bat_2_SW_on(){hal.gpio->write(FSO_BAT_2_EN_PIN, 1);}
     void set_bat_2_SW_off(){hal.gpio->write(FSO_BAT_2_EN_PIN, 0);}
-
-    void set_payload_HV_PC_on(){hal.gpio->write(FSO_PAYLOAD_HV_PC_PIN, 1);}
-    void set_payload_HV_PC_off(){hal.gpio->write(FSO_PAYLOAD_HV_PC_PIN, 0);}
-
-    void set_payload_HV_SW_on(){hal.gpio->write(FSO_PAYLOAD_HV_EN_PIN, 1);}
-    void set_payload_HV_SW_off(){hal.gpio->write(FSO_PAYLOAD_HV_EN_PIN, 0);}
 
     void set_payload_BEC_1_on(){hal.gpio->write(FSO_PAYLOAD_1_EN_PIN, 1); payload_BEC_1_on = true;}
     void set_payload_BEC_1_off(){hal.gpio->write(FSO_PAYLOAD_1_EN_PIN, 0); payload_BEC_1_on = false;}
@@ -157,13 +142,10 @@ private:
     uint32_t switch_1_press_time_ms;
 
     bool main_on;
-    bool payload_HV_on;
     bool payload_BEC_1_on;
     bool payload_BEC_2_on;
     bool payload_internal_HC_on;
     uint32_t start_main_precharge_ms;
-    uint32_t start_payload_HV_precharge_ms;
-    LowPassFilterFloat  payload_HV_current_filter;  // Payload HV current input filter
     LowPassFilterFloat  payload_1_current_filter;   // Payload BEC 1 current input filter
     LowPassFilterFloat  payload_2_current_filter;   // Payload BEC 2 current input filter
     LowPassFilterFloat  internal_HC_current_filter;  // Internal BEC HC current input filter
@@ -171,7 +153,6 @@ private:
     LowPassFilterFloat  internal_2_current_filter;   // Internal BEC 2 current input filter
 
     TurnOnState main_state = Off;
-    TurnOnState payload_HV_state = Off;
 
     // init called after CAN init
     void late_init(void);
