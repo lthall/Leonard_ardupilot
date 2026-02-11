@@ -40,10 +40,9 @@ private:
     AP_Float cal_payload_P1c2;
     AP_Float cal_payload_P2c1;
     AP_Float cal_payload_P2c2;
-    
+
     uint32_t last_update_ms;
-    bool version_displayed = false;
-    
+
 
     class Fan {
     public:

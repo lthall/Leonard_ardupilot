@@ -436,10 +436,6 @@ void FSOPowerStack::update_main_power()
     case TurnOnState::Off:
         if (main_on == true) {
             main_state = TurnOnState::PreChargeStart;
-            if (!version_displayed) {
-                GCS_SEND_TEXT(MAV_SEVERITY_INFO, "PowerStack Version: 2.0");
-                version_displayed = true;
-            }
         }
         break;
 
