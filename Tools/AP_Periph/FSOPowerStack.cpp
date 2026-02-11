@@ -23,7 +23,7 @@
 #define FSO_PAYLOAD_1_VOLT_DEFAULT          12.0    // Default voltage setting of Payload BEC 1
 #define FSO_PAYLOAD_2_VOLT_DEFAULT          5.0     // Default voltage setting of Payload BEC 2
 #define FSO_FAN_ERROR_HZ_MIN                100.0   // Minimum tachometer reading for the standard fan
-#define FSO_OPTIONS_DEFAULT                 2       // Default options: DEBUG OFF PAYLOAD_BEC ON
+#define FSO_OPTIONS_DEFAULT                 1       // Default options: PAYLOAD_BEC ON
 
 #define FSO_OVER_CURRENT_TC                 1.0     // Time constant for over current filter
 #define FSO_PAYLOAD_BEC_CURRENT_MAX         10.0    // Maximum current of the payload BEC's
@@ -57,7 +57,7 @@ const AP_Param::GroupInfo FSOPowerStack::var_info[] {
     // @Param: _OPTIONS
     // @DisplayName: FSO Options
     // @Description: FSO Options
-    // @Bitmask: 0:Debug, 1:PAYLOAD_BEC_ON
+    // @Bitmask: 0:PAYLOAD_BEC_ON
     AP_GROUPINFO("_OPTIONS", 2, FSOPowerStack, options, FSO_OPTIONS_DEFAULT),
 
     // @Param: _BAT_OFF_MAX
@@ -262,52 +262,6 @@ void FSOPowerStack::Fan::update(void)
     freq_hz = 1.0/(dt_avg*1.0e-6);
 }
 
-void FSOPowerStack::debug_msg(void)
-{
-    if (!option_is_set(Option::DEBUG)) {
-        return;
-    }
-
-    uint32_t now_ms = AP_HAL::millis();
-    if (now_ms - last_debug_msg_ms < 5000) {
-        return;
-    }
-    last_debug_msg_ms = now_ms;
-
-    auto &batt = AP::battery();
-
-    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Volt - B1:%.1f, B2:%.1f, P1:%.2f, P2:%.2f, IHC:%.2f, I1:%.2f, I2:%.2f, O:%.2f",
-                  batt.voltage(0), batt.voltage(1), batt.voltage(3),
-                  batt.voltage(4), batt.voltage(5), batt.voltage(6), batt.voltage(7), batt.voltage(8));
-
-    float B1_C = nanf("");
-    float B2_C = nanf("");
-    float P1_C = nanf("");
-    float P2_C = nanf("");
-    float IHC_C = nanf("");
-    float I1_C = nanf("");
-    float I2_C = nanf("");
-    if (batt.current_amps(B1_C, 0) || batt.current_amps(B2_C, 1) || batt.current_amps(P1_C, 3) || batt.current_amps(P2_C, 4) || batt.current_amps(IHC_C, 5) || batt.current_amps(I1_C, 6) || batt.current_amps(I2_C, 7)) {
-    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Current - B1:%.4f, B2:%.4f, P1:%.2f, P2:%.2f, IHC:%.2f, I1:%.2f, I2:%.2f",
-                  B1_C, B2_C, P1_C, P2_C, IHC_C, I1_C, I2_C);
-    }
-    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Current Limit - P1:%.2f, P2:%.2f,  IHC:%.2f, I1:%.2f, I2:%.2f",
-                  payload_1_current_filter.get(), payload_2_current_filter.get(),
-                  internal_HC_current_filter.get(), internal_1_current_filter.get(), internal_2_current_filter.get());
-
-    float main_temp;
-    float P1_temp;
-    float P2_temp;
-    float IHC_temp;
-    float I1_temp;
-    float I2_temp;
-    if (batt.get_temperature(main_temp, 9) && batt.get_temperature(P1_temp, 3) && batt.get_temperature(P2_temp, 4) && batt.get_temperature(IHC_temp, 5) && batt.get_temperature(I1_temp, 6) && batt.get_temperature(I2_temp, 7)) {
-        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Temp - M:%.1f, P1:%.1f, P2:%.1f, IHC:%.1f, I1:%.1f, I2:%.1f",
-                    main_temp, P1_temp, P2_temp, IHC_temp, I1_temp, I2_temp);
-    }
-    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Fans - F1: %.0f, F2: %.0f, F3: %.0f, F4: %.0f",
-                    fans[0].freq_hz, fans[1].freq_hz, fans[2].freq_hz, fans[3].freq_hz);
-}
 
 void FSOPowerStack::report_errors(void)
 {
@@ -598,7 +552,6 @@ void FSOPowerStack::update(bool battery_read)
 
     update_payload_BEC();
 
-    debug_msg();
     report_errors();
 }
 

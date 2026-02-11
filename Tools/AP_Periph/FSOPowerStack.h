@@ -17,8 +17,7 @@ public:
 private:
 
     enum class Option : uint32_t {
-        DEBUG               = 0,
-        PAYLOAD_BEC_ON      = 1
+        PAYLOAD_BEC_ON      = 0
     };
 
     bool option_is_set(Option option) {
@@ -126,8 +125,6 @@ private:
 
     bool switch_1_pressed(){return hal.gpio->read(FSO_SWITCH_MAIN_PIN);}
 
-    uint32_t last_debug_msg_ms;
-    void debug_msg();
     uint32_t last_report_errors_ms;
     uint32_t last_main_report_errors_ms;
     void report_errors();
