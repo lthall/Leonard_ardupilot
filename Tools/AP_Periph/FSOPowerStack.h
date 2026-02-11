@@ -18,9 +18,8 @@ private:
 
     enum class Option : uint32_t {
         DEBUG               = 0,
-        H16_PRO_ON          = 1,
-        PAYLOAD_HV_ON       = 2,
-        PAYLOAD_BEC_ON      = 3
+        PAYLOAD_HV_ON       = 1,
+        PAYLOAD_BEC_ON      = 2
     };
 
     bool option_is_set(Option option) {
@@ -153,11 +152,7 @@ private:
     void set_internal_HC_on(){hal.gpio->write(FSO_INTERNAL_HC_EN_PIN, 1); payload_internal_HC_on = true;}
     void set_internal_HC_off(){hal.gpio->write(FSO_INTERNAL_HC_EN_PIN, 0); payload_internal_HC_on = false;}
 
-    void set_h16pro_on(){hal.gpio->write(FSO_H16_EN_PIN, 1);}
-    void set_h16pro_off(){hal.gpio->write(FSO_H16_EN_PIN, 0);}
-    bool h16pro_fault(){return hal.gpio->read(FSO_H16_FAULT_PIN);}
-
-    bool switch_1_pressed(){return hal.gpio->read(FSO_SWITCH_MAIN_PIN);}
+    bool switch_1_pressed(){return hal.gpio->read(FSO_SWITCH_MAIN_PIN);
     bool switch_2_pressed(){return hal.gpio->read(FSO_SWITCH_PAYLOAD_PIN);}
 
     uint32_t last_debug_msg_ms;

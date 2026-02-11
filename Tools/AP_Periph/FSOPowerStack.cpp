@@ -23,7 +23,7 @@
 #define FSO_PAYLOAD_1_VOLT_DEFAULT          12.0    // Default voltage setting of Payload BEC 1
 #define FSO_PAYLOAD_2_VOLT_DEFAULT          5.0     // Default voltage setting of Payload BEC 2
 #define FSO_FAN_ERROR_HZ_MIN                100.0   // Minimum tachometer reading for the standard fan
-#define FSO_OPTIONS_DEFAULT                 10      // Default options: H16_PRO ON  PAYLOAD_HV OFF PAYLOAD_BEC ON
+#define FSO_OPTIONS_DEFAULT                 4       // Default options: PAYLOAD_HV OFF PAYLOAD_BEC ON
 
 #define FSO_OVER_CURRENT_TC                 1.0     // Maximum current of the HV payload output
 #define FSO_PAYLOAD_BEC_CURRENT_MAX         10.0    // Maximum current of the payload BEC's
@@ -59,7 +59,7 @@ const AP_Param::GroupInfo FSOPowerStack::var_info[] {
     // @Param: _OPTIONS
     // @DisplayName: FSO Options
     // @Description: FSO Options
-    // @Bitmask: 0:Debug, 1:H16_PRO_ON, 2:PAYLOAD_HV_ON, 3:PAYLOAD_BEC_ON
+    // @Bitmask: 0:Debug, 1:PAYLOAD_HV_ON, 2:PAYLOAD_BEC_ON
     AP_GROUPINFO("_OPTIONS", 2, FSOPowerStack, options, FSO_OPTIONS_DEFAULT),
 
     // @Param: _BAT_OFF_MAX
@@ -220,11 +220,6 @@ void FSOPowerStack::init()
     payload_2_current_filter.set_cutoff_frequency(1.0/over_current_tc);
 
     set_internal_HC_on();
-    if (option_is_set(Option::H16_PRO_ON)) {
-        set_h16pro_on();
-    } else {
-        set_h16pro_off();
-    }
 }
 
 /*
@@ -420,11 +415,6 @@ void FSOPowerStack::report_errors(void)
             GCS_SEND_TEXT(MAV_SEVERITY_CRITICAL, "Internal BEC 2 over current fault: %.2f A", internal_2_current_filter.get());
             last_report_errors_ms = now_ms;
         }
-    }
-
-    if (!h16pro_fault()){
-        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "H16 Pro power fault");
-        last_report_errors_ms = now_ms;
     }
 }
 
