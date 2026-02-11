@@ -504,7 +504,7 @@ void FSOPowerStack::update_main_power()
         if (main_on == true) {
             main_state = TurnOnState::PreChargeStart;
             if (!version_displayed) {
-                GCS_SEND_TEXT(MAV_SEVERITY_INFO, "PowerStack Version: 1.5");
+                GCS_SEND_TEXT(MAV_SEVERITY_INFO, "PowerStack Version: 1.6");
                 version_displayed = true;
             }
         }
