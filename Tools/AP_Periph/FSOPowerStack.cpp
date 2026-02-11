@@ -439,23 +439,6 @@ void FSOPowerStack::update_switches()
             switch_1_switch_released = false;
         }
     }
-
-    if (!switch_2_pressed()) {
-        switch_2_press_time_ms = now_ms;
-        switch_2_switch_released = true;
-    }
-    
-    if (switch_2_on == false){
-        if (switch_2_switch_released && (now_ms - switch_2_press_time_ms > FSO_SWITCH_ON_TIME_MS)) {
-            set_switch_2_on();
-            switch_2_switch_released = false;
-        }
-    } else {
-        if (switch_2_switch_released && (now_ms - switch_2_press_time_ms > FSO_SWITCH_OFF_TIME_MS)) {
-            set_switch_2_off();
-            switch_2_switch_released = false;
-        }
-    }
 }
 
 void FSOPowerStack::update_main_power()
@@ -702,12 +685,6 @@ void FSOPowerStack::update(bool battery_read)
             set_payload_BEC_1_off();
             set_payload_BEC_2_off();
         }
-    }
-
-    if (switch_2_is_on()) {
-        set_LED_2_on();
-    } else {
-        set_LED_2_off();
     }
 
     update_DAC();

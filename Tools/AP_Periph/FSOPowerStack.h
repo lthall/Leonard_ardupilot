@@ -109,21 +109,12 @@ private:
 
     void set_switch_1_on(){switch_1_on = true;}
     void set_switch_1_off(){switch_1_on = false;}
-    
+
     bool switch_1_is_on(){return switch_1_on == true;}
     bool switch_1_is_off(){return switch_1_on == false;}
 
-    void set_switch_2_on(){switch_2_on = true;}
-    void set_switch_2_off(){switch_2_on = false;}
-    
-    bool switch_2_is_on(){return switch_2_on == true;}
-    bool switch_2_is_off(){return switch_2_on == false;}
-
     void set_LED_1_on(){hal.gpio->write(FSO_LED_MAIN_PIN, 1);}
     void set_LED_1_off(){hal.gpio->write(FSO_LED_MAIN_PIN, 0);}
-
-    void set_LED_2_on(){hal.gpio->write(FSO_LED_PAYLOAD_PIN, 1);}
-    void set_LED_2_off(){hal.gpio->write(FSO_LED_PAYLOAD_PIN, 0);}
 
     void set_LED_debug_on(){hal.gpio->write(FSO_LED_DEBUG_PIN, 1);}
     void set_LED_debug_off(){hal.gpio->write(FSO_LED_DEBUG_PIN, 0);}
@@ -152,8 +143,7 @@ private:
     void set_internal_HC_on(){hal.gpio->write(FSO_INTERNAL_HC_EN_PIN, 1); payload_internal_HC_on = true;}
     void set_internal_HC_off(){hal.gpio->write(FSO_INTERNAL_HC_EN_PIN, 0); payload_internal_HC_on = false;}
 
-    bool switch_1_pressed(){return hal.gpio->read(FSO_SWITCH_MAIN_PIN);
-    bool switch_2_pressed(){return hal.gpio->read(FSO_SWITCH_PAYLOAD_PIN);}
+    bool switch_1_pressed(){return hal.gpio->read(FSO_SWITCH_MAIN_PIN);}
 
     uint32_t last_debug_msg_ms;
     void debug_msg();
@@ -165,10 +155,6 @@ private:
     bool switch_1_on;
     bool switch_1_switch_released;
     uint32_t switch_1_press_time_ms;
-
-    bool switch_2_on;
-    bool switch_2_switch_released;
-    uint32_t switch_2_press_time_ms;
 
     bool main_on;
     bool payload_HV_on;
