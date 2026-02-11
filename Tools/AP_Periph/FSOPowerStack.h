@@ -107,9 +107,6 @@ private:
     void set_LED_1_on(){hal.gpio->write(FSO_LED_MAIN_PIN, 1);}
     void set_LED_1_off(){hal.gpio->write(FSO_LED_MAIN_PIN, 0);}
 
-    void set_LED_debug_on(){hal.gpio->write(FSO_LED_DEBUG_PIN, 1);}
-    void set_LED_debug_off(){hal.gpio->write(FSO_LED_DEBUG_PIN, 0);}
-
     void set_main_PC_on(){hal.gpio->write(FSO_MAIN_PC_PIN, 1);}
     void set_main_PC_off(){hal.gpio->write(FSO_MAIN_PC_PIN, 0);}
 
