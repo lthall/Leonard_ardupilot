@@ -39,7 +39,6 @@
 
 #define FSO_CAL_MAIN_VOLT                   50.0    // Voltage of source used for calibrating Bat 1, Bat 2 and Main Output voltages
 #define FSO_CAL_MAIN_LOAD                   0.5     // Resistance of the load used to calibrate the Bat 1, Bat 2 and Main Output currents
-#define FSO_CAL_MAIN_VOLT                   50.0    // Voltage of source used for calibrating Bat 1, Bat 2 and Main Output voltages
 #define FSO_CAL_HV_CURRENT                  2.5     // Current of load used for calibrating High Voltage Payload current
 #define FSO_CAL_HC_CURRENT                  5.0     // Current of load used for calibrating the three High Current BEC currents
 #define FSO_CAL_LC_CURRENT                  1.0     // Current of load used for calibrating internal 5.3V BEC currents
@@ -536,7 +535,7 @@ void FSOPowerStack::update_main_power()
             main_state = TurnOnState::On;
         } else if (now_ms - start_main_precharge_ms > FSO_PRECHARGE_TIMEOUT_MS) {
             GCS_SEND_TEXT(MAV_SEVERITY_CRITICAL, "Main pre-charge failure, dV: %.2f", MAX(batt.voltage(0), batt.voltage(1)) - batt.voltage(8));
-            main_state = ShutDown;
+            main_state = TurnOnState::ShutDown;
         }
         break;
 
@@ -645,7 +644,7 @@ void FSOPowerStack::update_payload_BEC()
     
     float payload_2_current;
     if (batt.current_amps(payload_2_current, 4)) {
-        if ((payload_2_current > FSO_PAYLOAD_BEC_CURRENT_FUSE)
+        if ((payload_2_current > FSO_PAYLOAD_BEC_CURRENT_MAX)
                 && payload_BEC_2_on == true) {
             set_payload_BEC_2_off();
             GCS_SEND_TEXT(MAV_SEVERITY_CRITICAL, "BEC 2 fuse shutdown: %.2f A", payload_2_current);
