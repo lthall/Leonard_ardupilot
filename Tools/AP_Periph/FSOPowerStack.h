@@ -17,12 +17,10 @@ public:
 private:
 
     enum class Option : uint32_t {
-        CAL                 = 0,
-        CAL_MAIN_CURRENT    = 1,
-        DEBUG               = 2,
-        H16_PRO_ON          = 3,
-        PAYLOAD_HV_ON       = 4,
-        PAYLOAD_BEC_ON      = 5
+        DEBUG               = 0,
+        H16_PRO_ON          = 1,
+        PAYLOAD_HV_ON       = 2,
+        PAYLOAD_BEC_ON      = 3
     };
 
     bool option_is_set(Option option) {
@@ -41,11 +39,6 @@ private:
     AP_Float fan_2_min_Hz;
     AP_Float fan_3_min_Hz;
     AP_Float fan_4_min_Hz;
-    AP_Float cal_main_voltage;
-    AP_Float cal_main_load_impedance;
-    AP_Float cal_HV_current;
-    AP_Float cal_HCB_current;
-    AP_Float cal_LCB_current;
     AP_Float cal_payload_P1c1;
     AP_Float cal_payload_P1c2;
     AP_Float cal_payload_P2c1;
@@ -97,61 +90,11 @@ private:
         ShutDown
     };
 
-    // States used during turn on
-    enum CalibrateState {
-        Begin,
-        Payload_BEC_C1,
-        Payload_BEC_C2,
-        Payload_BEC_1_Shunt,
-        Payload_BEC_2_Shunt,
-        Internal_BEC_HC_Shunt,
-        Internal_BEC_1_Shunt,
-        Internal_BEC_2_Shunt,
-        Payload_HV_Shunt,
-        Main_V_Divider,
-        Bat1_Amp_Offset,
-        Bat2_Amp_Offset,
-        Finished
-    };
-    
-    enum CalibrateSubState {
-        Setup,
-        Start,
-        Measure,
-        Write
-    };
-    
-    enum CalibrateHighCurrentState {
-        Current_Setup,
-        Current_Start,
-        Load_On,
-        Both_On,
-        Bat_1,
-        Both_Swap,
-        Bat_2,
-        Both_Off,
-        Current_Write,
-        Current_Finish
-    };
-
-    CalibrateState cal_state = CalibrateState::Begin;
-    CalibrateSubState cal_sub_state = CalibrateSubState::Setup;
-    CalibrateHighCurrentState cal_HC_state = CalibrateHighCurrentState::Current_Setup;
-
-    uint32_t    cal_ms;
-    uint32_t    cal_measurement_count;
-    float       cal_measurement_1;
-    float       cal_measurement_2;
-    float       cal_measurement_3;
-    float       cal_measurement_4;
-
     void update_switches();
     void update_main_power();
     void update_payload_HV_power();
     void update_payload_BEC();
     void update_DAC();
-    void calibrate();
-    void calibrate_main_current();
 
     void set_main_on(){main_on = true;}
     void set_main_off(){main_on = false;}
@@ -245,8 +188,6 @@ private:
     LowPassFilterFloat  internal_HC_current_filter;  // Internal BEC HC current input filter
     LowPassFilterFloat  internal_1_current_filter;   // Internal BEC 1 current input filter
     LowPassFilterFloat  internal_2_current_filter;   // Internal BEC 2 current input filter
-
-    bool waiting_for_test;
 
     TurnOnState main_state = Off;
     TurnOnState payload_HV_state = Off;
