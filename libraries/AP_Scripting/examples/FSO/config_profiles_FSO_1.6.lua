@@ -349,7 +349,7 @@ local config_domains = {
                ["INS_HNTCH_HMNCS"] = 15,
                ["INS_HNTCH_REF"] = 0.21,
                ["MOT_BAT_CURR_MAX"] = 150,
-               ["MOT_THST_HOVER"] = 0.2053075,
+               ["MOT_THST_HOVER"] = 0.25,
             },
          },
          [75] = {
@@ -566,7 +566,6 @@ local config_domains = {
          ["SERVO14_MIN"] = 1100,
          ["SERVO14_REVERSED"] = 0,
          ["SERVO14_TRIM"] = 1500,
-         ["SERVO15_FUNCTION"] = -1,
          ["SERVO15_MAX"] = 1900,
          ["SERVO15_MIN"] = 1100,
          ["SERVO15_REVERSED"] = 0,
