@@ -11,7 +11,7 @@
 --   far flung future - change parameters on peripherals too
 
 
-gcs:send_text(6, string.format("CFG: config_profiles v1.9 FSO starting"))
+gcs:send_text(6, string.format("CFG: config_profiles v1.9 Ship Ops starting"))
 
 local SEL_APPLY_DEFAULTS = 0
 local SEL_DO_NOTHING = -1
@@ -990,6 +990,32 @@ local parameters_which_can_be_set = {
    ["WPNAV_SPEED_DN"] = true,
    ["WPNAV_SPEED_UP"] = true,
    ["WPNAV_TER_MARGIN"] = true,
+
+   -- ShipOps
+   ["SHIP_HHV_ALT"] = true,
+   ["SHIP_HTL_ALT"] = true,
+   ["SHIP_HTL_ANG"] = true,
+   ["SHIP_HTL_RAD"] = true,
+   ["SHIP_KOZ_CCW"] = true,
+   ["SHIP_KOZ_CW"] = true,
+   ["SHIP_KOZ_DKR"] = true,
+   ["SHIP_KOZ_RAD"] = true,
+   ["SHIP1_HHV_ALT"] = true,
+   ["SHIP1_HTL_ALT"] = true,
+   ["SHIP1_HTL_ANG"] = true,
+   ["SHIP1_HTL_RAD"] = true,
+   ["SHIP1_KOZ_CCW"] = true,
+   ["SHIP1_KOZ_CW"] = true,
+   ["SHIP1_KOZ_DKR"] = true,
+   ["SHIP1_KOZ_RAD"] = true,
+   ["SHIP2_HHV_ALT"] = true,
+   ["SHIP2_HTL_ALT"] = true,
+   ["SHIP2_HTL_ANG"] = true,
+   ["SHIP2_HTL_RAD"] = true,
+   ["SHIP2_KOZ_CCW"] = true,
+   ["SHIP2_KOZ_CW"] = true,
+   ["SHIP2_KOZ_DKR"] = true,
+   ["SHIP2_KOZ_RAD"] = true,
 }
 
 
