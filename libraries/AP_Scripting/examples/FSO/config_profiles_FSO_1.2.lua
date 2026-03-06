@@ -48,7 +48,6 @@ local config_domains = {
          -- Flight Behavior
          ["ANGLE_MAX"] = 3000,
 
-
          -- Failsafes
          ["FS_CRASH_CHECK"] = 1,
          ["FS_DR_ENABLE"] = 2,
@@ -144,28 +143,6 @@ local config_domains = {
       },
       default_sel_value = SEL_APPLY_DEFAULTS,
       profiles = {
-         [1] = {
-            name = "Stringing",
-            params = {
-               ["FLTMODE_CH"] = 9,
-               ["FLTMODE1"] = 2,
-               ["FLTMODE2"] = 5,
-               ["FLTMODE3"] = 5,
-               ["FLTMODE4"] = 16,
-               ["FLTMODE5"] = 5,
-               ["FLTMODE6"] = 17,
-               ["FLTMODE_GCSBLOCK"] = 12232580,
-               ["BATT_FS_CRT_ACT"] = 0,
-               ["BATT_FS_LOW_ACT"] = 0,
-               ["LOG_BITMASK"] = 176126,
-               ["LOG_FILE_DSRMROT"] = 1,
-               ["FS_THR_ENABLE"] = 7,
-               ["RTL_SPEED"] = 1200,
-               ["LOIT_SPEED"] = 500,
-               ["WP_YAW_BEHAVIOR"] = 0,
-               ["WPNAV_SPEED"] = 500,
-            },
-         },
          [100] = {
             name = "Testing",
             params = {
@@ -534,7 +511,7 @@ local config_domains = {
          -- External PWM Port
          ["SERVO9_FUNCTION"] = -1,
          ["SERVO9_MAX"] = 1900,
-         ["SERVO9_MIN"] = 1100,
+         ["SERVO9_MIN"] = 1000,
          ["SERVO9_REVERSED"] = 0,
          ["SERVO9_TRIM"] = 1500,
          ["SERVO10_FUNCTION"] = -1,
@@ -572,30 +549,87 @@ local config_domains = {
          ["SERVO16_MIN"] = 1100,
          ["SERVO16_REVERSED"] = 0,
          ["SERVO16_TRIM"] = 1500,
-
-         -- Infravision
-         ["IFV_OPERATION"] = 0,
       },
       default_sel_value = SEL_APPLY_DEFAULTS,
       profiles = {
          [1] = {
-            name = "Stringing - Main Rig",
+            name = "HookFixed",
             params = {
-               -- Servo 9
-               ["SERVO9_FUNCTION"] = 94,
-               
-               -- Servo 10
-               ["SERVO10_FUNCTION"] = 95,
-
-               -- Servo 11
-               ["SERVO11_FUNCTION"] = 96,
-
-               -- Servo 12
-               ["SERVO12_FUNCTION"] = 97,
-
-               -- Scripting
-               ["IFV_OPERATION"] = 0,
+               ["GRIP_ENABLE"] = 1,
+               ["RC8_OPTION"] = 19,          -- 19 = Gripper (RC switch triggers grab/release)
+               ["SERVO9_FUNCTION"] = 28,     -- 28 = gripper
+            }
+         },
+         [2] = {
+            name = "HookSlung",
+            params = {
+               ["GRIP_ENABLE"] = 1,
+               ["RC8_OPTION"] = 19,           -- 19 = Gripper (RC switch triggers grab/release)
+               ["SERVO9_FUNCTION"] = 146,     -- 146 = k_rcin7_mapped?!
+               ["SERVO9_REVERSED"] = 1,
+               ["SERVO10_FUNCTION"] = 28,     -- 28 = gripper
             },
+         },
+         [3] = {
+            name = "Gimbal - AVT_CM62",
+            params = {
+               ["MNT1_TYPE"] = 6,           -- 6 = Mount type MAVLinkv2 (or Custom)
+               ["RC13_OPTION"] = 214,       -- 214 = Mount Yaw
+               ["RC14_OPTION"] = 213,       -- 213 = Mount Pitch
+            },
+         },
+         [4] = {
+            name = "Gimbal - HookFixed",
+            params = {
+               ["GRIP_ENABLE"] = 1,
+               ["RC8_OPTION"] = 19,            -- 19 = Gripper
+
+               ["SERVO9_FUNCTION"] = 28,       -- 28 = Mount Shutter (e.g. camera trigger)
+               ["SERVO10_FUNCTION"] = 64,      -- 64 = Landing Gear
+               ["SERVO11_FUNCTION"] = 63,      -- 63 = Mount Tilt
+               ["SERVO12_FUNCTION"] = 62,      -- 62 = Mount Roll
+               ["SERVO13_FUNCTION"] = 58,      -- 58 = Mount Zoom
+               ["SERVO14_FUNCTION"] = 57,      -- 57 = Mount Focus
+            },
+         },
+         [5] = {
+            name = "Gimbal - Hook Slung",
+            params = {
+               ["GRIP_ENABLE"] = 1,
+               ["RC8_OPTION"] = 19,        -- gripper
+               ["SERVO9_FUNCTION"] = 146,  -- k_rcin7_mapped?!
+               ["SERVO9_REVERSED"] = 1,
+               ["SERVO10_FUNCTION"] = 28,  -- gripper
+               ["SERVO10_TRIM"] = 2000,
+               ["SERVO11_FUNCTION"] = 64,  -- rcin 14
+               ["SERVO12_FUNCTION"] = 63,  -- rcin 13
+               ["SERVO13_FUNCTION"] = 61,  -- rcin 11
+               ["SERVO14_FUNCTION"] = 56,  -- rcin 6
+            }
+         },
+         [10] = {
+            name = "Silvus",
+            params = {
+               ["SERIAL5_BAUD"] = 115,      -- 115 = 115200 baud
+               ["SERIAL5_PROTOCOL"] = 2,    -- 2 = MAVLink2
+            }
+         },
+         [11] = {
+            name = "Skylink",
+            params = {
+               ["NET_ENABLE"] = 1,
+               ["NET_OPTIONS"] = 0,
+               ["NET_P1_IP0"] = 192,
+               ["NET_P1_IP1"] = 168,
+               ["NET_P1_IP2"] = 111,
+               ["NET_P1_IP3"] = 15,
+               ["NET_P1_PORT"] = 14550,
+               ["NET_P1_PROTOCOL"] = 2,
+               ["NET_P1_TYPE"] = 2,
+               ["NET_P2_TYPE"] = 0,
+               ["NET_P3_TYPE"] = 0,
+               ["NET_P4_TYPE"] = 0,
+            }
          },
       },
    },
@@ -665,10 +699,6 @@ local parameters_which_can_be_set = {
    ["INS_LOG_BAT_CNT"] = true,
    ["INS_LOG_BAT_MASK"] = true,
    ["INS_LOG_BAT_OPT"] = true,
-
-   -- IFV Parameters
-   ["IFV_DEBUG"] = true,
-   ["IFV_OPERATION"] = true,
 
    -- Landing behavior
    ["LAND_ALT_LOW"] = true,
