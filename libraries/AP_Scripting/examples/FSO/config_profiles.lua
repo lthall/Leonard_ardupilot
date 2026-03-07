@@ -47,19 +47,25 @@ local config_domains = {
    JOB = {
       param_name = "JOB",
       all_param_defaults = {
-         -- Flight Modes
-         ["FLTMODE_CH"] = 5,
-         ["FLTMODE1"] = 2,
-         ["FLTMODE2"] = 2,
-         ["FLTMODE3"] = 5,
-         ["FLTMODE4"] = 5,
-         ["FLTMODE5"] = 6,
-         ["FLTMODE6"] = 6,
-         ["FLTMODE_GCSBLOCK"] = 12232576,
 
          -- Flight Behavior
          ["ANGLE_MAX"] = 3000,
          ["ATC_SLEW_YAW"] = 6000,
+
+         -- Battery Failsafes
+         ["BATT_FS_CRT_ACT"] = 1,
+         ["BATT_FS_LOW_ACT"] = 2,
+
+         -- Battery Options
+         ["BATT_OPTIONS"] = 1,
+         ["BATT2_OPTIONS"] = 257,
+         ["BATT3_OPTIONS"] = 257,
+         ["BATT4_OPTIONS"] = 257,
+         ["BATT5_OPTIONS"] = 257,
+         ["BATT6_OPTIONS"] = 257,
+         ["BATT7_OPTIONS"] = 257,
+         ["BATT8_OPTIONS"] = 257,
+         ["BATT9_OPTIONS"] = 257,
 
          -- Geofence
          ["FENCE_ACTION"] = 1,
@@ -69,6 +75,16 @@ local config_domains = {
          ["FENCE_MARGIN"] = 2,
          ["FENCE_RADIUS"] = 300,
          ["FENCE_TYPE"] = 7,
+
+         -- Flight Modes
+         ["FLTMODE_CH"] = 5,
+         ["FLTMODE1"] = 2,
+         ["FLTMODE2"] = 2,
+         ["FLTMODE3"] = 5,
+         ["FLTMODE4"] = 5,
+         ["FLTMODE5"] = 6,
+         ["FLTMODE6"] = 6,
+         ["FLTMODE_GCSBLOCK"] = 12232576,
 
          -- Failsafes
          ["FS_CRASH_CHECK"] = 1,
@@ -83,10 +99,6 @@ local config_domains = {
          ["FS_THR_ENABLE"] = 1,
          ["FS_THR_VALUE"] = 975,
          ["FS_VIBE_ENABLE"] = 1,
-
-         -- Battery Failsafes
-         ["BATT_FS_CRT_ACT"] = 1,
-         ["BATT_FS_LOW_ACT"] = 2,
 
          -- IMU Logging
          ["INS_FAST_SAMPLE"] = 7,
@@ -195,6 +207,20 @@ local config_domains = {
                ["FLTMODE4"] = 3,
                ["FLTMODE5"] = 6,
                ["FLTMODE6"] = 6,
+            },
+         },
+         [102] = {
+            name = "Battery Test",
+            params = {
+               ["BATT_OPTIONS"] = 1,
+               ["BATT2_OPTIONS"] = 1,
+               ["BATT3_OPTIONS"] = 1,
+               ["BATT4_OPTIONS"] = 1,
+               ["BATT5_OPTIONS"] = 1,
+               ["BATT6_OPTIONS"] = 1,
+               ["BATT7_OPTIONS"] = 1,
+               ["BATT8_OPTIONS"] = 1,
+               ["BATT9_OPTIONS"] = 1,
             },
          },
       },
@@ -504,7 +530,6 @@ local config_domains = {
          -- Camera Type
          ["CAM1_TYPE"] = 0,
 		 
-
          -- CAN Bus
          ["CAN_D1_UC_SER_EN"] = 0,
          ["CAN_D1_PROTOCOL"] = 1,
@@ -525,7 +550,6 @@ local config_domains = {
          ["CAN_D1_UC_S2_IDX"] = -1,
          ["CAN_D1_UC_S2_NOD"] = 0,
          ["CAN_D1_UC_S2_PRO"] = -1,
-
 
          -- network setup
          ["NET_ENABLE"] = 0,
@@ -567,6 +591,26 @@ local config_domains = {
          ["RC16_OPTION"] = 0,
          ["RC16_REVERSED"] = 0,
          
+         -- ADSB Transponder
+         ["ADSB_EMIT_TYPE"] = 0,
+         ["ADSB_ICAO_ID"] = 0,
+         ["ADSB_ICAO_SPECL"] = 0,
+         ["ADSB_LEN_WIDTH"] = 0,
+         ["ADSB_LIST_ALT"] = 0,
+         ["ADSB_LIST_MAX"] = 0,
+         ["ADSB_LIST_RADIUS"] = 0,
+         ["ADSB_LOG"] = 0,
+         ["ADSB_OFFSET_LAT"] = 0,
+         ["ADSB_OFFSET_LON"] = 0,
+         ["ADSB_OPTIONS"] = 0,
+         ["ADSB_RF_CAPABLE"] = 0,
+         ["ADSB_RF_SELECT"] = 0,
+         ["ADSB_SQUAWK"] = 7000,
+         ["ADSB_TYPE"] = 0,
+         ["SR0_ADSB"] = 0,
+         ["SR1_ADSB"] = 0,
+         ["SR2_ADSB"] = 0,
+
          -- External Serial Port
          ["SERIAL5_BAUD"] = 57,
          ["SERIAL5_OPTIONS"] = 0,
@@ -728,12 +772,38 @@ local config_domains = {
          },	
 		 
 		 [14] = {
-            name = "Gremsy Vio", 
+            name = "Gremsy Vio",
             params = {
-               ["MNT1_TYPE"] = 0, --bug with gremsy cant get mount or RC to work will circle back to this but works fine through gremsy app 
+               ["MNT1_TYPE"] = 0, --bug with gremsy cant get mount or RC to work will circle back to this but works fine through gremsy app
                ["SERIAL5_BAUD"] = 115,
             }
-         },	
+         },
+         [15] = {
+            name = "ping1090i",
+            params = {
+               ["ADSB_EMIT_TYPE"] = 14,
+               ["ADSB_ICAO_ID"] = 0,
+               ["ADSB_ICAO_SPECL"] = 0,
+               ["ADSB_LEN_WIDTH"] = 1,
+               ["ADSB_LIST_ALT"] = 0,
+               ["ADSB_LIST_MAX"] = 25,
+               ["ADSB_LIST_RADIUS"] = 0,
+               ["ADSB_LOG"] = 2,
+               ["ADSB_OFFSET_LAT"] = 4,
+               ["ADSB_OFFSET_LON"] = 1,
+               ["ADSB_OPTIONS"] = 0,
+               ["ADSB_RF_CAPABLE"] = 0,
+               ["ADSB_RF_SELECT"] = 3,
+               ["ADSB_SQUAWK"] = 7000,
+               ["ADSB_TYPE"] = 1,
+               ["SERIAL5_BAUD"] = 57,
+               ["SERIAL5_OPTIONS"] = 1024,
+               ["SERIAL5_PROTOCOL"] = 2,
+               ["SR0_ADSB"] = 5,
+               ["SR1_ADSB"] = 5,
+               ["SR2_ADSB"] = 5,
+            }
+         },
       },
    },
 }
