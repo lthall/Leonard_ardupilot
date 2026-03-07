@@ -11,7 +11,19 @@
 --   far flung future - change parameters on peripherals too
 
 
-gcs:send_text(6, string.format("CFG: config_profiles v1.9 FSO starting"))
+gcs:send_text(6, string.format("CFG: v2.0_beta1 FSO starting"))
+
+local msg_pfx = "CFG: "
+local auth_id = arming:get_aux_auth_id() or 0
+local gcs_allow_set = gcs:get_allow_param_set()
+
+-- Verify firmware compatibility; block arming and exit if wrong firmware
+if string.find(FWVersion:string(), "ArduCopter V4.5%.7%-C2%.5") == nil then
+   gcs:send_text(3, string.format("CFG: ERROR: unsupported firmware '%s', expected ArduCopter V4.5.7-C2.5", FWVersion:string()))
+   arming:set_aux_auth_failed(auth_id, msg_pfx .. "Wrong firmware version")
+   gcs:set_allow_param_set(true)
+   return
+end
 
 local SEL_APPLY_DEFAULTS = 0
 local SEL_DO_NOTHING = -1
@@ -993,11 +1005,7 @@ local parameters_which_can_be_set = {
 }
 
 
-local msg_pfx = "CFG: "
-
 -- set up for denying arming when problems occur:
-local auth_id = arming:get_aux_auth_id() or 0
-
 local function set_aux_auth_failed(reason)
    arming:set_aux_auth_failed(auth_id, msg_pfx .. reason)
 end
@@ -1014,12 +1022,6 @@ mavlink:init(5, 1)
 -- register message id to receive
 local PARAM_SET_ID = 23
 mavlink:register_rx_msgid(PARAM_SET_ID)
-
--- initialise our knowledge of the GCS's allow-set-parameters state.
---   We do not want to fight over setting this GCS state via other
---   mechanisms (eg. an auxiliary function), so we keep this state
---   around to track what we last set:
-local gcs_allow_set = gcs:get_allow_param_set()
 
 local function send_text(severity, message)
    gcs:send_text(severity, msg_pfx .. message)
