@@ -77,13 +77,13 @@ local config_domains = {
          ["FENCE_TYPE"] = 7,
 
          -- Flight Modes
-         ["FLTMODE_CH"] = 5,
          ["FLTMODE1"] = 2,
          ["FLTMODE2"] = 2,
          ["FLTMODE3"] = 5,
          ["FLTMODE4"] = 5,
          ["FLTMODE5"] = 6,
          ["FLTMODE6"] = 6,
+         ["FLTMODE_CH"] = 5,
          ["FLTMODE_GCSBLOCK"] = 12232576,
 
          -- Failsafes
@@ -156,15 +156,15 @@ local config_domains = {
          ["SERIAL1_OPTIONS"] = 0,
          ["SERIAL1_PROTOCOL"] = 2,
 
-		 -- Takeoff
-         ["TKOFF_SLEW_TIME"] = 4,
-
          -- Terrain Following
          ["TERRAIN_ENABLE"] = 1,
          ["TERRAIN_MARGIN"] = 0.05,
          ["TERRAIN_OFS_MAX"] = 15,
          ["TERRAIN_OPTIONS"] = 0,
          ["TERRAIN_SPACING"] = 100,
+
+         -- Takeoff
+         ["TKOFF_SLEW_TIME"] = 4,
 
          -- Waypoint Navigation
          ["WP_NAVALT_MIN"] = 0,
@@ -186,27 +186,27 @@ local config_domains = {
             name = "Testing",
             params = {
                ["ANGLE_MAX"] = 4500,
-               ["FLTMODE_CH"] = 5,
                ["FLTMODE1"] = 0,
                ["FLTMODE2"] = 0,
                ["FLTMODE3"] = 2,
                ["FLTMODE4"] = 2,
                ["FLTMODE5"] = 5,
                ["FLTMODE6"] = 5,
+               ["FLTMODE_CH"] = 5,
                ["LOG_BITMASK"] = 180223,
             },
          },
          [101] = {
             name = "FSO",
             params = {
-               ["PSC_ANGLE_MAX"] = 2500,
-               ["FLTMODE_CH"] = 5,
                ["FLTMODE1"] = 5,
                ["FLTMODE2"] = 5,
                ["FLTMODE3"] = 3,
                ["FLTMODE4"] = 3,
                ["FLTMODE5"] = 6,
                ["FLTMODE6"] = 6,
+               ["FLTMODE_CH"] = 5,
+               ["PSC_ANGLE_MAX"] = 2500,
             },
          },
          [102] = {
@@ -377,8 +377,8 @@ local config_domains = {
                ["ATC_RAT_RLL_I"] = 0.08,
                ["ATC_RAT_RLL_P"] = 0.08,
                ["INS_GYRO_FILTER"] = 30,
-               ["INS_HNTC2_FREQ"] = 30,
                ["INS_HNTC2_BW"] = 20,
+               ["INS_HNTC2_FREQ"] = 30,
                ["INS_HNTCH_ATT"] = 40,
                ["INS_HNTCH_BW"] = 33,
                ["INS_HNTCH_FM_RAT"] = 0.75,
@@ -398,13 +398,13 @@ local config_domains = {
                ["ATC_RATE_P_MAX"] = 120,
                ["ATC_RATE_R_MAX"] = 120,
                ["ATC_RAT_PIT_D"] = 0.004,
-               ["ATC_RAT_PIT_FLTT"] = 10.0,
                ["ATC_RAT_PIT_FLTD"] = 10.0,
+               ["ATC_RAT_PIT_FLTT"] = 10.0,
                ["ATC_RAT_PIT_I"] = 0.09,
                ["ATC_RAT_PIT_P"] = 0.09,
                ["ATC_RAT_RLL_D"] = 0.004,
-               ["ATC_RAT_RLL_FLTT"] = 10.0,
                ["ATC_RAT_RLL_FLTD"] = 10.0,
+               ["ATC_RAT_RLL_FLTT"] = 10.0,
                ["ATC_RAT_RLL_I"] = 0.09,
                ["ATC_RAT_RLL_P"] = 0.09,
                ["ATC_RAT_YAW_D"] = 0.01,
@@ -496,9 +496,32 @@ local config_domains = {
    PAY = {
       param_name = "PAY",
       all_param_defaults = {
+         -- ADSB Transponder
+         ["ADSB_EMIT_TYPE"] = 0,
+         ["ADSB_ICAO_ID"] = 0,
+         ["ADSB_ICAO_SPECL"] = 0,
+         ["ADSB_LEN_WIDTH"] = 0,
+         ["ADSB_LIST_ALT"] = 0,
+         ["ADSB_LIST_MAX"] = 0,
+         ["ADSB_LIST_RADIUS"] = 0,
+         ["ADSB_LOG"] = 0,
+         ["ADSB_OFFSET_LAT"] = 0,
+         ["ADSB_OFFSET_LON"] = 0,
+         ["ADSB_OPTIONS"] = 0,
+         ["ADSB_RF_CAPABLE"] = 0,
+         ["ADSB_RF_SELECT"] = 0,
+         ["ADSB_SQUAWK"] = 7000,
+         ["ADSB_TYPE"] = 0,
+         ["SR0_ADSB"] = 0,
+         ["SR1_ADSB"] = 0,
+         ["SR2_ADSB"] = 0,
+
          -- Payload Power supply checks
          ["BATT2_ARM_VOLT"] = 0,
          ["BATT3_ARM_VOLT"] = 0,
+
+         -- Camera
+         ["CAM1_TYPE"] = 0,
 
          -- Gripper
          ["GRIP_ENABLE"] = 0,
@@ -526,10 +549,7 @@ local config_domains = {
          ["MNT1_TYPE"] = 0,
          ["MNT1_YAW_MAX"] = 180,
          ["MNT1_YAW_MIN"] = -180,
-		 
-         -- Camera Type
-         ["CAM1_TYPE"] = 0,
-		 
+
          -- CAN Bus
          ["CAN_D1_UC_SER_EN"] = 0,
          ["CAN_D1_PROTOCOL"] = 1,
@@ -590,26 +610,6 @@ local config_domains = {
          ["RC15_REVERSED"] = 0,
          ["RC16_OPTION"] = 0,
          ["RC16_REVERSED"] = 0,
-         
-         -- ADSB Transponder
-         ["ADSB_EMIT_TYPE"] = 0,
-         ["ADSB_ICAO_ID"] = 0,
-         ["ADSB_ICAO_SPECL"] = 0,
-         ["ADSB_LEN_WIDTH"] = 0,
-         ["ADSB_LIST_ALT"] = 0,
-         ["ADSB_LIST_MAX"] = 0,
-         ["ADSB_LIST_RADIUS"] = 0,
-         ["ADSB_LOG"] = 0,
-         ["ADSB_OFFSET_LAT"] = 0,
-         ["ADSB_OFFSET_LON"] = 0,
-         ["ADSB_OPTIONS"] = 0,
-         ["ADSB_RF_CAPABLE"] = 0,
-         ["ADSB_RF_SELECT"] = 0,
-         ["ADSB_SQUAWK"] = 7000,
-         ["ADSB_TYPE"] = 0,
-         ["SR0_ADSB"] = 0,
-         ["SR1_ADSB"] = 0,
-         ["SR2_ADSB"] = 0,
 
          -- External Serial Port
          ["SERIAL5_BAUD"] = 57,
@@ -741,25 +741,24 @@ local config_domains = {
          [12] = {
             name = "ZR30",
             params = {
-               ["RC13_OPTION"] = 214,
-               ["RC14_OPTION"] = 213,
-               ["RC6_OPTION"] = 163,
-               ["RC7_OPTION"] = 166,
-               ["RC8_OPTION"] = 167,
-               ["SERIAL5_BAUD"] = 115,
-               ["SERIAL5_OPTIONS"] = 0,
-               ["SERIAL5_PROTOCOL"] = 8,
+               ["CAM1_TYPE"] = 4,
                ["MNT1_PITCH_MAX"] = 25,
                ["MNT1_TYPE"] = 8,
                ["MNT1_YAW_MAX"] = 80,
                ["MNT1_YAW_MIN"] = -80,
-               ["CAM1_TYPE"] = 4,
+               ["RC6_OPTION"] = 163,
+               ["RC7_OPTION"] = 166,
+               ["RC8_OPTION"] = 167,
+               ["RC13_OPTION"] = 214,
+               ["RC14_OPTION"] = 213,
+               ["SERIAL5_BAUD"] = 115,
+               ["SERIAL5_OPTIONS"] = 0,
+               ["SERIAL5_PROTOCOL"] = 8,
             }
          },
          [13] = {
             name = "Silvus & CM62 & Kutta", --Ap perif can node
             params = {
-               ["MNT1_TYPE"] = 6,
                ["CAN_D1_UC_SER_EN"] = 1,
                ["CAN_D1_UC_S1_IDX"] = 1,
                ["CAN_D1_UC_S1_NOD"] = 100,
@@ -768,6 +767,7 @@ local config_domains = {
                ["CAN_D1_UC_S2_IDX"] = 4,
                ["CAN_D1_UC_S2_NOD"] = 100,
                ["CAN_D1_UC_S2_PRO"] = 2,
+               ["MNT1_TYPE"] = 6,
             }
          },	
 		 
