@@ -896,8 +896,12 @@ void AC_PosControl::D_init_controller()
     _pos_target_ned_m.z = _pos_estimate_ned_m.z;
     _pos_desired_ned_m.z = _pos_target_ned_m.z - _pos_offset_ned_m.z;
 
-    _vel_target_ned_ms.z = _vel_estimate_ned_ms.z;
+    _vel_target_ned_ms.z = _vel_estimate_ned_ms.z * (_pid_vel_d_m.kP() / (_pid_vel_d_m.kP() + _pid_vel_d_m.ff()));
     _vel_desired_ned_ms.z = _vel_target_ned_ms.z - _vel_offset_ned_ms.z;
+
+// 0 = (i-m)*p + i*ff
+// 0 = i*(p+ff) - m*p
+// i = m (p/(p+ff))
 
     // Reset I term of velocity PID
     _pid_vel_d_m.reset_filter();
