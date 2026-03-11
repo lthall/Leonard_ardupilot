@@ -769,16 +769,8 @@ local config_domains = {
                ["CAN_D1_UC_S2_PRO"] = 2,
                ["MNT1_TYPE"] = 6,
             }
-         },	
-		 
-		 [14] = {
-            name = "Gremsy Vio",
-            params = {
-               ["MNT1_TYPE"] = 0, --bug with gremsy cant get mount or RC to work will circle back to this but works fine through gremsy app
-               ["SERIAL5_BAUD"] = 115,
-            }
          },
-         [15] = {
+         [14] = {
             name = "ping1090i",
             params = {
                ["ADSB_EMIT_TYPE"] = 14,
@@ -804,6 +796,14 @@ local config_domains = {
                ["SR2_ADSB"] = 5,
             }
          },
+         [15] = {
+            name = "Gremsy Vio",
+            params = {
+               ["MNT1_TYPE"] = 0, --bug with gremsy cant get mount or RC to work will circle back to this but works fine through gremsy app
+               ["SERIAL5_BAUD"] = 115,
+            }
+         },
+         -- reserve 16 for Vio and hook
       },
    },
 }
