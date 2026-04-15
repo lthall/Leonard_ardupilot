@@ -290,12 +290,7 @@ void SCurve::set_speed_max(float speed_xy, float speed_up, float speed_down)
         segment[SEG_DECEL_END].end_vel = MAX(0.0f, segment[SEG_DECEL_END].end_vel);
 
         // add to constant velocity segment to end at the correct position
-        const float dP = MAX(0.0f, Pend - segment[SEG_DECEL_END].end_pos);
-        const float t15 = is_positive(segment[SEG_CONST].end_vel) ? dP / segment[SEG_CONST].end_vel : 0.0f;
-        for (uint8_t i = SEG_CONST; i <= SEG_DECEL_END; i++) {
-            segment[i].end_time += t15;
-            segment[i].end_pos += dP;
-        }
+        extend_const_vel_to(Pend);
     }
 
     // adjust the speed change segments (8 to 14) for new speed
@@ -368,12 +363,7 @@ void SCurve::set_speed_max(float speed_xy, float speed_up, float speed_down)
     segment[SEG_DECEL_END].end_vel = MAX(0.0f, segment[SEG_DECEL_END].end_vel);
 
     // add to constant velocity segment to end at the correct position
-    const float dP = MAX(0.0f, Pend - segment[SEG_DECEL_END].end_pos);
-    const float t15 = is_positive(segment[SEG_CONST].end_vel) ? dP / segment[SEG_CONST].end_vel : 0.0f;
-    for (uint8_t i = SEG_CONST; i <= SEG_DECEL_END; i++) {
-        segment[i].end_time += t15;
-        segment[i].end_pos += dP;
-    }
+    extend_const_vel_to(Pend);
 
     // catch calculation errors
     if (!valid()) {
@@ -450,12 +440,7 @@ float SCurve::set_origin_speed_max(float speed)
     segment[SEG_DECEL_END].end_vel = MAX(0.0f, segment[SEG_DECEL_END].end_vel);
 
     // add to constant velocity segment to end at the correct position
-    const float dP = MAX(0.0f, seg_length - segment[SEG_DECEL_END].end_pos);
-    const float t15 = is_positive(segment[SEG_CONST].end_vel) ? dP / segment[SEG_CONST].end_vel : 0.0f;
-    for (uint8_t i = SEG_CONST; i <= SEG_DECEL_END; i++) {
-        segment[i].end_time += t15;
-        segment[i].end_pos += dP;
-    }
+    extend_const_vel_to(seg_length);
 
     // catch calculation errors
     if (!valid()) {
@@ -505,12 +490,7 @@ void SCurve::set_destination_speed_max(float speed)
     segment[SEG_DECEL_END].end_vel = MAX(0.0f, segment[SEG_DECEL_END].end_vel);
 
     // add to constant velocity segment to end at the correct position
-    const float dP = MAX(0.0f, seg_length - segment[SEG_DECEL_END].end_pos);
-    const float t15 = is_positive(segment[SEG_CONST].end_vel) ? dP / segment[SEG_CONST].end_vel : 0.0f;
-    for (uint8_t i = SEG_CONST; i <= SEG_DECEL_END; i++) {
-        segment[i].end_time += t15;
-        segment[i].end_pos += dP;
-    }
+    extend_const_vel_to(seg_length);
 
     // catch calculation errors
     if (!valid()) {
@@ -1115,6 +1095,17 @@ void SCurve::add_segment_decr_jerk(uint8_t &index, float tj, float Jm)
     const float V = (segment[index - 1].end_vel - VT) + (segment[index - 1].end_accel - AT) * tj + V2T;
     const float P = (segment[index - 1].end_pos - PT) + (segment[index - 1].end_vel - VT) * tj + 0.5f * (segment[index - 1].end_accel - AT) * sq(tj) + P2T;
     add_segment(index, T, SegmentType::NEGATIVE_JERK, J, A, V, P);
+}
+
+// extend the constant velocity segment so the deceleration finishes at target_pos
+void SCurve::extend_const_vel_to(float target_pos)
+{
+    const float dP = MAX(0.0f, target_pos - segment[SEG_DECEL_END].end_pos);
+    const float t15 = is_positive(segment[SEG_CONST].end_vel) ? dP / segment[SEG_CONST].end_vel : 0.0f;
+    for (uint8_t i = SEG_CONST; i <= SEG_DECEL_END; i++) {
+        segment[i].end_time += t15;
+        segment[i].end_pos += dP;
+    }
 }
 
 // add single S-Curve segment
