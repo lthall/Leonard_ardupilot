@@ -228,7 +228,7 @@ class VehicleInfo(object):
                 "default_params_filename": [
                     "default_params/copter.parm",
                     "default_params/copter-octaquad.parm",
-                    "models/Callisto.param",
+                    "models/Callisto.parm",
                 ],
             },
             "quad-can": {
@@ -242,7 +242,7 @@ class VehicleInfo(object):
                 "default_params_filename": [
                     "default_params/copter.parm",
                     "default_params/copter-X.parm",
-                    "models/freestyle.param",
+                    "models/freestyle.parm",
                 ],
             },
         },
