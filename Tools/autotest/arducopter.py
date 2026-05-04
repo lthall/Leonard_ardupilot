@@ -109,7 +109,7 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
     def callisto_sitl_kwargs(self):
         """Returns kwargs for a SITL commandline to fly the Callisto. Wipes params."""
         return {
-            "model": "octa-quad:@ROMFS/models/Callisto.json",
+            "model": "octa-quad-cwx:@ROMFS/models/Callisto.json",
             "wipe": True
         }
 
@@ -16584,6 +16584,60 @@ return update, 1000
         for pname in ["TST_A"]:
             if pname in all_params:
                 raise ValueError(f"{pname} in fetched-all-parameters when it should have gone away")
+
+    def ManyCallistos(self):
+        '''set up many callistos for sim'''
+
+        self.progress("Stopping base simulation")
+        self.stop_SITL()
+
+        speedup = 1
+
+        array_x = 3
+        array_y = 1
+        array_spacing_x = 5  # metres
+        array_spacing_y = 5  # metres
+
+        instance = 0
+        sysid_base = 100
+        for x in range(array_x):
+            for y in range(array_y):
+                instance_rundir = util.reltopdir(f'run-callisto{instance}')
+                if not os.path.exists(instance_rundir):
+                    os.mkdir(instance_rundir)
+
+                def location_to_string(location):
+                    return "%.9f,%.9f,%.2f,%.1f" % (location.lat, location.lng, location.alt, location.heading)
+
+                sitl_home = self.offset_location_ne(SITL_START_LOCATION, x * array_spacing_x, y * array_spacing_y)
+
+                extra_callisto = util.start_SITL(
+                    self.binary,
+                    home=location_to_string(sitl_home),
+                    cwd=instance_rundir,
+                    model="octa-quad-cwx:@ROMFS/models/Callisto.json",
+                    stdout_prefix=f"callisto{instance}",
+                    gdb=self.gdb,
+                    valgrind=self.valgrind,
+                    customisations=[
+                        '-I', str(instance),
+                        '--serial0', 'mcast:',
+                    ],
+                    param_defaults={
+                        "MAV_SYSID": sysid_base + instance,
+                        "SIM_SPEEDUP": speedup,
+                    },
+                    defaults_filepath=self.model_defaults_filepath('Callisto'),
+                )
+                self.expect_list_add(extra_callisto)
+                instance += 1
+
+        self.progress("Try 'mavproxy --master mcast:'")
+
+        # remember - there's no base "SITL" sim running here!
+        while True:
+            self.drain_all_pexpects()
+            time.sleep(10)
 
     def tests2b(self):  # this block currently around 9.5mins here
         '''return list of all tests'''
