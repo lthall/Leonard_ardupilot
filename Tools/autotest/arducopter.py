@@ -9514,7 +9514,7 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
         self.customise_SITL_commandline(
             [],
             defaults_filepath=self.model_defaults_filepath('Callisto'),
-            model="octa-quad:@ROMFS/models/Callisto.json",
+            model="octa-quad-cwx:@ROMFS/models/Callisto.json",
             wipe=True,
         )
         wind_spd_truth = 8.0
@@ -12068,7 +12068,7 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
         self.customise_SITL_commandline(
             [],
             defaults_filepath=self.model_defaults_filepath('Callisto'),
-            model="octa-quad:@ROMFS/models/Callisto.json",
+            model="octa-quad-cwx:@ROMFS/models/Callisto.json",
             wipe=True,
         )
         self.takeoff(10)
@@ -16332,7 +16332,7 @@ RTL_ALT_M 111
             self.customise_SITL_commandline([
                 "--serial5=mcast:",
             ],
-                model="octa-quad:@ROMFS/models/Callisto.json",
+                model="octa-quad-cwx:@ROMFS/models/Callisto.json",
                 defaults_filepath=self.model_defaults_filepath('Callisto'),
                 wipe=True,
             )
@@ -16426,7 +16426,7 @@ RTL_ALT_M 111
         self.customise_SITL_commandline(
             [],
             defaults_filepath=self.model_defaults_filepath('Callisto'),
-            model="octa-quad:@ROMFS/models/Callisto.json",
+            model="octa-quad-cwx:@ROMFS/models/Callisto.json",
             wipe=True,
         )
         self.install_example_script_context("config_profiles.lua")

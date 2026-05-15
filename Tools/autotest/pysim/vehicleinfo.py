@@ -223,7 +223,7 @@ class VehicleInfo(object):
                 "external": True,  # lies!  OTOH, hard to take off with this
             },
             "Callisto": {
-                "model": "octa-quad:@ROMFS/models/Callisto.json",
+                "model": "octa-quad-cwx:@ROMFS/models/Callisto.json",
                 "waf_target": "bin/arducopter",
                 "default_params_filename": [
                     "default_params/copter.parm",
