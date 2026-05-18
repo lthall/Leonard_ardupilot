@@ -1333,6 +1333,21 @@ bool AC_PosControl::get_posvelaccel_offset(Vector3f &pos_offset_ned_m, Vector3f 
     return true;
 }
 
+// Retrieves current target position (NED frame, m, relative to EKF origin) including any
+// scripted offset. This is the instantaneous, kinematically-shaped target the controller is
+// flying this loop -- NOT the commanded end-state -- so a healthy aircraft is never more
+// than normal tracking error from it.
+// Used in LUA
+bool AC_PosControl::get_pos_target(Vector3f &pos_target_ned_m)
+{
+    if (!NE_is_active() || !D_is_active()) {
+        return false;
+    }
+
+    pos_target_ned_m = _pos_target_ned_m.tofloat();
+    return true;
+}
+
 // Retrieves current target velocity (NED frame, m/s) including any scripted offset.
 // Used in LUA
 bool AC_PosControl::get_vel_target(Vector3f &vel_target_ned_ms)
@@ -1354,6 +1369,19 @@ bool AC_PosControl::get_accel_target(Vector3f &accel_target_ned_mss)
     }
 
     accel_target_ned_mss = _accel_target_ned_mss;
+    return true;
+}
+
+// Retrieves current desired acceleration (NED frame, m/s²) excluding the scripted offsets
+// (accel_target = accel_desired + accel_offset).
+// Used in LUA
+bool AC_PosControl::get_accel_desired(Vector3f &accel_desired_ned_mss)
+{
+    if (!NE_is_active() || !D_is_active()) {
+        return false;
+    }
+
+    accel_desired_ned_mss = _accel_desired_ned_mss;
     return true;
 }
 #endif

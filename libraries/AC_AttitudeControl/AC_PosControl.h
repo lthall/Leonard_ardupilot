@@ -433,6 +433,9 @@ public:
     // Sets desired horizontal acceleration in m/s².
     void set_accel_desired_NE_mss(const Vector2f &accel_desired_ne_mss) { _accel_desired_ned_mss.xy() = accel_desired_ne_mss; }
 
+    // Returns desired NED acceleration in m/s² (feed forward).
+    const Vector3f& get_accel_desired_NED_mss() const { return _accel_desired_ned_mss; }
+
     // Returns target NED acceleration in m/s².
     const Vector3f& get_accel_target_NED_mss() const { return _accel_target_ned_mss; }
 
@@ -477,6 +480,13 @@ public:
 
     bool get_posvelaccel_offset(Vector3f &pos_offset_NED_m, Vector3f &vel_offset_NED_ms, Vector3f &accel_offset_NED_mss);
 
+    // Retrieves current target position (NED frame, m, relative to EKF origin) including any
+    // scripted offset. This is the instantaneous, kinematically-shaped target the controller is
+    // flying this loop -- NOT the commanded end-state -- so a healthy aircraft is never more
+    // than normal tracking error from it.
+    // Used in LUA
+    bool get_pos_target(Vector3f &pos_target_NED_m);
+
     // Retrieves current target velocity (NED frame, m/s) including any scripted offset.
     // Used in LUA
     bool get_vel_target(Vector3f &vel_target_NED_ms);
@@ -484,6 +494,14 @@ public:
     // Retrieves current target acceleration (NED frame, m/s²) including any scripted offset.
     // Used in LUA
     bool get_accel_target(Vector3f &accel_target_NED_mss);
+
+    // Retrieves current desired acceleration (NED frame, m/s²) EXCLUDING the scripted offsets:
+    // the shaped acceleration of the desired trajectory itself (accel_target = accel_desired +
+    // accel_offset). A script deriving geometry from the vehicle's commanded motion (e.g. an
+    // acceleration lean) should use this, not accel_target, or its own offset's shaping feeds
+    // back into the calculation.
+    // Used in LUA
+    bool get_accel_desired(Vector3f &accel_desired_NED_mss);
 #endif
 
     // Sets NE offset targets in meters, m/s, and m/s².
