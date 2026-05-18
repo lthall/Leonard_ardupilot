@@ -316,6 +316,13 @@ bool GCS_MAVLINK_Copter::try_send_message(enum ap_message id)
         send_wind();
         break;
 
+#if AP_MAVLINK_SEND_FOLLOW_TARGET_ENABLED
+    case MSG_FOLLOW_TARGET:
+        CHECK_PAYLOAD_SIZE(FOLLOW_TARGET);
+        send_follow_target();
+        break;
+#endif  // AP_MAVLINK_SEND_FOLLOW_TARGET_ENABLED
+
     case MSG_ADSB_VEHICLE: {
 #if HAL_ADSB_ENABLED
         CHECK_PAYLOAD_SIZE(ADSB_VEHICLE);
@@ -1323,6 +1330,75 @@ void GCS_MAVLINK_Copter::send_wind() const
         wind.xy().length(),
         wind.z);
 }
+
+#if AP_MAVLINK_SEND_FOLLOW_TARGET_ENABLED
+void GCS_MAVLINK_Copter::send_follow_target() const
+{
+    const auto &ahrs = AP::ahrs();
+    Location loc;
+    float alt_m;
+    Vector3f vel_NED_ms;
+    Vector3f acc_NED_mss;
+    // While the position controller is running, report its smooth (ship-like)
+    // targets. When it is not active (disarmed, or a manual mode such as
+    // STABILIZE/ACRO) those targets are stale, so fall back to the vehicle's
+    // actual position, velocity and acceleration instead.
+    const bool use_pos_control_targets = copter.pos_control->NE_is_active() && copter.pos_control->D_is_active();
+    if (use_pos_control_targets) {
+        // we need the EKF origin to convert position-controller targets to absolute altitude
+        Location origin_loc;
+        if (!ahrs.get_origin(origin_loc)) {
+            return;
+        }
+        const Vector3f pos_target_NED_m = copter.pos_control->get_pos_desired_NED_m().tofloat();
+        loc = Location::from_ekf_offset_NED_m(pos_target_NED_m, Location::AltFrame::ABOVE_ORIGIN);
+        // absolute altitude = origin altitude + (-NED.z)
+        alt_m = origin_loc.alt * 0.01f - pos_target_NED_m.z;
+        vel_NED_ms = copter.pos_control->get_vel_desired_NED_ms();
+        acc_NED_mss = copter.pos_control->get_accel_desired_NED_mss();
+    } else {
+        if (!ahrs.get_location(loc)) {
+            return;
+        }
+        int32_t alt_cm;
+        if (!loc.get_alt_cm(Location::AltFrame::ABSOLUTE, alt_cm)) {
+            return;
+        }
+        alt_m = alt_cm * 0.01f;
+        if (!ahrs.get_velocity_NED(vel_NED_ms)) {
+            return;
+        }
+        acc_NED_mss = ahrs.get_accel_ef() + Vector3f{0.0f, 0.0f, GRAVITY_MSS};
+    }
+
+    const uint8_t est_capabilities {
+        (1U << 0) |  // we do position
+        (1U << 1) |  // we do velocity
+        (1U << 2) |  // we do acceleration
+        (1U << 3) |  // we do attitude and rates
+        0
+    };
+
+    // get the attitude and angular velocity from the attitude controller targets
+    const Quaternion quat  = copter.attitude_control->get_attitude_target_quat();
+    const Vector3f ang_vel = copter.attitude_control->get_attitude_target_ang_vel();
+
+    const mavlink_follow_target_t msg{
+        uint64_t(AP_HAL::millis()),       // time since boot (ms) (32-bits converted to 64 here)
+        0,  // 64 bits of custom state
+        loc.lat,
+        loc.lng,
+        alt_m,
+        { vel_NED_ms[0], vel_NED_ms[1], vel_NED_ms[2] },
+        { acc_NED_mss[0], acc_NED_mss[1], acc_NED_mss[2] },
+        { quat[0], quat[1], quat[2], quat[3] },
+        { ang_vel[0], ang_vel[1], ang_vel[2] },
+        { 0, 0, 0 },  // position_cov
+        est_capabilities
+    };
+    mavlink_msg_follow_target_send_struct(chan, &msg);
+}
+#endif  // AP_MAVLINK_SEND_FOLLOW_TARGET_ENABLED
 
 #if HAL_HIGH_LATENCY2_ENABLED
 // returns the HIGH_LATENCY2 target altitude in metres
