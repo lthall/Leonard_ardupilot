@@ -148,6 +148,9 @@ private:
 
     // sends WIND when the EKF is estimating wind
     void send_wind() const;
+#if AP_MAVLINK_SEND_FOLLOW_TARGET_ENABLED
+    void send_follow_target() const;
+#endif  // AP_MAVLINK_SEND_FOLLOW_TARGET_ENABLED
 
 #if HAL_HIGH_LATENCY2_ENABLED
     // returns the HIGH_LATENCY2 target altitude in metres
