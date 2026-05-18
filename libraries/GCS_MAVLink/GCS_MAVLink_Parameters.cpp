@@ -293,6 +293,9 @@ static const ap_message STREAM_EXTRA1_msgs[] = {
 #if AP_AHRS_ENABLED
     MSG_ATTITUDE,
 #endif  // AP_AHRS_ENABLED
+#if AP_MAVLINK_SEND_FOLLOW_TARGET_ENABLED && APM_BUILD_TYPE(APM_BUILD_ArduCopter)
+    MSG_FOLLOW_TARGET,
+#endif
 #if AP_SIM_ENABLED
     MSG_SIMSTATE,
 #endif
