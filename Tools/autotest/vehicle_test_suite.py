@@ -336,6 +336,10 @@ class Context(object):
         self.installed_modules = []
         self.overridden_message_rates = {}
         self.raising_debug_trap_on_exceptions = False
+        # self.speedup value to restore on context_pop(); set by the
+        # first context_set_speedup() call in this context (None means
+        # speedup was never changed in this context)
+        self.original_speedup = None
 
 
 # https://stackoverflow.com/questions/616645/how-do-i-duplicate-sys-stdout-to-a-log-file-in-python
@@ -3837,6 +3841,21 @@ class TestSuite(abc.ABC):
         context.raising_debug_trap_on_exceptions = False
         sys.settrace(None)
 
+    def context_set_speedup(self, speedup):
+        '''set the simulation speedup, keeping the SIM_SPEEDUP parameter and
+        the self.speedup attribute (used to scale timeouts) in sync.  The
+        original speedup is restored on context_pop(), so cleanup is
+        exception-safe and handled by the suite rather than each test.
+
+        Calling this more than once in a single context retains the speedup
+        from before the first call - the value restored on context_pop() is
+        always the one in effect when this context was entered.'''
+        context = self.context_get()
+        if context.original_speedup is None:
+            context.original_speedup = self.speedup
+        self.speedup = speedup
+        self.set_parameter("SIM_SPEEDUP", speedup)
+
     def context_set_message_rate_hz(self, id, rate_hz, run_cmd=None):
         if run_cmd is None:
             run_cmd = self.run_cmd
@@ -6760,6 +6779,8 @@ class TestSuite(abc.ABC):
     def context_pop(self, process_interaction_allowed=True, hooks_already_removed=False):
         """Set parameters to origin values in reverse order."""
         dead = self.contexts.pop()
+        if dead.original_speedup is not None:
+            self.speedup = dead.original_speedup
         # remove hooks first; these hooks can raise exceptions which
         # we really don't want...
         if not hooks_already_removed:
