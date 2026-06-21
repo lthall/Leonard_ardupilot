@@ -432,7 +432,7 @@ void shape_angle_vel_accel(float angle_desired, float angle_vel_desired, float a
 // - If the full acceleration vector exceeds `accel_max`, it is reshaped to prioritize the cross-track component.
 // - If `vel_norm` is zero, a simple magnitude limit is applied.
 // Returns true if the acceleration vector was modified.
-bool limit_accel_xy(const Vector2f& vel_norm, Vector2f& accel, float accel_max)
+bool limit_accel_xy(const Vector2f& vel_norm, Vector2f& accel, float accel_max, bool disable_cross_track_priority)
 {
     // check accel_max is defined
     if (!is_positive(accel_max)) {
@@ -450,8 +450,10 @@ bool limit_accel_xy(const Vector2f& vel_norm, Vector2f& accel, float accel_max)
     accel_isotropic.limit_length(accel_max);
 
     const float ref_mag = vel_norm.length();
-    if (!is_positive(ref_mag)) {
-        // We do not have a reference direction so do a simple vector length limit
+    if (!is_positive(ref_mag) || disable_cross_track_priority) {
+        // No reference direction, or cross-track prioritisation disabled by the
+        // caller: apply a simple vector length limit so along-track and
+        // cross-track acceleration are limited equally.
         accel = accel_isotropic;
         return true;
     }

@@ -138,8 +138,10 @@ void shape_angle_vel_accel(float angle_desired, float angle_vel_desired, float a
 //   direction-preserving magnitude limit, avoiding a lateral acceleration spike
 //   as the reference direction rotates (e.g. a hard stick reversal).
 // - If `vel_norm` is zero, a simple magnitude limit is applied.
+// - If `disable_cross_track_priority` is true, the simple magnitude limit is applied even when a
+//   reference direction exists, so along-track and cross-track acceleration are limited equally.
 // Returns true if the acceleration vector was modified.
-bool limit_accel_xy(const Vector2f& vel_norm, Vector2f& accel, float accel_max);
+bool limit_accel_xy(const Vector2f& vel_norm, Vector2f& accel, float accel_max, bool disable_cross_track_priority = false);
 
 // Limits a 2D acceleration vector with direction-dependent prioritisation.
 // - Acceleration is decomposed into along-track (parallel to velocity) and cross-track components.
