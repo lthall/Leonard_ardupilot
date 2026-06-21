@@ -188,7 +188,9 @@ public:
     // Runs the NE-axis position controller, computing output acceleration from position and velocity errors.
     // Uses P and PID controllers to generate corrections which are added to feedforward velocity/acceleration.
     // Requires all desired targets to be pre-set using the input_* or set_* methods.
-    void NE_update_controller();
+    // disable_cross_track_priority: when true, the acceleration limit is applied isotropically
+    // rather than prioritising cross-track correction (see limit_accel_xy).
+    void NE_update_controller(bool disable_cross_track_priority = false);
 
     ///
     /// Vertical position controller

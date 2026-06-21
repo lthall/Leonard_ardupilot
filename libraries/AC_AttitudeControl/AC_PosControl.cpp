@@ -703,7 +703,9 @@ bool AC_PosControl::NE_is_active() const
 
 // Uses P and PID controllers to generate corrections which are added to feedforward velocity/acceleration.
 // Requires all desired targets to be pre-set using the input_* or set_* methods.
-void AC_PosControl::NE_update_controller()
+// disable_cross_track_priority: when true, the acceleration limit is applied isotropically
+// rather than prioritising cross-track correction (see limit_accel_xy).
+void AC_PosControl::NE_update_controller(bool disable_cross_track_priority)
 {
     // check for ekf xy position reset
     NE_handle_ekf_reset();
@@ -778,7 +780,7 @@ void AC_PosControl::NE_update_controller()
     if (is_positive(_vel_max_ne_ms)) {
         vel_norm_ne = _vel_desired_ned_ms.xy() / _vel_max_ne_ms;
     }
-    if (!limit_accel_xy(vel_norm_ne, _accel_target_ned_mss.xy(), accel_max_mss)) {
+    if (!limit_accel_xy(vel_norm_ne, _accel_target_ned_mss.xy(), accel_max_mss, disable_cross_track_priority)) {
         // _accel_target_ned_mss was not limited so we can zero the xy limit vector
         _limit_vector_ned.xy().zero();
     }
