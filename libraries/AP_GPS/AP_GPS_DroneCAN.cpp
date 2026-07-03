@@ -503,6 +503,11 @@ void AP_GPS_DroneCAN::handle_heading_msg(const ardupilot_gnss_Heading& msg)
     if (interim_state.have_gps_yaw) {
         interim_state.gps_yaw_time_ms = AP_HAL::millis();
     }
+    // this yaw is the device-reported vehicle heading, not one calculated
+    // from a moving baseline offset, so no attitude correction applies. A
+    // stale offset could otherwise survive from an earlier relposheading
+    // calculation on this instance
+    interim_state.mb_yaw_offset.zero();
 
     interim_state.have_gps_yaw_accuracy = msg.heading_accuracy_valid;
     interim_state.gps_yaw_accuracy = degrees(msg.heading_accuracy_rad);

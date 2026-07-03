@@ -2012,6 +2012,24 @@ bool AP_GPS::gps_yaw_deg(uint8_t instance, float &yaw_deg, float &accuracy_deg, 
 }
 
 /*
+  get the body-frame moving baseline antenna offset used to calculate the yaw
+  returned by gps_yaw_deg, zero when that yaw is not derived from a moving
+  baseline. The yaw is calculated assuming the offset is horizontal, so
+  consumers with an attitude estimate can use this offset to correct the yaw
+  for vehicle roll and pitch
+ */
+const Vector3f &AP_GPS::get_mb_yaw_offset(uint8_t instance) const
+{
+#if GPS_MAX_RECEIVERS > 1
+    if (is_rtk_base(instance) && is_rtk_rover(instance^1)) {
+        // gps_yaw_deg returns the yaw from the rover for this instance
+        instance ^= 1;
+    }
+#endif
+    return state[instance].mb_yaw_offset;
+}
+
+/*
  * Old parameter metadata.  Until we have versioned parameters, keeping
  * old parameters around for a while can help with an adjustment
  * period.
