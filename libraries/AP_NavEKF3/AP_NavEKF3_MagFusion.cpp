@@ -209,6 +209,54 @@ void NavEKF3_core::realignYawGPS(bool emergency_reset)
     }
 }
 
+/*
+  Correct a yaw measurement calculated from a moving baseline antenna offset
+  for vehicle attitude.
+
+  The GPS driver recovers the vehicle yaw from the reported baseline heading
+  by subtracting the bearing of the body-frame antenna offset, which is only
+  exact when the vehicle is level. The residual attitude correction is applied
+  here using this core's own roll and pitch estimate at the fusion time
+  horizon, which is time-aligned with the measurement. Using the core's own
+  attitude estimate rather than the published AHRS attitude keeps each lane
+  independent of the others and allows Replay to reproduce the fusion exactly.
+*/
+void NavEKF3_core::CorrectGPSYawForAntennaOffset(yaw_elements &yawAngData) const
+{
+    const Vector3F &offset = yawAngData.antOffset;
+    if (offset.is_zero()) {
+        // no antenna offset supplied so the measurement is used as reported
+        return;
+    }
+
+    // calculate the rotation from body to earth frame with yaw set to zero
+    // using the rotation order of the measurement
+    Matrix3F Tbn_zeroYaw;
+    if (yawAngData.order == rotationOrder::TAIT_BRYAN_321) {
+        Vector3F euler321;
+        stateStruct.quat.to_euler(euler321.x, euler321.y, euler321.z);
+        Tbn_zeroYaw.from_euler(euler321.x, euler321.y, 0.0f);
+    } else if (yawAngData.order == rotationOrder::TAIT_BRYAN_312) {
+        const Vector3F euler312 = stateStruct.quat.to_vector312();
+        Tbn_zeroYaw.from_euler312(euler312.x, euler312.y, 0.0f);
+    } else {
+        // rotation order not supported
+        return;
+    }
+
+    const Vector3F offsetLevel = Tbn_zeroYaw * offset;
+    if (!is_positive(sq(offsetLevel.x) + sq(offsetLevel.y))) {
+        // the antenna baseline is vertical at this attitude so its bearing is undefined
+        return;
+    }
+
+    // replace the body-frame bearing of the antenna offset subtracted by the
+    // driver with the bearing of the offset at the estimated attitude
+    const ftype bearingBody = atan2F(-offset.y, -offset.x);
+    const ftype bearingLevel = atan2F(-offsetLevel.y, -offsetLevel.x);
+    yawAngData.yawAng = wrap_PI(yawAngData.yawAng + bearingBody - bearingLevel);
+}
+
 // align the yaw angle for the quaternion states to the given yaw angle which should be at the fusion horizon
 void NavEKF3_core::alignYawAngle(const yaw_elements &yawAngData)
 {
@@ -288,6 +336,10 @@ void NavEKF3_core::SelectMagFusion()
     if (yaw_source_last == AP_NavEKF_Source::SourceYaw::GPS || yaw_source_last == AP_NavEKF_Source::SourceYaw::GPS_COMPASS_FALLBACK) {
         bool have_fused_gps_yaw = false;
         if (storedYawAng.recall(yawAngDataDelayed,imuDataDelayed.time_ms)) {
+            // correct the measurement for vehicle attitude using this core's own attitude
+            // estimate. This is done once per recalled measurement, before all consumers of
+            // yawAngDataDelayed (alignYawAngle, fuseEulerYaw and learnMagBiasFromGPS)
+            CorrectGPSYawForAntennaOffset(yawAngDataDelayed);
             if (tiltAlignComplete && (!yawAlignComplete || yaw_source_reset)) {
                 alignYawAngle(yawAngDataDelayed);
                 yaw_source_reset = false;
