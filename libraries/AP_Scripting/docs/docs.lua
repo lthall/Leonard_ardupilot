@@ -2668,6 +2668,14 @@ function vehicle:set_rudder_offset(rudder_pct, run_yaw_rate_control) end
 function vehicle:has_ekf_failsafed() end
 
 -- desc
+---@return boolean
+function vehicle:has_gcs_failsafed() end
+
+-- desc
+---@return boolean
+function vehicle:has_radio_failsafed() end
+
+-- desc
 ---@return number|nil
 ---@return number|nil
 function vehicle:get_pan_tilt_norm() end
@@ -3906,11 +3914,23 @@ poscontrol = {}
 ---@return boolean
 function poscontrol:set_posvelaccel_offset(pos_offset_NED, vel_offset_NED, accel_offset_NED) end
 
+-- reset position controller's offsets, folding the current offset into the target trajectory (no step) then zeroing all offsets
+---@return boolean
+function poscontrol:reset_offsets() end
+
 -- get position controller's target position, velocity and acceleration offsets
 ---@return Vector3f_ud|nil
 ---@return Vector3f_ud|nil
 ---@return Vector3f_ud|nil
 function poscontrol:get_posvelaccel_offset() end
+
+-- get position controller's target position in m in NED frame relative to the EKF origin,
+-- including any scripted offset. This is the instantaneous, kinematically-shaped target the
+-- controller is flying this loop (not the commanded end-state), so a healthy aircraft is never
+-- more than normal tracking error from it. Compare against
+-- ahrs:get_relative_position_NED_origin() (same frame) for true tracking error.
+---@return Vector3f_ud|nil
+function poscontrol:get_pos_target() end
 
 -- get position controller's target velocity in m/s in NED frame
 ---@return Vector3f_ud|nil
@@ -3919,6 +3939,13 @@ function poscontrol:get_vel_target() end
 -- get position controller's target acceleration in m/s/s in NED frame
 ---@return Vector3f_ud|nil
 function poscontrol:get_accel_target() end
+
+-- get position controller's desired acceleration in m/s/s in NED frame, excluding the scripted
+-- offsets (accel_target = accel_desired + accel_offset): the shaped acceleration of the desired
+-- trajectory itself. Use this (not get_accel_target) to derive geometry from the vehicle's
+-- commanded motion, or the script's own offset shaping feeds back into the calculation.
+---@return Vector3f_ud|nil
+function poscontrol:get_accel_desired() end
 
 -- precision landing access
 precland = {}
