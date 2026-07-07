@@ -231,6 +231,12 @@ public:
     // returns true if the EKF failsafe has triggered
     virtual bool has_ekf_failsafed() const { return false; }
 
+    // returns true if the GCS failsafe has triggered
+    virtual bool has_gcs_failsafed() const { return false; }
+
+    // returns true if the radio (RC) failsafe has triggered
+    virtual bool has_radio_failsafed() const { return false; }
+
     // allow for landing descent rate to be overridden by a script, may be -ve to climb
     virtual bool set_land_descent_rate(float descent_rate_ms) { return false; }
 
