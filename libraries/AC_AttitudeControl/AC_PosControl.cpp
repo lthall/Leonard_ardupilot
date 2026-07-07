@@ -552,8 +552,12 @@ void AC_PosControl::NE_soften_for_landing()
 void AC_PosControl::NE_init_controller()
 {
     // initialise offsets to target offsets and ensure offset targets are zero if they have not been updated.
-    NE_init_offsets();
-    
+    // A running controller is only left alone while armed: disarmed there is no trajectory the
+    // offsets belong to, so they snap every init and never shape a move on the ground.
+    if (!NE_is_active() || !_motors.armed()) {
+        NE_init_offsets();
+    }
+
     // set roll, pitch lean angle targets to current attitude
     const Vector3f &att_target_euler_rad = _attitude_control.get_att_target_euler_rad();
     _roll_target_rad = att_target_euler_rad.x;
@@ -738,6 +742,10 @@ void AC_PosControl::NE_update_controller(bool disable_cross_track_priority)
 
     // Run P controller to compute velocity setpoint from position error
     Vector2f vel_target_ne_ms = _p_pos_ne_m.update_all(_pos_target_ned_m.xy(), comb_pos_ne_m);
+
+    // update_all() may have clamped _pos_target_ned_m to keep the position error within limits;
+    // back out the offset so _pos_desired_ned_m tracks the limited target and cannot wind up ahead
+    // of what the controller can follow.
     _pos_desired_ned_m.xy() = _pos_target_ned_m.xy() - _pos_offset_ned_m.xy();
 
     // Velocity Controller
@@ -913,7 +921,11 @@ void AC_PosControl::D_init_controller()
     init_terrain();
 
     // initialise offsets to target offsets and ensure offset targets are zero if they have not been updated.
-    D_init_offsets();
+    // A running controller is only left alone while armed: disarmed there is no trajectory the
+    // offsets belong to, so they snap every init and never shape a move on the ground.
+    if (!D_is_active() || !_motors.armed()) {
+        D_init_offsets();
+    }
 
     _pos_target_ned_m.z = _pos_estimate_ned_m.z;
     _pos_desired_ned_m.z = _pos_target_ned_m.z - _pos_offset_ned_m.z;
@@ -1124,6 +1136,9 @@ void AC_PosControl::D_update_controller()
     _vel_target_ned_ms.z = _p_pos_d_m.update_all(_pos_target_ned_m.z, _pos_estimate_ned_m.z);
     _vel_target_ned_ms.z *= AP::ahrs().getControlScaleZ();
 
+    // update_all() may have clamped _pos_target_ned_m.z to keep the position error within limits;
+    // back out the offset and terrain so _pos_desired_ned_m.z tracks the limited target and cannot
+    // wind up ahead of what the controller can follow.
     _pos_desired_ned_m.z = _pos_target_ned_m.z - (_pos_offset_ned_m.z + _pos_terrain_d_m);
 
     // add feed forward component
@@ -1312,6 +1327,42 @@ void AC_PosControl::D_init_offsets()
     _accel_offset_ned_mss.z = _accel_offset_target_ned_mss.z;
 }
 
+// Initializes NE position/velocity/acceleration offsets to match their respective targets.
+void AC_PosControl::NE_reset_offsets()
+{
+    _posvelaccel_offset_target_ne_ms = AP_HAL::millis();
+
+    _pos_desired_ned_m.xy() += _pos_offset_ned_m.xy();
+    _vel_desired_ned_ms.xy() += _vel_offset_ned_ms.xy();
+    _accel_desired_ned_mss.xy() += _accel_offset_ned_mss.xy();
+
+    _pos_offset_target_ned_m.xy().zero();
+    _vel_offset_target_ned_ms.xy().zero();
+    _accel_offset_target_ned_mss.xy().zero();
+
+    _pos_offset_ned_m.xy().zero();
+    _vel_offset_ned_ms.xy().zero();
+    _accel_offset_ned_mss.xy().zero();
+}
+
+// Initializes vertical (U) offsets to match their respective targets.
+void AC_PosControl::D_reset_offsets()
+{
+    _posvelaccel_offset_target_d_ms = AP_HAL::millis();
+
+    _pos_desired_ned_m.z += _pos_offset_ned_m.z;
+    _vel_desired_ned_ms.z += _vel_offset_ned_ms.z;
+    _accel_desired_ned_mss.z += _accel_offset_ned_mss.z;
+
+    _pos_offset_target_ned_m.z = 0.0;
+    _vel_offset_target_ned_ms.z = 0.0;
+    _accel_offset_target_ned_mss.z = 0.0;
+
+    _pos_offset_ned_m.z = 0.0;
+    _vel_offset_ned_ms.z = 0.0;
+    _accel_offset_ned_mss.z = 0.0;
+}
+
 #if AP_SCRIPTING_ENABLED
 // Sets additional position, velocity, and acceleration offsets in meters (NED frame) for scripting.
 // Offsets are added to the controller’s internal target.
@@ -1323,13 +1374,23 @@ bool AC_PosControl::set_posvelaccel_offset(const Vector3f &pos_offset_ned_m, con
     return true;
 }
 
+// Resets scripted offsets: folds the current offset into the controller's target trajectory
+// (NED frame) so there is no step, then zeroes all offset targets and offsets.
+// Used in LUA
+bool AC_PosControl::reset_offsets()
+{
+    NE_reset_offsets();
+    D_reset_offsets();
+    return true;
+}
+
 // Retrieves current scripted offsets in meters (NED frame).
 // Used in LUA
 bool AC_PosControl::get_posvelaccel_offset(Vector3f &pos_offset_ned_m, Vector3f &vel_offset_ned_ms, Vector3f &accel_offset_ned_mss)
 {
-    pos_offset_ned_m = _pos_offset_target_ned_m.tofloat();
-    vel_offset_ned_ms = _vel_offset_target_ned_ms;
-    accel_offset_ned_mss = _accel_offset_target_ned_mss;
+    pos_offset_ned_m = _pos_offset_ned_m.tofloat();
+    vel_offset_ned_ms = _vel_offset_ned_ms;
+    accel_offset_ned_mss = _accel_offset_ned_mss;
     return true;
 }
 
