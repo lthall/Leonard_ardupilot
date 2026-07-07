@@ -534,6 +534,18 @@ bool Copter::has_ekf_failsafed() const
     return failsafe.ekf;
 }
 
+// returns true if the GCS failsafe has triggered.  Only used by Lua scripts
+bool Copter::has_gcs_failsafed() const
+{
+    return failsafe.gcs;
+}
+
+// returns true if the radio (RC) failsafe has triggered.  Only used by Lua scripts
+bool Copter::has_radio_failsafed() const
+{
+    return failsafe.radio;
+}
+
 // get target location (for use by scripting)
 bool Copter::get_target_location(Location& target_loc)
 {
