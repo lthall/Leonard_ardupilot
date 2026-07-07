@@ -475,6 +475,11 @@ public:
     // Used in LUA
     bool set_posvelaccel_offset(const Vector3f &pos_offset_NED_m, const Vector3f &vel_offset_NED_ms, const Vector3f &accel_offset_NED_mss);
 
+    // Resets scripted offsets: folds the current offset into the controller's target trajectory
+    // (NED frame) so there is no step, then zeroes all offset targets and offsets.
+    // Used in LUA
+    bool reset_offsets();
+
     // Retrieves current scripted offsets in meters (NED frame).
     // Used in LUA
 
@@ -721,6 +726,12 @@ protected:
 
     // Initializes vertical (D) offsets to match their respective targets.
     void D_init_offsets();
+
+    // Initializes NE position/velocity/acceleration offsets to match their respective targets.
+    void NE_reset_offsets();
+
+    // Initializes vertical (D) offsets to match their respective targets.
+    void D_reset_offsets();
 
     // Updates NE offsets by gradually moving them toward their targets.
     void NE_update_offsets();
