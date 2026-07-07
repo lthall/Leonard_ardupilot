@@ -392,14 +392,10 @@ void ModeRTL::land_start()
     pos_control->NE_set_correction_speed_accel_m(wp_nav->get_default_speed_NE_ms(), wp_nav->get_wp_acceleration_mss());
 
     // initialise loiter target destination
-    if (!pos_control->NE_is_active()) {
-        pos_control->NE_init_controller();
-    }
+    pos_control->NE_init_controller();
 
     // initialise the vertical position controller
-    if (!pos_control->D_is_active()) {
-        pos_control->D_init_controller();
-    }
+    pos_control->D_init_controller();
 
     // initialise yaw
     auto_yaw.set_mode(AutoYaw::Mode::HOLD);

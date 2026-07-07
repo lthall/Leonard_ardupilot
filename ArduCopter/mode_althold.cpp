@@ -10,9 +10,7 @@ bool ModeAltHold::init(bool ignore_checks)
 {
 
     // initialise the vertical position controller
-    if (!pos_control->D_is_active()) {
-        pos_control->D_init_controller();
-    }
+    pos_control->D_init_controller();
 
     // set vertical speed and acceleration limits
     pos_control->D_set_max_speed_accel_m(get_pilot_speed_dn_ms(), get_pilot_speed_up_ms(), get_pilot_accel_D_mss());

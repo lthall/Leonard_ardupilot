@@ -496,18 +496,14 @@ void ModeAuto::land_start()
     pos_control->NE_set_correction_speed_accel_m(wp_nav->get_default_speed_NE_ms(), wp_nav->get_wp_acceleration_mss());
 
     // initialise the vertical position controller
-    if (!pos_control->NE_is_active()) {
-        pos_control->NE_init_controller();
-    }
+    pos_control->NE_init_controller();
 
     // set vertical speed and acceleration limits
     pos_control->D_set_max_speed_accel_m(wp_nav->get_default_speed_down_ms(), wp_nav->get_default_speed_up_ms(), wp_nav->get_accel_D_mss());
     pos_control->D_set_correction_speed_accel_m(wp_nav->get_default_speed_down_ms(), wp_nav->get_default_speed_up_ms(), wp_nav->get_accel_D_mss());
 
     // initialise the vertical position controller
-    if (!pos_control->D_is_active()) {
-        pos_control->D_init_controller();
-    }
+    pos_control->D_init_controller();
 
     // initialise yaw
     auto_yaw.set_mode(AutoYaw::Mode::HOLD);
@@ -645,18 +641,14 @@ void PayloadPlace::start_descent()
     pos_control->NE_set_correction_speed_accel_m(wp_nav->get_default_speed_NE_ms(), wp_nav->get_wp_acceleration_mss());
 
     // initialise the vertical position controller
-    if (!pos_control->NE_is_active()) {
-        pos_control->NE_init_controller();
-    }
+    pos_control->NE_init_controller();
 
     // set vertical speed and acceleration limits
     pos_control->D_set_max_speed_accel_m(wp_nav->get_default_speed_down_ms(), wp_nav->get_default_speed_up_ms(), wp_nav->get_accel_D_mss());
     pos_control->D_set_correction_speed_accel_m(wp_nav->get_default_speed_down_ms(), wp_nav->get_default_speed_up_ms(), wp_nav->get_accel_D_mss());
 
     // initialise the vertical position controller
-    if (!pos_control->D_is_active()) {
-        pos_control->D_init_controller();
-    }
+    pos_control->D_init_controller();
 
     // initialise yaw
     copter.flightmode->auto_yaw.set_mode(Mode::AutoYaw::Mode::HOLD);
@@ -1203,9 +1195,7 @@ void ModeAuto::loiter_to_alt_run()
         pos_control->NE_set_max_speed_accel_m(wp_nav->get_default_speed_NE_ms(), wp_nav->get_wp_acceleration_mss());
         pos_control->NE_set_correction_speed_accel_m(wp_nav->get_default_speed_NE_ms(), wp_nav->get_wp_acceleration_mss());
 
-        if (!pos_control->NE_is_active()) {
-            pos_control->NE_init_controller();
-        }
+        pos_control->NE_init_controller();
 
         loiter_to_alt.loiter_start_done = true;
     }

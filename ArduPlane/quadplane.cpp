@@ -2217,9 +2217,7 @@ void QuadPlane::run_xy_controller(float accel_limit_mss)
     const float speed_ms = wp_nav->get_default_speed_NE_ms();
     pos_control->NE_set_max_speed_accel_m(speed_ms, accel_mss);
     pos_control->NE_set_correction_speed_accel_m(speed_ms, accel_mss);
-    if (!pos_control->NE_is_active()) {
-        pos_control->NE_init_controller();
-    }
+    pos_control->NE_init_controller();
     pos_control->set_lean_angle_max_cd(MIN(4500, MAX(accel_mss_to_angle_deg(accel_limit_mss) * 100, attitude_control->lean_angle_max_cd())));
     if (q_fwd_throttle > 0.95f) {
         // prevent wind up of the velocity controller I term due to a saturated forward throttle

@@ -117,9 +117,7 @@ void ModeQLoiter::run()
     loiter_nav->set_pilot_desired_acceleration_cd(target_roll_cd, target_pitch_cd);
     
     // run loiter controller
-    if (!pos_control->NE_is_active()) {
-        pos_control->NE_init_controller();
-    }
+    pos_control->NE_init_controller();
     loiter_nav->update();
 
     // nav roll and pitch are controller by loiter controller

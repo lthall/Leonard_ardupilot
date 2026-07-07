@@ -543,6 +543,10 @@ void AC_PosControl::NE_soften_for_landing()
 // Private function shared by other NE initializers.
 void AC_PosControl::NE_init_controller()
 {
+    if (NE_is_active()) {
+        return;
+    }
+
     // initialise offsets to target offsets and ensure offset targets are zero if they have not been updated.
     NE_init_offsets();
     
@@ -563,9 +567,7 @@ void AC_PosControl::NE_init_controller()
     // Set desired acceleration to zero because raw acceleration is prone to noise
     _accel_desired_ned_mss.xy().zero();
 
-    if (!NE_is_active()) {
-        lean_angles_to_accel_NE_mss(_accel_target_ned_mss.x, _accel_target_ned_mss.y);
-    }
+    lean_angles_to_accel_NE_mss(_accel_target_ned_mss.x, _accel_target_ned_mss.y);
 
     // limit acceleration using maximum lean angles
     const float angle_max_rad = MIN(_attitude_control.get_althold_lean_angle_max_rad(), get_lean_angle_max_rad());
@@ -887,6 +889,10 @@ void AC_PosControl::D_relax_controller(float throttle_setting)
 // Private function shared by other vertical initializers.
 void AC_PosControl::D_init_controller()
 {
+    if (D_is_active()) {
+        return;
+    }
+
     // initialise terrain targets and offsets to zero
     init_terrain();
 
