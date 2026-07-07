@@ -705,6 +705,10 @@ private:
     // lua scripts use this to retrieve EKF failsafe state
     // returns true if the EKF failsafe has triggered
     bool has_ekf_failsafed() const override;
+    // returns true if the GCS failsafe has triggered
+    bool has_gcs_failsafed() const override;
+    // returns true if the radio (RC) failsafe has triggered
+    bool has_radio_failsafed() const override;
 #endif // AP_SCRIPTING_ENABLED
     bool is_landing() const override;
     bool is_taking_off() const override;
