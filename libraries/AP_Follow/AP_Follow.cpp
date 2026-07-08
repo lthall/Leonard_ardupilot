@@ -158,7 +158,7 @@ const AP_Param::GroupInfo AP_Follow::var_info[] = {
     // @Param: _OPTIONS
     // @DisplayName: Follow options
     // @Description: Follow options bitmask
-    // @Bitmask: 0:Mount follows lead vehicle on mode enter
+    // @Bitmask: 0:Mount follows lead vehicle on mode enter, 1:Do not auto-learn follow offset, 2:Only consume FOLLOW_TARGET messages
     // @User: Standard
     AP_GROUPINFO("_OPTIONS", 11, AP_Follow, _options, 0),
 
@@ -541,8 +541,9 @@ void AP_Follow::handle_msg(const mavlink_message_t &msg)
 
     switch (msg.msgid) {
     case MAVLINK_MSG_ID_GLOBAL_POSITION_INT: {
+        // FOLL_OPTIONS bit 2: target updates come from FOLLOW_TARGET only OR
         // if we are using follow_target, ignore global_position_int messages
-        if (_using_follow_target) {
+        if (_using_follow_target || option_is_enabled(Option::FOLLOW_TARGET_ONLY)) {
             return;
         }
         // handle standard global position messages
@@ -845,6 +846,14 @@ bool AP_Follow::handle_follow_target_message(const mavlink_message_t &msg)
 // Initializes the positional offsets from the target vehicle if not already set.
 void AP_Follow::init_offsets_if_required()
 {
+    // do not auto-learn offsets if the operator has opted out (FOLL_OPTIONS bit 1): a zero
+    // FOLL_OFS then means "track the target position directly". Used when the follow offset is
+    // commanded elsewhere -- e.g. a scripted position-controller offset -- which auto-learning
+    // would otherwise capture and double-count.
+    if (option_is_enabled(Option::NO_AUTO_OFFSET)) {
+        return;
+    }
+
     // return immediately if offsets have already been set
     if (!_offset_m.get().is_zero()) {
         return;
