@@ -41,7 +41,9 @@ public:
 
     // enum for FOLLOW_OPTIONS parameter
     enum class Option {
-        MOUNT_FOLLOW_ON_ENTER = 1
+        MOUNT_FOLLOW_ON_ENTER = 1,
+        NO_AUTO_OFFSET        = 2,   // do not auto-learn FOLL_OFS on entry; a zero offset stays a true zero
+        FOLLOW_TARGET_ONLY    = 4,   // never update the target from GLOBAL_POSITION_INT; a stopped FOLLOW_TARGET stream means the target is lost
     };
 
     // enum for YAW_BEHAVE parameter
