@@ -44,8 +44,8 @@ bool ModeFollow::init(const bool ignore_checks)
     pos_control->D_set_correction_speed_accel_m(wp_nav->get_default_speed_down_ms(), wp_nav->get_default_speed_up_ms(), wp_nav->get_accel_D_mss());
 
     // initialise velocity controller
-    pos_control->D_init_controller();
-    pos_control->NE_init_controller();
+    pos_control->D_init_controller(copter.ap.land_complete);
+    pos_control->NE_init_controller(copter.ap.land_complete);
 
     // initialise yaw
     auto_yaw.set_mode_to_default(false);

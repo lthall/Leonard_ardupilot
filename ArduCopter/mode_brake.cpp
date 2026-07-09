@@ -14,16 +14,14 @@ bool ModeBrake::init(bool ignore_checks)
     pos_control->NE_set_correction_speed_accel_m(pos_control->get_vel_estimate_NED_ms().xy().length(), BRAKE_MODE_DECEL_RATE_MSS);
 
     // initialise position controller
-    pos_control->NE_init_controller();
+    pos_control->NE_init_controller(copter.ap.land_complete);
 
     // set vertical speed and acceleration limits
     pos_control->D_set_max_speed_accel_m(BRAKE_MODE_SPEED_Z_MS, BRAKE_MODE_SPEED_Z_MS, BRAKE_MODE_DECEL_RATE_MSS);
     pos_control->D_set_correction_speed_accel_m(BRAKE_MODE_SPEED_Z_MS, BRAKE_MODE_SPEED_Z_MS, BRAKE_MODE_DECEL_RATE_MSS);
 
     // initialise the vertical position controller
-    if (!pos_control->D_is_active()) {
-        pos_control->D_init_controller();
-    }
+    pos_control->D_init_controller(copter.ap.land_complete);
 
     _timeout_ms = 0;
 
