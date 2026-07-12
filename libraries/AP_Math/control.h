@@ -187,6 +187,34 @@ float sqrt_controller_accel(float error, float rate_cmd, float rate_state, float
 // - Output: stopping distance required to decelerate cleanly.
 float stopping_distance(float velocity, float p, float accel_max);
 
+// Computes the exact stopping distance of the discrete shape_vel_accel() recursion when
+// commanding zero velocity and acceleration.
+// With a zero velocity input, shape_vel_accel() reduces to a saturated proportional
+// controller on velocity, accel_target = -k_v * vel with k_v = jerk_max / accel_brake,
+// followed by the jerk limit, where accel_brake is the acceleration limit opposing the
+// velocity (selected exactly as shape_vel_accel() selects its gain). The jerk limit lands
+// exactly on its target once the target is within one jerk step, jerk_max * dt.
+// One loop ahead the velocity advances to vel_next = vel + accel * dt. If accel is within
+// one jerk step of the decay curve -k_v * vel_next, and |vel_next| is inside the linear
+// region sq(accel_brake) / jerk_max, the acceleration snaps onto the curve and the
+// remainder of the discrete trajectory is an exact exponential decay. The stopping
+// distance is then exact, with no tolerance:
+//   stopping_dist = vel * dt + accel * dt² / 2 + vel_next * (accel_brake / jerk_max - dt / 2)
+// Returns true and writes stopping_dist when the state satisfies these conditions
+// (k_v * dt <= 1 is also required so the discrete decay is monotonic and the
+// sqrt_controller() dt limit is inactive); returns false otherwise.
+bool stopping_distance_jerk_limited(float vel, float accel,
+                                    float accel_min, float accel_max,
+                                    float jerk_max, float dt, float& stopping_dist);
+
+// 2D form of stopping_distance_jerk_limited() matching shape_vel_accel_xy(): a single
+// acceleration magnitude limit applies. Because the snap makes the jerk limit inactive,
+// the axes are exactly decoupled and the result holds for any velocity and acceleration
+// directions, including non-collinear states.
+bool stopping_distance_jerk_limited_xy(const Vector2f& vel, const Vector2f& accel,
+                                       float accel_max, float jerk_max, float dt,
+                                       Vector2f& stopping_dist);
+
 // Return the largest M >= 0 that can scale a 3D direction without exceeding
 // independent axis limits:
 //
