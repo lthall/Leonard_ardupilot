@@ -419,6 +419,7 @@ void ModePosHold::run()
         pitch_mode = RPMode::BRAKE_TO_LOITER;
         brake.loiter_transition_start_time_ms = now_ms;
         // init loiter controller
+        loiter_nav->clear_pilot_desired_acceleration();
         loiter_nav->init_target();
         // set delay to start of wind compensation estimate updates
         wind_comp_start_time_ms = now_ms;

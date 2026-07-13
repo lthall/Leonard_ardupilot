@@ -20,7 +20,6 @@ class _AutoTakeoff {
 public:
     void run();
     void start_m(float complete_alt_m, bool is_terrain_alt);
-    bool get_completion_pos_ned_m(Vector3p& pos_ned_m);
 
     bool complete;          // true when takeoff is complete
 
@@ -32,7 +31,6 @@ private:
     // auto takeoff variables
     float complete_alt_m;          // completion altitude expressed in m above ekf origin or above terrain (depending upon auto_takeoff_terrain_alt)
     bool is_terrain_alt;            // true if altitudes are above terrain
-    Vector3p complete_pos_ned_m;   // target takeoff position as offset from ekf origin in m
 };
 
 #if AC_PAYLOAD_PLACE_ENABLED
@@ -2064,7 +2062,7 @@ public:
     void save_or_move_to_destination(Destination ab_dest);
 
     // return manual control to the pilot
-    void return_to_manual_control(bool maintain_target);
+    void return_to_manual_control(bool maintain_surface_tracking);
 
     static const struct AP_Param::GroupInfo var_info[];
 
