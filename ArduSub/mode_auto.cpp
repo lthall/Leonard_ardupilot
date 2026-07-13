@@ -20,6 +20,10 @@ bool ModeAuto::init(bool ignore_checks) {
         set_auto_yaw_mode(AUTO_YAW_HOLD);
     }
 
+    // initialise the position controller, preserving the current trajectory if active
+    position_control->NE_init_controller(false);
+    position_control->D_init_controller(false);
+
     // initialise waypoint controller
     sub.wp_nav.wp_and_spline_init_m();
 
@@ -452,7 +456,7 @@ bool ModeAuto::auto_terrain_recover_start()
 
     // Reset xy target
     sub.loiter_nav.clear_pilot_desired_acceleration();
-    sub.loiter_nav.init_target();
+    sub.loiter_nav.init_target(false);
 
     // Reset z axis controller
     position_control->D_relax_controller(motors.get_throttle_hover());
@@ -482,7 +486,8 @@ void ModeAuto::auto_terrain_recover_run()
         attitude_control->set_throttle_out(NEUTRAL_THROTTLE,true,g.throttle_filt);
         attitude_control->relax_attitude_controllers();
 
-        sub.loiter_nav.init_target();                                       // Reset xy target
+        position_control->NE_relax_velocity_controller();
+        sub.loiter_nav.init_target(true);                                   // Reset xy target
         position_control->D_relax_controller(motors.get_throttle_hover());  // Reset z axis controller
         return;
     }

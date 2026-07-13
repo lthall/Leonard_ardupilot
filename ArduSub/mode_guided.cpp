@@ -80,17 +80,12 @@ void ModeGuided::guided_pos_control_start()
     // set to position control mode
     sub.guided_mode = Guided_WP;
 
-    // initialise waypoint controller
+    // initialise the position controller, preserving the current trajectory if active
+    position_control->NE_init_controller(false);
+    position_control->D_init_controller(false);
+
+    // initialise the waypoint controller holding the current desired position
     sub.wp_nav.wp_and_spline_init_m();
-
-    // initialise wpnav to stopping point at current altitude
-    // To-Do: set to current location if disarmed?
-    // To-Do: set to stopping point altitude?
-    Vector3f stopping_point_neu_cm;
-    sub.wp_nav.get_wp_stopping_point_NEU_cm(stopping_point_neu_cm);
-
-    // no need to check return status because terrain data is not used
-    sub.wp_nav.set_wp_destination_NEU_cm(stopping_point_neu_cm, false);
 
     // initialise yaw
     sub.yaw_rate_only = false;
@@ -466,6 +461,10 @@ void ModeGuided::guided_pos_control_run()
         // Sub vehicles do not stabilize roll/pitch/yaw when disarmed
         attitude_control->set_throttle_out(NEUTRAL_THROTTLE,true,g.throttle_filt);
         attitude_control->relax_attitude_controllers();
+        // keep the position controller and waypoint target initialised to the current
+        // state while disarmed
+        position_control->NE_init_controller(false);
+        position_control->D_init_controller(false);
         sub.wp_nav.wp_and_spline_init_m();
         return;
     }

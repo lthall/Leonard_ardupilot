@@ -7,7 +7,7 @@ bool ModeQLoiter::_enter()
 {
     // initialise loiter
     loiter_nav->clear_pilot_desired_acceleration();
-    loiter_nav->init_target();
+    loiter_nav->init_target(false);
 
     // set vertical speed and acceleration limits
     // All limits must be positive
@@ -83,7 +83,8 @@ void ModeQLoiter::run()
         quadplane.relax_attitude_control();
         pos_control->D_relax_controller(0);
         loiter_nav->clear_pilot_desired_acceleration();
-        loiter_nav->init_target();
+        pos_control->NE_relax_velocity_controller();
+        loiter_nav->init_target(true);
 
         // Stabilize with fixed wing surfaces
         plane.stabilize_roll();
@@ -100,7 +101,7 @@ void ModeQLoiter::run()
 
     if (now - quadplane.last_loiter_ms > 500) {
         loiter_nav->clear_pilot_desired_acceleration();
-        loiter_nav->init_target();
+        loiter_nav->init_target(false);
     }
     quadplane.last_loiter_ms = now;
 

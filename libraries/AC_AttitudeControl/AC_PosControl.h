@@ -78,6 +78,17 @@ public:
     // the vertical controller maintains a safe distance above terrain.
     float terrain_scaler_D_m(float pos_terrain_d_m, float terrain_margin_m) const;
 
+    // Commands a jerk-limited stop by shaping the desired NE and D trajectories toward zero
+    // velocity and acceleration. Call once per loop, in place of the other input_* methods,
+    // while bringing the vehicle to a stop. Returns false while either axis is still braking.
+    // Once the stopping point is exactly known, the residual desired velocity, acceleration
+    // and remaining stopping distance are transferred into the position controller offsets
+    // (leaving the combined target unchanged, so the handover is continuous), the desired
+    // state becomes the stopping point with zero velocity and acceleration, and true is
+    // returned. The stopping point can be retrieved with get_pos_desired_NED_m().
+    // See the implementation for full details.
+    bool input_stopping_point_NED();
+
     ///
     /// Lateral position controller
     ///
@@ -128,6 +139,9 @@ public:
 
     // Smoothly decays NE acceleration over time to zero while maintaining current velocity and position.
     // Reduces output acceleration by ~95% over 0.5 seconds to avoid abrupt transitions.
+    // Callers must follow this with a call to NE_init_controller(): force_reinit = true when
+    // relaxing to the current estimate every loop, false to preserve an active controller
+    // (desired state and offsets) when taking over a running trajectory.
     void NE_relax_velocity_controller();
 
     // Softens NE controller for landing by reducing position error and suppressing I-term windup.
@@ -136,8 +150,12 @@ public:
 
     // Fully initializes the NE controller with current position, velocity, acceleration, and attitude.
     // Intended for normal startup when the full state is known.
+    // If force_reinit is false and the controller is already running, the call is ignored so that an
+    // in-flight mode change preserves the running controller (and its offsets) instead of introducing
+    // a discontinuity. force_reinit defaults to true so a caller that does nothing always gets a full
+    // initialisation; the vehicle should pass force_reinit = false only while flying.
     // Private function shared by other NE initializers.
-    void NE_init_controller();
+    void NE_init_controller(bool force_reinit = true);
 
     // Sets the desired NE-plane acceleration in m/s² using jerk-limited shaping.
     // Smoothly transitions to the specified acceleration from current kinematic state.
@@ -162,7 +180,7 @@ public:
     // If `limit_output` is true, limits apply to full command (desired + correction).
     void input_pos_vel_accel_NE_m(Vector2p& pos_ne_m, Vector2f& vel_ne_ms, const Vector2f& accel_ne_mss, bool limit_output = true);
 
-    // Returns true if the NE position controller has run in the last 5 control loop cycles.
+    // Returns true if the NE position controller ran in the current or previous control loop cycle.
     bool NE_is_active() const;
 
     // Disables NE position correction by setting the target position to the current position.
@@ -245,8 +263,12 @@ public:
 
     // Fully initializes the U-axis controller with current position, velocity, acceleration, and attitude.
     // Used during standard controller activation when full state is known.
+    // If force_reinit is false and the controller is already running, the call is ignored so that an
+    // in-flight mode change preserves the running controller (and its offsets/terrain) instead of
+    // introducing a discontinuity. force_reinit defaults to true so a caller that does nothing always
+    // gets a full initialisation; the vehicle should pass force_reinit = false only while flying.
     // Private function shared by other vertical initializers.
-    void D_init_controller();
+    void D_init_controller(bool force_reinit = true);
 
     // Sets the desired vertical acceleration in m/s² using jerk-limited shaping.
     // Smoothly transitions to the target acceleration from current kinematic state.
@@ -283,7 +305,7 @@ public:
     // Sets target altitude in meters using jerk-limited shaping.
     void D_set_alt_target_with_slew_m(float pos_u_m);
 
-    // Returns true if the U-axis controller has run in the last 5 control loop cycles.
+    // Returns true if the U-axis controller ran in the current or previous control loop cycle.
     bool D_is_active() const;
 
     // Runs the vertical (U-axis) position controller.

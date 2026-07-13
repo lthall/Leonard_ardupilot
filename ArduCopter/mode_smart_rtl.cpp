@@ -18,14 +18,12 @@ bool ModeSmartRTL::enabled() const
 bool ModeSmartRTL::init(bool ignore_checks)
 {
     if (enabled() && g2.smart_rtl.is_active()) {
-        // initialise waypoint and spline controller
-        wp_nav->wp_and_spline_init_m();
+        // initialise the position controller, preserving the current trajectory if active
+        pos_control->NE_init_controller(false);
+        pos_control->D_init_controller(false);
 
-        // set current target to a reasonable stopping point
-        Vector3p stopping_point_ned_m;
-        pos_control->get_stopping_point_NE_m(stopping_point_ned_m.xy());
-        pos_control->get_stopping_point_D_m(stopping_point_ned_m.z);
-        wp_nav->set_wp_destination_NED_m(stopping_point_ned_m);
+        // initialise the waypoint controller holding the current desired position
+        wp_nav->wp_and_spline_init_m();
 
         // initialise yaw to obey user parameter
         auto_yaw.set_mode_to_default(true);

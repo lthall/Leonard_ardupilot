@@ -107,33 +107,13 @@ AC_Loiter::AC_Loiter(const AP_AHRS_View& ahrs, AC_PosControl& pos_control, const
     AP_Param::setup_object_defaults(this, var_info);
 }
 
-// Sets the initial loiter target position in meters from the EKF origin.
-// - position_ne_m: horizontal position in the NE frame, in meters.
-// - Initializes internal control state including acceleration targets and feed-forward planning.
-void AC_Loiter::init_target_m(const Vector2p& position_ne_m)
-{
-    sanity_check_params();
-
-    // Configure speed/accel limits in meters using internal parameter (_accel_max_ne_mss)
-    _pos_control.NE_set_correction_speed_accel_m(LOITER_VEL_CORRECTION_MAX_MS, _accel_max_ne_mss);
-    _pos_control.NE_set_pos_error_max_m(LOITER_POS_CORRECTION_MAX_M);
-
-    // Reset controller state for stationary loiter
-    _pos_control.NE_init_controller_stopping_point();
-
-    // Zero out desired and predicted accelerations and angles
-    _predicted_accel_ne_mss.zero();
-    _desired_accel_ne_mss.zero();
-    _predicted_euler_angle_rad.zero();
-    _brake_accel_mss = 0.0f;
-
-    // Set position target for stationary loiter
-    _pos_control.set_pos_desired_NE_m(position_ne_m);
-}
-
 // Initializes the loiter controller using the current position and velocity.
 // Updates feed-forward velocity, predicted acceleration, and resets control state.
-void AC_Loiter::init_target()
+// force_reinit = true resets the position controller to the current estimate; use for
+// per-loop resets while landed. force_reinit = false preserves an active controller
+// (desired state and offsets) when taking over a running trajectory, and fully
+// initialises when the controller is not active.
+void AC_Loiter::init_target(bool force_reinit)
 {
     sanity_check_params();
 
@@ -141,8 +121,12 @@ void AC_Loiter::init_target()
     _pos_control.NE_set_correction_speed_accel_m(LOITER_VEL_CORRECTION_MAX_MS, _accel_max_ne_mss);
     _pos_control.NE_set_pos_error_max_m(LOITER_POS_CORRECTION_MAX_M);
 
-    // Apply velocity smoothing: softly transitions target acceleration to zero
-    _pos_control.NE_relax_velocity_controller();
+    // Initialise the position controller: reset to the current estimate when forced,
+    // otherwise preserve an active controller so the desired state and offsets carry the
+    // current trajectory. Per-loop callers (landed) must call
+    // NE_relax_velocity_controller() before this so the decayed acceleration is captured
+    // in the integrator.
+    _pos_control.NE_init_controller(force_reinit);
 
     // Initialize prediction state using current acceleration and lean angles
     _predicted_accel_ne_mss = _pos_control.get_accel_target_NED_mss().xy();

@@ -2775,6 +2775,7 @@ void QuadPlane::vtol_position_controller(void)
         // relax when close to the ground
         if (should_relax()) {
             pos_control->NE_relax_velocity_controller();
+            pos_control->NE_init_controller(true);
         } else {
             Vector2f zero;
             Vector2f vel_ne_ms = poscontrol.target_vel_ms.xy() + landing_velocity_ne_ms;
@@ -3221,6 +3222,7 @@ void QuadPlane::takeoff_controller(void)
 
     if (no_navigation) {
         pos_control->NE_relax_velocity_controller();
+        pos_control->NE_init_controller(true);
     } else {
         pos_control->input_vel_accel_NE_m(vel_ne_ms, zero);
 

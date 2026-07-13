@@ -20,6 +20,10 @@ bool ModeCircle::init(bool ignore_checks)
     position_control->D_set_max_speed_accel_cm(sub.get_pilot_speed_dn(), g.pilot_speed_up, g.pilot_accel_z);
     position_control->D_set_correction_speed_accel_cm(sub.get_pilot_speed_dn(), g.pilot_speed_up, g.pilot_accel_z);
 
+    // initialise the position controller, preserving the current trajectory if active
+    position_control->NE_init_controller(false);
+    position_control->D_init_controller(false);
+
     // initialise circle controller including setting the circle center based on vehicle speed
     sub.circle_nav.init();
 
@@ -48,6 +52,10 @@ void ModeCircle::run()
         // Sub vehicles do not stabilize roll/pitch/yaw when disarmed
         attitude_control->set_throttle_out(NEUTRAL_THROTTLE,true,g.throttle_filt);
         attitude_control->relax_attitude_controllers();
+        // keep the position controller and circle initialised to the current state
+        // while disarmed
+        position_control->NE_init_controller(false);
+        position_control->D_init_controller(false);
         sub.circle_nav.init();
         return;
     }

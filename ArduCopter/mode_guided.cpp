@@ -193,7 +193,7 @@ bool ModeGuided::do_user_takeoff_start_m(float takeoff_alt_m)
     auto_yaw.set_mode(AutoYaw::Mode::HOLD);
 
     // clear i term when we're taking off
-    pos_control->D_init_controller();
+    pos_control->D_init_controller(copter.ap.land_complete);
 
     // initialise alt for WP_NAVALT_MIN and set completion alt
     auto_takeoff.start_m(alt_target_m, alt_target_terrain);
@@ -210,16 +210,12 @@ void ModeGuided::wp_control_start()
     // set to position control mode
     guided_mode = SubMode::WP;
 
-    // initialise waypoint and spline controller
-    wp_nav->wp_and_spline_init_m();
+    // initialise the position controller, preserving the current trajectory if active
+    pos_control->NE_init_controller(false);
+    pos_control->D_init_controller(false);
 
-    // initialise wpnav to stopping point
-    Vector3p stopping_point_ned_m;
-    wp_nav->get_wp_stopping_point_NED_m(stopping_point_ned_m);
-    if (!wp_nav->set_wp_destination_NED_m(stopping_point_ned_m, false)) {
-        // this should never happen because terrain data is not used
-        INTERNAL_ERROR(AP_InternalError::error_t::flow_of_control);
-    }
+    // initialise the waypoint controller holding the current desired position
+    wp_nav->wp_and_spline_init_m();
 
     // initialise yaw
     auto_yaw.set_mode_to_default(false);
@@ -260,8 +256,8 @@ void ModeGuided::pva_control_start()
     pos_control->D_set_correction_speed_accel_m(wp_nav->get_default_speed_down_ms(), wp_nav->get_default_speed_up_ms(), wp_nav->get_accel_D_mss());
 
     // initialise velocity controller
-    pos_control->D_init_controller();
-    pos_control->NE_init_controller();
+    pos_control->D_init_controller(copter.ap.land_complete);
+    pos_control->NE_init_controller(copter.ap.land_complete);
 
     // initialise yaw
     auto_yaw.set_mode_to_default(false);
@@ -350,9 +346,7 @@ void ModeGuided::angle_control_start()
     pos_control->D_set_correction_speed_accel_m(wp_nav->get_default_speed_down_ms(), wp_nav->get_default_speed_up_ms(), wp_nav->get_accel_D_mss());
 
     // initialise the vertical position controller
-    if (!pos_control->D_is_active()) {
-        pos_control->D_init_controller();
-    }
+    pos_control->D_init_controller(copter.ap.land_complete);
 
     // initialise targets
     guided_angle_state.update_time_ms = millis();
@@ -686,7 +680,7 @@ void ModeGuided::set_angle(const Quaternion &attitude_quat, const Vector3f &ang_
         angle_control_start();
     } else if (!use_thrust && guided_angle_state.use_thrust) {
         // Already angle control but changing from thrust to climb rate
-        pos_control->D_init_controller();
+        pos_control->D_init_controller(copter.ap.land_complete);
     }
 
     guided_angle_state.attitude_quat = attitude_quat;
@@ -987,7 +981,7 @@ void ModeGuided::angle_control_run()
         climb_rate_ms = 0.0f;
         if (guided_angle_state.use_thrust) {
             // initialise vertical velocity controller
-            pos_control->D_init_controller();
+            pos_control->D_init_controller(copter.ap.land_complete);
             guided_angle_state.use_thrust = false;
         }
     }
@@ -1012,7 +1006,7 @@ void ModeGuided::angle_control_run()
         motors->set_desired_spool_state(AP_Motors::DesiredSpoolState::THROTTLE_UNLIMITED);
         if (motors->get_spool_state() == AP_Motors::SpoolState::THROTTLE_UNLIMITED) {
             set_land_complete(false);
-            pos_control->D_init_controller();
+            pos_control->D_init_controller(copter.ap.land_complete);
         }
         return;
     }

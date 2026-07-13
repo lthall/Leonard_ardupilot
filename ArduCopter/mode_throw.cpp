@@ -85,7 +85,7 @@ void ModeThrow::run()
         stage = Throw_PosHold;
 
         // initialise position controller
-        pos_control->NE_init_controller();
+        pos_control->NE_init_controller(copter.ap.land_complete);
 
         // Set the auto_arm status to true to avoid a possible automatic disarm caused by selection of an auto mode with throttle at minimum
         copter.set_auto_armed(true);

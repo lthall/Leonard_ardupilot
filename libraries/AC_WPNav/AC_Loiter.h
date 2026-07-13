@@ -15,14 +15,14 @@ public:
     /// Constructor
     AC_Loiter(const AP_AHRS_View& ahrs, AC_PosControl& pos_control, const AC_AttitudeControl& attitude_control);
 
-    // Sets the initial loiter target position in meters from the EKF origin.
-    // - position_ne_m: horizontal position in the NE frame, in meters.
-    // - Initializes internal control state including acceleration targets and feed-forward planning.
-    void init_target_m(const Vector2p& position_ne_m);
-
     // Initializes the loiter controller using the current position and velocity.
     // Updates feed-forward velocity, predicted acceleration, and resets control state.
-    void init_target();
+    // force_reinit = true resets the position controller to the current estimate; use for
+    // per-loop resets while landed, preceded by a call to NE_relax_velocity_controller()
+    // so the decayed acceleration is captured in the integrator. force_reinit = false
+    // preserves an active controller (desired state and offsets) when taking over a
+    // running trajectory, and fully initialises when the controller is not active.
+    void init_target(bool force_reinit);
 
     // Reduces loiter responsiveness for smoother descent during landing.
     // Internally softens horizontal control gains.

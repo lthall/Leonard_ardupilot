@@ -64,9 +64,14 @@ public:
     ///
 
     // Initializes waypoint and spline navigation using inputs in meters.
-    // Sets speed and acceleration limits, calculates jerk constraints,
-    // and initializes spline or S-curve leg with a defined starting point.
-    void wp_and_spline_init_m(float speed_ms = 0.0f, Vector3p stopping_point_ned_m = Vector3p{});
+    // Sets speed and acceleration limits, calculates jerk constraints, and starts with
+    // origin and destination at the current desired position.
+    // The position controller must already be initialised with the desired state at rest
+    // (zero velocity and acceleration); callers transitioning while moving must first
+    // brake to a stop (see AC_PosControl::input_stopping_point_NED()) so that the current
+    // desired position is the stopping point and any residual motion is carried by the
+    // offsets.
+    void wp_and_spline_init_m(float speed_ms = 0.0f);
 
     // Sets the target horizontal speed in cm/s during waypoint navigation.
     // See set_speed_NE_ms() for full details.

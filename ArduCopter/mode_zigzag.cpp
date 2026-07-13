@@ -77,16 +77,14 @@ bool ModeZigZag::init(bool ignore_checks)
     // process pilot's roll and pitch input
     loiter_nav->set_pilot_desired_acceleration_rad(target_roll_rad, target_pitch_rad);
 
-    loiter_nav->init_target();
+    loiter_nav->init_target(copter.ap.land_complete);
 
     // set vertical speed and acceleration limits
     pos_control->D_set_max_speed_accel_m(get_pilot_speed_dn_ms(), get_pilot_speed_up_ms(), get_pilot_accel_D_mss());
     pos_control->D_set_correction_speed_accel_m(get_pilot_speed_dn_ms(), get_pilot_speed_up_ms(), get_pilot_accel_D_mss());
 
     // initialise the vertical position controller
-    if (!pos_control->D_is_active()) {
-        pos_control->D_init_controller();
-    }
+    pos_control->D_init_controller(copter.ap.land_complete);
 
     // initialise waypoint state
     stage = STORING_POINTS;
@@ -231,23 +229,20 @@ void ModeZigZag::move_to_side()
 }
 
 // return manual control to the pilot
-void ModeZigZag::return_to_manual_control(bool maintain_target)
+// maintain_surface_tracking should be true when a leg was completed normally so pilot
+// surface tracking can continue from the waypoint controller's terrain offset
+void ModeZigZag::return_to_manual_control(bool maintain_surface_tracking)
 {
     if (stage == AUTO) {
         stage = MANUAL_REGAIN;
         spray(false);
         loiter_nav->clear_pilot_desired_acceleration();
-        if (maintain_target) {
-            const Vector3p& wp_dest_ned_m = wp_nav->get_wp_destination_NED_m();
-            loiter_nav->init_target_m(wp_dest_ned_m.xy());
+        loiter_nav->init_target(false);
 #if AP_RANGEFINDER_ENABLED
-            if (copter.rangefinder_alt_ok() && wp_nav->rangefinder_used_and_healthy()) {
-                copter.surface_tracking.external_init();
-            }
-#endif
-        } else {
-            loiter_nav->init_target();
+        if (maintain_surface_tracking && copter.rangefinder_alt_ok() && wp_nav->rangefinder_used_and_healthy()) {
+            copter.surface_tracking.external_init();
         }
+#endif
         is_auto = false;
         gcs().send_text(MAV_SEVERITY_INFO, "%s: manual control", name());
     }
@@ -318,8 +313,21 @@ void ModeZigZag::manual_control()
         attitude_control->reset_rate_controller_I_terms();
         attitude_control->reset_yaw_target_and_rate();
         pos_control->D_relax_controller(0.0f);   // forces throttle output to decay to zero
-        loiter_nav->init_target();
+        pos_control->NE_relax_velocity_controller();
+        loiter_nav->init_target(true);
         attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw_rad(loiter_nav->get_roll_rad(), loiter_nav->get_pitch_rad(), target_yaw_rate_rads);
+        break;
+
+    case AltHoldModeState::Landed_Ground_Idle:
+        attitude_control->reset_yaw_target_and_rate();
+        FALLTHROUGH;
+
+    case AltHoldModeState::Landed_Pre_Takeoff:
+        attitude_control->reset_rate_controller_I_terms_smoothly();
+        pos_control->NE_relax_velocity_controller();
+        loiter_nav->init_target(true);
+        attitude_control->input_thrust_vector_rate_heading_rads(loiter_nav->get_thrust_vector(), target_yaw_rate_rads);
+        pos_control->D_relax_controller(0.0f);   // forces throttle output to decay to zero
         break;
 
     case AltHoldModeState::Takeoff:
@@ -339,17 +347,6 @@ void ModeZigZag::manual_control()
 
         // set position controller targets adjusted for pilot input
         takeoff.do_pilot_takeoff_ms(target_climb_rate_ms);
-        break;
-
-    case AltHoldModeState::Landed_Ground_Idle:
-        attitude_control->reset_yaw_target_and_rate();
-        FALLTHROUGH;
-
-    case AltHoldModeState::Landed_Pre_Takeoff:
-        attitude_control->reset_rate_controller_I_terms_smoothly();
-        loiter_nav->init_target();
-        attitude_control->input_thrust_vector_rate_heading_rads(loiter_nav->get_thrust_vector(), target_yaw_rate_rads);
-        pos_control->D_relax_controller(0.0f);   // forces throttle output to decay to zero
         break;
 
     case AltHoldModeState::Flying:

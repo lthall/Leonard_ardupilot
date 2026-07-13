@@ -80,9 +80,10 @@ void AC_Circle::init_NED_m(const Vector3p& center_ned_m, bool is_terrain_alt, fl
     // Convert desired turn rate from degrees to radians
     _rotation_rate_max_rads = radians(rate_degs);
 
-    // Initialise position controller using current lean angles
-    _pos_control.NE_init_controller_stopping_point();
-    _pos_control.D_init_controller_stopping_point();
+    // The position controller must already be initialised with the desired state at rest:
+    // callers transitioning while moving must first brake to a stop (see
+    // AC_PosControl::input_stopping_point_NED()) so that the current desired position is
+    // the stopping point and any residual motion is carried by the offsets.
 
     // Calculate velocity and acceleration limits based on circle configuration
     calc_velocities(true);
@@ -101,15 +102,13 @@ void AC_Circle::init()
     _last_radius_param_m = _radius_m;
     _rotation_rate_max_rads = radians(_rate_parm_degs);
 
-    // Initialise position controller using current lean angles
-    _pos_control.NE_init_controller_stopping_point();
-    _pos_control.D_init_controller_stopping_point();
+    // The position controller must already be initialised with the desired state at rest:
+    // callers transitioning while moving must first brake to a stop (see
+    // AC_PosControl::input_stopping_point_NED()) so that the current desired position is
+    // the stopping point and any residual motion is carried by the offsets.
 
-    // Get stopping point as initial reference for center
-    const Vector3p& stopping_point_ned_m = _pos_control.get_pos_desired_NED_m();
-
-    // By default, set center to stopping point
-    _center_ned_m = stopping_point_ned_m;
+    // By default, set center to the current desired position (the stopping point)
+    _center_ned_m = _pos_control.get_pos_desired_NED_m();
 
     // If INIT_AT_CENTER is not set, project center forward by radius in heading direction
     if ((_options.get() & CircleOptions::INIT_AT_CENTER) == 0) {

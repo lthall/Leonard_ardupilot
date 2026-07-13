@@ -144,6 +144,7 @@ void _AutoTakeoff::run()
     if (motors->get_spool_state() != AP_Motors::SpoolState::THROTTLE_UNLIMITED) {
         // motors have not completed spool up yet so relax navigation and position controllers
         pos_control->NE_relax_velocity_controller();
+        pos_control->NE_init_controller(true);
         pos_control->NE_update_controller();
         pos_control->D_relax_controller(0.0f);   // forces throttle output to decay to zero
         pos_control->D_update_controller();
@@ -163,6 +164,7 @@ void _AutoTakeoff::run()
         // tell position controller to reset alt target and reset I terms
         copter.pos_control->D_init_controller();
         pos_control->NE_relax_velocity_controller();
+        pos_control->NE_init_controller(true);
         pos_control->NE_update_controller();
         attitude_control->reset_rate_controller_I_terms();
         attitude_control->input_thrust_vector_rate_heading_rads(pos_control->get_thrust_vector(), 0.0);
@@ -186,6 +188,7 @@ void _AutoTakeoff::run()
             no_nav_active = false;
         }
         pos_control->NE_relax_velocity_controller();
+        pos_control->NE_init_controller(true);
     } else {
         Vector2f vel_ne_zero;
         Vector2f accel_ne_zero;
@@ -213,11 +216,8 @@ void _AutoTakeoff::run()
     bool reached_climb_rate = copter.pos_control->get_vel_desired_U_ms() < copter.pos_control->get_max_speed_up_ms() * vel_threshold_fraction;
     complete = reached_altitude && reached_climb_rate;
 
-    // calculate completion for location in case it is needed for a smooth transition to wp_nav
     if (complete) {
         no_nav_active = false;
-        const Vector3p& _complete_pos_ned_m = copter.pos_control->get_pos_desired_NED_m();
-        complete_pos_ned_m = Vector3p{_complete_pos_ned_m.x, _complete_pos_ned_m.y, pos_d_m};
     }
 }
 
@@ -236,18 +236,6 @@ void _AutoTakeoff::start_m(float _complete_alt_m, bool _is_terrain_alt)
     } else {
         no_nav_active = false;
     }
-}
-
-// return takeoff final target position in m from the EKF origin if takeoff has completed successfully
-bool _AutoTakeoff::get_completion_pos_ned_m(Vector3p& pos_ned_m)
-{
-    // only provide location if takeoff has completed
-    if (!complete) {
-        return false;
-    }
-
-    pos_ned_m = complete_pos_ned_m;
-    return true;
 }
 
 bool Mode::is_taking_off() const

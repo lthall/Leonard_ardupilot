@@ -75,9 +75,7 @@ bool ModePosHold::init(bool ignore_checks)
     pos_control->D_set_correction_speed_accel_m(get_pilot_speed_dn_ms(), get_pilot_speed_up_ms(), get_pilot_accel_D_mss());
 
     // initialise the vertical position controller
-    if (!pos_control->D_is_active()) {
-        pos_control->D_init_controller();
-    }
+    pos_control->D_init_controller(copter.ap.land_complete);
 
     // initialise lean angles to current attitude
     pilot_roll_rad = 0.0f;
@@ -98,7 +96,7 @@ bool ModePosHold::init(bool ignore_checks)
 
     // initialise loiter
     loiter_nav->clear_pilot_desired_acceleration();
-    loiter_nav->init_target();
+    loiter_nav->init_target(copter.ap.land_complete);
 
     // initialise wind_comp each time PosHold is switched on
     init_wind_comp_estimate();
@@ -148,11 +146,12 @@ void ModePosHold::run()
     switch (poshold_state) {
 
     case AltHoldModeState::MotorStopped:
-        attitude_control->reset_rate_controller_I_terms();
-        attitude_control->reset_yaw_target_and_rate(false);
-        pos_control->D_relax_controller(0.0f);   // forces throttle output to decay to zero
         loiter_nav->clear_pilot_desired_acceleration();
-        loiter_nav->init_target();
+        pos_control->NE_relax_velocity_controller();
+        loiter_nav->init_target(true);
+        attitude_control->reset_yaw_target_and_rate(false);
+        attitude_control->reset_rate_controller_I_terms();
+        pos_control->D_relax_controller(0.0f);   // forces throttle output to decay to zero
 
         // set poshold state to pilot override
         roll_mode = RPMode::PILOT_OVERRIDE;
@@ -164,7 +163,8 @@ void ModePosHold::run()
 
     case AltHoldModeState::Landed_Ground_Idle:
         loiter_nav->clear_pilot_desired_acceleration();
-        loiter_nav->init_target();
+        pos_control->NE_relax_velocity_controller();
+        loiter_nav->init_target(true);
         attitude_control->reset_yaw_target_and_rate();
         init_wind_comp_estimate();
         FALLTHROUGH;
@@ -192,7 +192,8 @@ void ModePosHold::run()
 
         // init and update loiter although pilot is controlling lean angles
         loiter_nav->clear_pilot_desired_acceleration();
-        loiter_nav->init_target();
+        pos_control->NE_relax_velocity_controller();
+        loiter_nav->init_target(true);
 
         // pilot override
         roll_mode = RPMode::PILOT_OVERRIDE;
@@ -421,7 +422,8 @@ void ModePosHold::run()
         pitch_mode = RPMode::BRAKE_TO_LOITER;
         brake.loiter_transition_start_time_ms = now_ms;
         // init loiter controller
-        loiter_nav->init_target_m((pos_control->get_pos_estimate_NED_m().xy() - pos_control->get_pos_offset_NED_m().xy()));
+        loiter_nav->clear_pilot_desired_acceleration();
+        loiter_nav->init_target(false);
         // set delay to start of wind compensation estimate updates
         wind_comp_start_time_ms = now_ms;
     }
