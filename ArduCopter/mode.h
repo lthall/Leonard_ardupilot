@@ -203,6 +203,14 @@ public:
     // handle situations where the vehicle is on the ground waiting for takeoff
     void make_safe_ground_handling(bool force_throttle_unlimited = false);
 
+    // Brakes the desired trajectory to a stop under jerk-limited shaping while running the
+    // position and attitude controllers. Returns true once the exact stopping point is
+    // known and the desired state is at rest; the stopping point is then
+    // pos_control->get_pos_desired_NED_m(). Returns true immediately when landed.
+    // The position controller must be initialised before the first call, e.g.
+    // NE_init_controller(false) and D_init_controller(false) in the mode's init().
+    bool stopping_point_run();
+
     // true if weathervaning is allowed in the current mode
 #if WEATHERVANE_ENABLED
     virtual bool allows_weathervaning() const { return false; }
@@ -922,6 +930,7 @@ private:
 
     // Circle
     bool speed_changing = false;     // true when the roll stick is being held to facilitate stopping at 0 rate
+    bool waiting_to_start = false;   // true while braking to a stop; the circle is initialised in run() once the stopping point is known
 };
 
 

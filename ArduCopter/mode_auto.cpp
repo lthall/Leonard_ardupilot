@@ -38,8 +38,11 @@ bool ModeAuto::init(bool ignore_checks)
             auto_yaw.set_mode(AutoYaw::Mode::HOLD);
         }
 
-        // initialise waypoint and spline controller
-        wp_nav->wp_and_spline_init_m();
+        // initialise the position controller for the braking phase, preserving the
+        // current trajectory if already active. The waypoint controller is initialised
+        // in run() once the stopping point is known.
+        pos_control->NE_init_controller(false);
+        pos_control->D_init_controller(false);
 
         // initialise desired speed overrides
         desired_speed_override_ms = {0, 0, 0};
@@ -86,16 +89,24 @@ void ModeAuto::run()
 {
     // start or update mission
     if (waiting_to_start) {
-        // don't start the mission until we have an origin
+        // Brake to a stop before starting the mission. stopping_point_run() flies the
+        // vehicle and returns true once the exact stopping point is known and the
+        // desired state is at rest; that point becomes the mission's starting point.
         Location loc;
-        if (copter.ahrs.get_origin(loc)) {
-            // start/resume the mission (based on MIS_RESTART parameter)
-            mission.start_or_resume();
-            waiting_to_start = false;
-
-            // initialise mission change check (ignore results)
-            IGNORE_RETURN(mis_change_detector.check_for_mission_change());
+        if (!stopping_point_run() || !copter.ahrs.get_origin(loc)) {
+            return;
         }
+
+        // initialise the waypoint controller from the stopping point (the desired
+        // state is at rest at the current desired position)
+        wp_nav->wp_and_spline_init_m();
+
+        // start/resume the mission (based on MIS_RESTART parameter)
+        mission.start_or_resume();
+        waiting_to_start = false;
+
+        // initialise mission change check (ignore results)
+        IGNORE_RETURN(mis_change_detector.check_for_mission_change());
     } else {
         // check for mission changes
         if (mis_change_detector.check_for_mission_change()) {
@@ -368,12 +379,8 @@ bool ModeAuto::loiter_start()
     }
     _mode = SubMode::LOITER;
 
-    // calculate stopping point
-    Vector3p stopping_point_ned_m;
-    wp_nav->get_wp_stopping_point_NED_m(stopping_point_ned_m);
-
-    // initialise waypoint controller target to stopping point
-    wp_nav->set_wp_destination_NED_m(stopping_point_ned_m);
+    // initialise the waypoint controller holding the current desired position
+    wp_nav->wp_and_spline_init_m();
 
     // hold yaw at current heading
     auto_yaw.set_mode(AutoYaw::Mode::HOLD);
@@ -451,17 +458,11 @@ void ModeAuto::takeoff_start(const Location& dest_loc)
 // auto_wp_start - initialises waypoint controller to implement flying to a particular destination
 bool ModeAuto::wp_start(const Location& dest_loc)
 {
-    // init wpnav and set origin if transitioning from takeoff
+    // init wpnav if not already active (e.g. transitioning from takeoff). The desired
+    // state is at rest so the leg origin is the current desired position.
     if (!wp_nav->is_active()) {
-        Vector3p stopping_point_ned_m;
-        if (_mode == SubMode::TAKEOFF) {
-            Vector3p takeoff_complete_pos_ned_m;
-            if (auto_takeoff.get_completion_pos_ned_m(takeoff_complete_pos_ned_m)) {
-                stopping_point_ned_m = takeoff_complete_pos_ned_m;
-            }
-        }
         float des_speed_xy_ms = is_positive(desired_speed_override_ms.xy) ? desired_speed_override_ms.xy : 0;
-        wp_nav->wp_and_spline_init_m(des_speed_xy_ms, stopping_point_ned_m);
+        wp_nav->wp_and_spline_init_m(des_speed_xy_ms);
 
         // override speeds up and down if necessary
         if (is_positive(desired_speed_override_ms.up)) {

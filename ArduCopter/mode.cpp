@@ -674,6 +674,37 @@ void Mode::make_safe_ground_handling(bool force_throttle_unlimited)
     attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw_rad(0.0f, 0.0f, 0.0f);
 }
 
+// Brakes the desired trajectory to a stop under jerk-limited shaping while running the
+// position and attitude controllers. Returns true once the exact stopping point is known
+// and the desired state is at rest; the stopping point is then
+// pos_control->get_pos_desired_NED_m().
+bool Mode::stopping_point_run()
+{
+    // if not armed set throttle to zero and exit immediately
+    if (is_disarmed_or_landed()) {
+        make_safe_ground_handling();
+        // no braking is required on the ground; the desired state starts at rest
+        return true;
+    }
+
+    // set motors to full range
+    motors->set_desired_spool_state(AP_Motors::DesiredSpoolState::THROTTLE_UNLIMITED);
+
+    // shape the desired trajectory toward zero velocity and acceleration. Returns true
+    // once the exact stopping point is known and the braking residual has been
+    // transferred to the position controller offsets.
+    const bool have_stopping_point = pos_control->input_stopping_point_NED();
+
+    // run the position controllers
+    pos_control->NE_update_controller();
+    pos_control->D_update_controller();
+
+    // call attitude controller with auto yaw
+    attitude_control->input_thrust_vector_heading(pos_control->get_thrust_vector(), auto_yaw.get_heading());
+
+    return have_stopping_point;
+}
+
 /*
   get a height above ground estimate for landing
  */

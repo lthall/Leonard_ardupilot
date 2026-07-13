@@ -236,8 +236,7 @@ void ModeZigZag::return_to_manual_control(bool maintain_target)
         spray(false);
         loiter_nav->clear_pilot_desired_acceleration();
         if (maintain_target) {
-            const Vector3p& wp_dest_ned_m = wp_nav->get_wp_destination_NED_m();
-            loiter_nav->init_target_m(wp_dest_ned_m.xy());
+            loiter_nav->init_target();
 #if AP_RANGEFINDER_ENABLED
             if (copter.rangefinder_alt_ok() && wp_nav->rangefinder_used_and_healthy()) {
                 copter.surface_tracking.external_init();

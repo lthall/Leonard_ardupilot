@@ -18,26 +18,16 @@ bool ModeCircle::init(bool ignore_checks)
     pos_control->D_set_max_speed_accel_m(get_pilot_speed_dn_ms(), get_pilot_speed_up_ms(), get_pilot_accel_D_mss());
     pos_control->D_set_correction_speed_accel_m(get_pilot_speed_dn_ms(), get_pilot_speed_up_ms(), get_pilot_accel_D_mss());
 
-    // initialise circle controller including setting the circle center based on vehicle speed
-    copter.circle_nav->init();
+    // initialise the position controller for the braking phase, preserving the current
+    // trajectory if already active. The circle controller is initialised in run() once
+    // the stopping point is known.
+    pos_control->NE_init_controller(false);
+    pos_control->D_init_controller(false);
+    waiting_to_start = true;
 
-#if HAL_MOUNT_ENABLED
-    // Check if the CIRCLE_OPTIONS parameter have roi_at_center
-    if (copter.circle_nav->roi_at_center()) {
-        const Vector3p &pos_ned_m { copter.circle_nav->get_center_NED_m() };
-        Location circle_center;
-        if (!AP::ahrs().get_location_from_origin_offset_NED(circle_center, pos_ned_m)) {
-            return false;
-        }
-        // point at the ground:
-        circle_center.set_alt_m(0, Location::AltFrame::ABOVE_TERRAIN);
-        AP_Mount *s = AP_Mount::get_singleton();
-        s->set_roi_target(circle_center);
-    }
-#endif
-
-    // set auto yaw circle mode
-    auto_yaw.set_mode(AutoYaw::Mode::CIRCLE);
+    // hold the current heading while braking; auto yaw circle mode is engaged once the
+    // circle center is known
+    auto_yaw.set_mode(AutoYaw::Mode::HOLD);
 
     return true;
 }
@@ -49,6 +39,37 @@ void ModeCircle::run()
     // set speed and acceleration limits
     pos_control->NE_set_max_speed_accel_m(wp_nav->get_default_speed_NE_ms(), wp_nav->get_wp_acceleration_mss());
     pos_control->D_set_max_speed_accel_m(get_pilot_speed_dn_ms(), get_pilot_speed_up_ms(), get_pilot_accel_D_mss());
+
+    // Brake to a stop before initialising the circle. stopping_point_run() flies the
+    // vehicle and returns true once the exact stopping point is known and the desired
+    // state is at rest.
+    if (waiting_to_start) {
+        if (!stopping_point_run()) {
+            return;
+        }
+
+        // initialise the circle controller; the center is derived from the stopping
+        // point and current heading
+        copter.circle_nav->init();
+
+#if HAL_MOUNT_ENABLED
+        // Check if the CIRCLE_OPTIONS parameter have roi_at_center
+        if (copter.circle_nav->roi_at_center()) {
+            const Vector3p &pos_ned_m { copter.circle_nav->get_center_NED_m() };
+            Location circle_center;
+            if (AP::ahrs().get_location_from_origin_offset_NED(circle_center, pos_ned_m)) {
+                // point at the ground:
+                circle_center.set_alt_m(0, Location::AltFrame::ABOVE_TERRAIN);
+                AP_Mount *s = AP_Mount::get_singleton();
+                s->set_roi_target(circle_center);
+            }
+        }
+#endif
+
+        // set auto yaw circle mode
+        auto_yaw.set_mode(AutoYaw::Mode::CIRCLE);
+        waiting_to_start = false;
+    }
 
     // Check for any change in params and update in real time
     copter.circle_nav->check_param_change();

@@ -210,16 +210,8 @@ void ModeGuided::wp_control_start()
     // set to position control mode
     guided_mode = SubMode::WP;
 
-    // initialise waypoint and spline controller
+    // initialise the waypoint controller holding the current desired position
     wp_nav->wp_and_spline_init_m();
-
-    // initialise wpnav to stopping point
-    Vector3p stopping_point_ned_m;
-    wp_nav->get_wp_stopping_point_NED_m(stopping_point_ned_m);
-    if (!wp_nav->set_wp_destination_NED_m(stopping_point_ned_m, false)) {
-        // this should never happen because terrain data is not used
-        INTERNAL_ERROR(AP_InternalError::error_t::flow_of_control);
-    }
 
     // initialise yaw
     auto_yaw.set_mode_to_default(false);

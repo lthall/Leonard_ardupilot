@@ -211,17 +211,20 @@ AC_WPNav::TerrainSource AC_WPNav::get_terrain_source() const
 // Initializes waypoint and spline navigation using inputs in meters.
 // Sets speed and acceleration limits, calculates jerk constraints,
 // and initializes spline or S-curve leg with a defined starting point.
-void AC_WPNav::wp_and_spline_init_m(float speed_ms, Vector3p stopping_point_ned_m)
-{    
+void AC_WPNav::wp_and_spline_init_m(float speed_ms)
+{
     // ensure waypoint radius is not below minimum allowed value
     _wp_radius_m.set_and_save_ifchanged(MAX(_wp_radius_m, WP_RADIUS_M_MIN));
 
     // ensure waypoint speed is not below minimum allowed value
     _wp_speed_ms.set_and_save_ifchanged(MAX(_wp_speed_ms, WP_SPD_MIN));
 
-    // initialise position controller
-    _pos_control.D_init_controller_stopping_point();
-    _pos_control.NE_init_controller_stopping_point();
+    // Initialise the position controller, preserving the current trajectory if active.
+    // The desired state is assumed to be at rest: callers transitioning while moving must
+    // first brake to a stop (see AC_PosControl::input_stopping_point_NED()) so that the
+    // current desired position is the stopping point.
+    _pos_control.D_init_controller(false);
+    _pos_control.NE_init_controller(false);
 
     // determine desired waypoint speed; fallback to default if not provided
     _check_wp_speed_change = !is_positive(speed_ms);
@@ -248,11 +251,9 @@ void AC_WPNav::wp_and_spline_init_m(float speed_ms, Vector3p stopping_point_ned_
     _flags.reached_destination = true;
     _flags.fast_waypoint = false;
 
-    // determine initial origin and destination; fallback to current stopping point if not provided
-    if (stopping_point_ned_m.is_zero()) {
-        get_wp_stopping_point_NED_m(stopping_point_ned_m);
-    }
-    _origin_ned_m = _destination_ned_m = stopping_point_ned_m;
+    // origin and destination start at the current desired position; the desired state is
+    // assumed to be at rest (zero velocity and acceleration)
+    _origin_ned_m = _destination_ned_m = _pos_control.get_pos_desired_NED_m();
     _is_terrain_alt = false;
     _this_leg_is_spline = false;
 
