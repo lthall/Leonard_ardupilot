@@ -6,6 +6,7 @@
 #include <GCS_MAVLink/GCS.h>
 #include <AP_DAL/AP_DAL.h>
 #include <AP_GPS/AP_GPS_config.h>
+#include <AP_Logger/AP_Logger.h>   // DEBUG XKGY
 
 // minimum GPS horizontal speed required to use GPS ground course for yaw alignment (m/s)
 #if APM_BUILD_TYPE(APM_BUILD_ArduPlane)
@@ -269,6 +270,9 @@ bool NavEKF3_core::correctGPSYawForAntennaOffset(yaw_elements &yawAngData) const
         // no antenna offset supplied so the measurement is used as reported
         return true;
     }
+#if HAL_LOGGING_ENABLED
+    const ftype dbg_yaw_err_before = yawAngData.yawAngErr;   // DEBUG XKGY
+#endif
 
     // calculate the rotation from body to earth frame with yaw set to zero
     // using the rotation order of the measurement
@@ -289,6 +293,21 @@ bool NavEKF3_core::correctGPSYawForAntennaOffset(yaw_elements &yawAngData) const
     // baseline
     const ftype minHorizontalSeparation = AP_GPS_MB_MIN_ANTENNA_SEPARATION_M;
     if (antOffsetLevelXY < minHorizontalSeparation) {
+#if HAL_LOGGING_ENABLED
+        // DEBUG XKGY: rejected, baseline too close to vertical (OK=0);
+        // YawC/dYaw/eAft are N/A on this path (no correction computed)
+        AP::logger().WriteStreaming("XKGY", "TimeUS,C,YawC,dYaw,HSep,TS,eBef,eAft,OK",
+                                    "s#ddm-dd-", "F--------", "QBffffffB",
+                                    AP_HAL::micros64(),
+                                    DAL_CORE(core_index),
+                                    AP_Logger::quiet_nanf(),
+                                    AP_Logger::quiet_nanf(),
+                                    (float)antOffsetLevelXY,
+                                    (float)(fabsF(antOffsetLevel.z) / MAX(antOffsetLevelXY, ftype(1e-3))),
+                                    (float)degrees(dbg_yaw_err_before),
+                                    AP_Logger::quiet_nanf(),
+                                    (uint8_t)0);
+#endif
         return false;
     }
 
@@ -304,6 +323,20 @@ bool NavEKF3_core::correctGPSYawForAntennaOffset(yaw_elements &yawAngData) const
     const ftype bearingBody = atan2F(-antOffsetBody.y, -antOffsetBody.x);
     const ftype bearingLevel = atan2F(-antOffsetLevel.y, -antOffsetLevel.x);
     yawAngData.yawAng = wrap_PI(yawAngData.yawAng + bearingBody - bearingLevel);
+#if HAL_LOGGING_ENABLED
+    // DEBUG XKGY: correction applied (OK=1)
+    AP::logger().WriteStreaming("XKGY", "TimeUS,C,YawC,dYaw,HSep,TS,eBef,eAft,OK",
+                                "s#ddm-dd-", "F--------", "QBffffffB",
+                                AP_HAL::micros64(),
+                                DAL_CORE(core_index),
+                                (float)degrees(yawAngData.yawAng),
+                                (float)degrees(wrap_PI(bearingBody - bearingLevel)),
+                                (float)antOffsetLevelXY,
+                                (float)tiltSensitivity,
+                                (float)degrees(dbg_yaw_err_before),
+                                (float)degrees(yawAngData.yawAngErr),
+                                (uint8_t)1);
+#endif
     return true;
 }
 #endif // EK3_FEATURE_MOVING_BASELINE
