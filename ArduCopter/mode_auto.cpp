@@ -379,6 +379,12 @@ bool ModeAuto::loiter_start()
     }
     _mode = SubMode::LOITER;
 
+    // Ensure the position controller is active before wp_and_spline_init_m() (which no longer
+    // initialises it). loiter_start() is also reached from exit_mission(), where the last command
+    // may have been NAV_ATTITUDE_TIME (NE controller inactive); preserve if already active.
+    pos_control->NE_init_controller(false);
+    pos_control->D_init_controller(false);
+
     // initialise the waypoint controller holding the current desired position
     wp_nav->wp_and_spline_init_m();
 
@@ -461,6 +467,12 @@ bool ModeAuto::wp_start(const Location& dest_loc)
     // init wpnav if not already active (e.g. transitioning from takeoff). The desired
     // state is at rest so the leg origin is the current desired position.
     if (!wp_nav->is_active()) {
+        // Ensure the position controller is active before wp_and_spline_init_m() (which no
+        // longer initialises it and uses get_pos_desired_NED_m() as the leg origin). When
+        // wp_nav is inactive the NE controller may also be inactive (e.g. the previous command
+        // was NAV_ATTITUDE_TIME, which drives only the D controller); preserve if active.
+        pos_control->NE_init_controller(false);
+        pos_control->D_init_controller(false);
         float des_speed_xy_ms = is_positive(desired_speed_override_ms.xy) ? desired_speed_override_ms.xy : 0;
         wp_nav->wp_and_spline_init_m(des_speed_xy_ms);
 
@@ -552,6 +564,12 @@ void ModeAuto::circle_movetoedge_start(const Location &circle_center, float radi
         // convert altitude to same as command
         circle_edge.copy_alt_from(circle_center);
 
+        // Ensure the position controller is active before wp_nav takes over (wp_and_spline_init_m(),
+        // reached via set_wp_destination_loc(), no longer initialises it). The previous command may
+        // have been NAV_ATTITUDE_TIME (NE controller inactive); preserve if already active.
+        pos_control->NE_init_controller(false);
+        pos_control->D_init_controller(false);
+
         // initialise wpnav to move to edge of circle
         if (!wp_nav->set_wp_destination_loc(circle_edge)) {
             // failure to set destination can only be because of missing terrain data
@@ -582,6 +600,12 @@ void ModeAuto::circle_movetoedge_start(const Location &circle_center, float radi
 //   assumes that circle_nav object has already been initialised with circle center and radius
 void ModeAuto::circle_start()
 {
+    // Ensure the position controller is active before circle_nav->init_NED_m() (which no longer
+    // initialises it) so circle_run() does not update an inactive controller. The previous command
+    // may have been NAV_ATTITUDE_TIME (NE controller inactive); preserve if already active.
+    pos_control->NE_init_controller(false);
+    pos_control->D_init_controller(false);
+
     // initialise circle controller
     copter.circle_nav->init_NED_m(copter.circle_nav->get_center_NED_m(), copter.circle_nav->center_is_terrain_alt(), copter.circle_nav->get_rate_degs());
 
@@ -1824,6 +1848,11 @@ void ModeAuto::do_spline_wp(const AP_Mission::Mission_Command& cmd)
         copter.failsafe_terrain_on_event();
         return;
     }
+    // Ensure the position controller is active before wp_nav takes over (wp_and_spline_init_m(),
+    // reached via set_spline_destination_loc(), no longer initialises it). The previous command may
+    // have been NAV_ATTITUDE_TIME (NE controller inactive); preserve if already active.
+    pos_control->NE_init_controller(false);
+    pos_control->D_init_controller(false);
     if (!wp_nav->set_spline_destination_loc(dest_loc, next_dest_loc, next_dest_loc_is_spline)) {
         // failure to set destination can only be because of missing terrain data
         copter.failsafe_terrain_on_event();
