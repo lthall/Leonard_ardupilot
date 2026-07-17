@@ -117,6 +117,11 @@ void ModeAuto::auto_wp_run()
         motors.set_desired_spool_state(AP_Motors::DesiredSpoolState::GROUND_IDLE);
         attitude_control->set_throttle_out(NEUTRAL_THROTTLE,true,g.throttle_filt);
         attitude_control->relax_attitude_controllers();
+        // Keep the position controller initialised while disarmed so that wp_and_spline_init_m()
+        // has a valid desired state (it no longer initialises the controller itself) and so a
+        // re-arm in AUTO does not run update_wpnav() on an inactive controller.
+        position_control->NE_init_controller(false);
+        position_control->D_init_controller(false);
         sub.wp_nav.wp_and_spline_init_m();                                                // Reset xy target
         return;
     }
@@ -205,6 +210,13 @@ void ModeAuto::auto_circle_movetoedge_start(const Location &circle_center, float
         // convert altitude to same as command
         circle_edge.copy_alt_from(circle_center);
 
+        // initialise the position controller, preserving the current trajectory if active, so it
+        // is active before wp_nav takes over. wp_and_spline_init_m() (reached via
+        // set_wp_destination_loc()) no longer initialises the position controller and uses its
+        // desired state as the leg origin, so that state must be valid before the call.
+        position_control->NE_init_controller(false);
+        position_control->D_init_controller(false);
+
         // initialise wpnav to move to edge of circle
         if (!sub.wp_nav.set_wp_destination_loc(circle_edge)) {
             // failure to set destination can only be because of missing terrain data
@@ -229,6 +241,13 @@ void ModeAuto::auto_circle_movetoedge_start(const Location &circle_center, float
 void ModeAuto::auto_circle_start()
 {
     sub.auto_mode = Auto_Circle;
+
+    // initialise the position controller, preserving the current trajectory if active.
+    // AC_Circle::init() no longer initialises the position controller, so it must be active
+    // before auto_circle_run() first calls circle_nav.update(); otherwise NE_update_controller()
+    // trips its "not initialised" internal error. This mirrors ModeCircle::init().
+    position_control->NE_init_controller(false);
+    position_control->D_init_controller(false);
 
     // initialise circle controller
     sub.circle_nav.init_NEU_cm(sub.circle_nav.get_center_NEU_cm(), sub.circle_nav.center_is_terrain_alt(), sub.circle_nav.get_rate_degs());
@@ -309,6 +328,11 @@ void ModeAuto::auto_loiter_run()
         attitude_control->set_throttle_out(NEUTRAL_THROTTLE,true,g.throttle_filt);
         attitude_control->relax_attitude_controllers();
 
+        // Keep the position controller initialised while disarmed so that wp_and_spline_init_m()
+        // has a valid desired state (it no longer initialises the controller itself) and so a
+        // re-arm in AUTO does not run update_wpnav() on an inactive controller.
+        position_control->NE_init_controller(false);
+        position_control->D_init_controller(false);
         sub.wp_nav.wp_and_spline_init_m();                                                // Reset xy target
         return;
     }

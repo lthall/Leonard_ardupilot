@@ -6,6 +6,12 @@
 bool ModeQLand::_enter()
 {
     plane.mode_qloiter._enter();
+    // Landing must start from a freshly initialised horizontal controller. ModeQLoiter::_enter()
+    // uses init_target(false), which preserves an already-running controller for smooth in-air
+    // mode changes; that is wrong for a landing, where any wind-fighting integrator windup or an
+    // unreachable target carried over from QLOITER (e.g. after a forward-motor failure) would be
+    // preserved into the descent and drive the vehicle off position. Force a full re-init.
+    loiter_nav->init_target(true);
     quadplane.throttle_wait = false;
     quadplane.setup_target_position();
     poscontrol.set_state(QuadPlane::QPOS_LAND_DESCEND);

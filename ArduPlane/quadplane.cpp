@@ -3273,6 +3273,14 @@ void QuadPlane::waypoint_controller(void)
     const uint32_t now = AP_HAL::millis();
     if (!loc.same_loc_as(last_auto_target) ||
         now - last_loiter_ms > 500) {
+        if (!pos_control->NE_is_active()) {
+            // Taking over from fixed-wing flight (e.g. a back transition): the NE position
+            // controller has not been running, so seed it from the current stopping point.
+            // wp_and_spline_init_m() (reached via set_wp_destination_NED_m()) no longer
+            // initialises the controller and instead uses get_pos_desired_NED_m() as the
+            // leg origin, so the desired state must be valid and at rest before it is called.
+            pos_control->NE_init_controller_stopping_point();
+        }
         wp_nav->set_wp_destination_NED_m(poscontrol.target_ned_m);
         last_auto_target = loc;
     }
