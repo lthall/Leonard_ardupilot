@@ -361,6 +361,15 @@ void ModeSystemId::run()
         
     } else {
 
+        // if not armed set throttle to zero and exit immediately
+        if (is_disarmed_or_landed()) {
+            make_safe_ground_handling();
+            return;
+        }
+
+        // set motors to full range
+        motors->set_desired_spool_state(AP_Motors::DesiredSpoolState::THROTTLE_UNLIMITED);
+
         // relax loiter target if we might be landed
         if (copter.ap.land_complete_maybe) {
             pos_control->NE_soften_for_landing();
