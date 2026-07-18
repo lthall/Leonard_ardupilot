@@ -439,6 +439,71 @@ float AC_PosControl::terrain_scaler_D_m(float pos_terrain_d_m, float terrain_mar
     return constrain_float((1.0 - (fabsf(pos_offset_error_d_m) - 0.5 * terrain_margin_m) / (0.5 * terrain_margin_m)), 0.01, 1.0);
 }
 
+// Commands a jerk-limited stop by shaping the desired NE and D trajectories toward zero
+// velocity and acceleration, and reports when the exact stopping point is known.
+// Call once per loop, in place of the other input_* methods, while bringing the vehicle
+// to a stop. Returns false while either axis is still braking.
+// The exact stopping distance of the zero-input shaping is provided by
+// stopping_distance_jerk_limited() / stopping_distance_jerk_limited_xy() in
+// AP_Math/control.cpp; see there for the math.
+// Once both axes report an exact stopping distance, the residual desired velocity,
+// acceleration and remaining stopping distance are transferred into the position
+// controller offsets and the desired state is set to the stopping point with zero
+// velocity and acceleration. The transfer leaves the combined target (desired + offset)
+// unchanged so the handover is continuous; the offsets then decay to their targets under
+// jerk-limited shaping, flying the remainder of the stop. The stopping point can be
+// retrieved with get_pos_desired_NED_m().
+bool AC_PosControl::find_stopping_point_NED()
+{
+    // Exact remaining NE stopping distance of the desired state before this loop's
+    // shaping, available once it is within one jerk step of the linear decay curve.
+    // Evaluating before the shaping means the transfer below replaces this loop's
+    // desired-state advance, so the transferred residual is advanced exactly once this
+    // loop (by the offset update in the controller update) and the combined target is
+    // continuous through the handover.
+    Vector2f stop_dist_ne_m;
+    const bool settled_ne = stopping_distance_jerk_limited_xy(_vel_desired_ned_ms.xy(), _accel_desired_ned_mss.xy(),
+        _accel_max_ne_mss, _jerk_max_ne_msss, stop_dist_ne_m);
+
+    // Mirror the limit calculation of input_vel_accel_D_m(). The overspeed gain must be
+    // inactive (1.0) for the stopping distance to be exact, because an active gain decays
+    // with the velocity and would change the limits during the remaining trajectory; the
+    // gain is applied to the limits regardless so they always match the shaping call.
+    const float overspeed_gain = calculate_overspeed_gain();
+    const float accel_max_d_mss = _accel_max_d_mss * overspeed_gain;
+    const float jerk_max_d_msss = _jerk_max_d_msss * overspeed_gain;
+    float stop_dist_d_m = 0.0;
+    const bool settled_d = is_equal(overspeed_gain, 1.0f) &&
+        stopping_distance_jerk_limited(_vel_desired_ned_ms.z, _accel_desired_ned_mss.z,
+            -accel_max_d_mss, constrain_float(accel_max_d_mss, 0.0, 7.5),
+            jerk_max_d_msss, stop_dist_d_m);
+
+    if (!settled_ne || !settled_d) {
+        // still braking: shape the desired NE and D trajectories toward zero velocity
+        // and acceleration
+        Vector2f vel_ne_ms;
+        input_vel_accel_NE_m(vel_ne_ms, Vector2f());
+        float vel_d_ms = 0.0;
+        input_vel_accel_D_m(vel_d_ms, 0.0);
+        return false;
+    }
+
+    // Transfer the residual desired state into the offsets so the combined target
+    // (desired + offset) is unchanged by the handover.
+    _pos_offset_ned_m.xy() -= stop_dist_ne_m.topostype();
+    _pos_offset_ned_m.z -= stop_dist_d_m;
+    _vel_offset_ned_ms += _vel_desired_ned_ms;
+    _accel_offset_ned_mss += _accel_desired_ned_mss;
+
+    // Move the desired state to the stopping point with zero velocity and acceleration.
+    _pos_desired_ned_m.xy() += stop_dist_ne_m.topostype();
+    _pos_desired_ned_m.z += stop_dist_d_m;
+    _vel_desired_ned_ms.zero();
+    _accel_desired_ned_mss.zero();
+
+    return true;
+}
+
 ///
 /// Lateral position controller
 ///

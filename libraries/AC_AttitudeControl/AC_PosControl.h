@@ -78,6 +78,17 @@ public:
     // the vertical controller maintains a safe distance above terrain.
     float terrain_scaler_D_m(float pos_terrain_d_m, float terrain_margin_m) const;
 
+    // Commands a jerk-limited stop by shaping the desired NE and D trajectories toward zero
+    // velocity and acceleration. Call once per loop, in place of the other input_* methods,
+    // while bringing the vehicle to a stop. Returns false while either axis is still braking.
+    // Once the stopping point is exactly known, the residual desired velocity, acceleration
+    // and remaining stopping distance are transferred into the position controller offsets
+    // (leaving the combined target unchanged, so the handover is continuous), the desired
+    // state becomes the stopping point with zero velocity and acceleration, and true is
+    // returned. The stopping point can be retrieved with get_pos_desired_NED_m().
+    // See the implementation for full details.
+    bool find_stopping_point_NED();
+
     ///
     /// Lateral position controller
     ///
