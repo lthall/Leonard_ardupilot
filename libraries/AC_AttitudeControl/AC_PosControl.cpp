@@ -514,13 +514,16 @@ void AC_PosControl::NE_init_controller_stopping_point()
 void AC_PosControl::NE_relax_velocity_controller()
 {
     // decay acceleration and therefore current attitude target to zero
-    // this will be reset by NE_init_controller() if !NE_is_active()
+    // the forced NE_init_controller() call below then re-initialises the controller to the current
+    // estimate (even while flying) so the decayed acceleration is captured in the integrator
     if (is_positive(_dt_s)) {
         float decay = 1.0 - _dt_s / (_dt_s + POSCONTROL_RELAX_TC);
         _accel_target_ned_mss.xy() *= decay;
     }
 
-    NE_init_controller();
+    // force a full re-initialisation: relaxing the controller must always reset it to the current
+    // estimate, never preserve the running state (even while flying).
+    NE_init_controller(true);
 }
 
 // Softens NE controller for landing by reducing position error and suppressing I-term windup.
@@ -541,11 +544,21 @@ void AC_PosControl::NE_soften_for_landing()
 // Fully initializes the NE controller with current position, velocity, acceleration, and attitude.
 // Intended for normal startup when the full state is known.
 // Private function shared by other NE initializers.
-void AC_PosControl::NE_init_controller()
+void AC_PosControl::NE_init_controller(bool force_reinit)
 {
+    // If the NE controller is already running and the caller does not force a re-initialisation,
+    // preserve the running controller (targets, integrators and offsets) so that an in-flight mode
+    // change does not snap the offsets or otherwise introduce a discontinuity. The vehicle passes
+    // force_reinit = false only while flying; while landed (or when starting cold) force_reinit is true
+    // so we always perform a full initialisation, starting from the current estimate with zero position
+    // and velocity error (and therefore zero commanded output) regardless of any offsets.
+    if (!force_reinit && NE_is_active()) {
+        return;
+    }
+
     // initialise offsets to target offsets and ensure offset targets are zero if they have not been updated.
     NE_init_offsets();
-    
+
     // set roll, pitch lean angle targets to current attitude
     const Vector3f &att_target_euler_rad = _attitude_control.get_att_target_euler_rad();
     _roll_target_rad = att_target_euler_rad.x;
@@ -574,9 +587,12 @@ void AC_PosControl::NE_init_controller()
 
     // initialise I terms from lean angles
     _pid_vel_ne_m.reset_filter();
-    // initialise the I term to (_accel_target_ned_mss - _accel_desired_ned_mss)
-    // _accel_desired_ned_mss is zero and can be removed from the equation
-    _pid_vel_ne_m.set_integrator((_accel_target_ned_mss.xy() - _vel_target_ned_ms.xy() * _pid_vel_ne_m.ff()));
+    // Initialise the velocity I term so the first controller output reproduces _accel_target_ned_mss.
+    // The velocity feed-forward (_vel_target_ned_ms * ff) and the acceleration offset (which
+    // NE_update_controller adds back into _accel_target_ned_mss) are removed here so that a non-zero
+    // offset does not produce a step in the commanded acceleration. _accel_desired_ned_mss is zero at
+    // this point and is therefore omitted.
+    _pid_vel_ne_m.set_integrator((_accel_target_ned_mss.xy() - _accel_offset_ned_mss.xy() - _vel_target_ned_ms.xy() * _pid_vel_ne_m.ff()));
 
     // initialise ekf xy reset handler
     NE_init_ekf_reset();
@@ -875,7 +891,9 @@ void AC_PosControl::D_init_controller_stopping_point()
 void AC_PosControl::D_relax_controller(float throttle_setting)
 {
     // Initialise the position controller to the current position, velocity and acceleration.
-    D_init_controller();
+    // force a full re-initialisation: relaxing the controller must always reset it to the current
+    // estimate, never preserve the running state (even while flying).
+    D_init_controller(true);
 
     // D_init_controller has set the acceleration PID I term to generate the current throttle set point
     // Use relax_integrator to decay the throttle set point to throttle_setting
@@ -885,8 +903,18 @@ void AC_PosControl::D_relax_controller(float throttle_setting)
 // Fully initializes the U-axis controller with current position, velocity, acceleration, and attitude.
 // Used during standard controller activation when full state is known.
 // Private function shared by other vertical initializers.
-void AC_PosControl::D_init_controller()
+void AC_PosControl::D_init_controller(bool force_reinit)
 {
+    // If the vertical controller is already running and the caller does not force a re-initialisation,
+    // preserve the running controller (targets, integrators, offsets and terrain) so that an in-flight
+    // mode change does not snap the offsets or otherwise introduce a discontinuity. The vehicle passes
+    // force_reinit = false only while flying; while landed (or when starting cold) force_reinit is true
+    // so we always perform a full initialisation, starting from the current estimate with zero position
+    // and velocity error (and therefore zero commanded output) regardless of any offsets.
+    if (!force_reinit && D_is_active()) {
+        return;
+    }
+
     // initialise terrain targets and offsets to zero
     init_terrain();
 
