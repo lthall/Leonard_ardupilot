@@ -203,6 +203,16 @@ public:
     // handle situations where the vehicle is on the ground waiting for takeoff
     void make_safe_ground_handling(bool force_throttle_unlimited = false);
 
+    // Brakes the desired trajectory to a stop under jerk-limited shaping while running the
+    // position and attitude controllers. Returns true once the exact stopping point is
+    // known and the desired state is at rest; the stopping point is then
+    // pos_control->get_pos_desired_NED_m(). Returns true immediately when landed.
+    // The position controllers are initialised on the first call when they are not
+    // already running, so this may be called from any state. It must be called every
+    // loop while braking, because a gap longer than a single tick re-initialises the
+    // controller and discards the shaped stopping point trajectory.
+    bool stopping_point_run();
+
     // true if weathervaning is allowed in the current mode
 #if WEATHERVANE_ENABLED
     virtual bool allows_weathervaning() const { return false; }
