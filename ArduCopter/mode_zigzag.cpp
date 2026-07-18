@@ -229,23 +229,20 @@ void ModeZigZag::move_to_side()
 }
 
 // return manual control to the pilot
-void ModeZigZag::return_to_manual_control(bool maintain_target)
+// maintain_surface_tracking should be true when a leg was completed normally so pilot
+// surface tracking can continue from the waypoint controller's terrain offset
+void ModeZigZag::return_to_manual_control(bool maintain_surface_tracking)
 {
     if (stage == AUTO) {
         stage = MANUAL_REGAIN;
         spray(false);
         loiter_nav->clear_pilot_desired_acceleration();
-        if (maintain_target) {
-            const Vector3p& wp_dest_ned_m = wp_nav->get_wp_destination_NED_m();
-            loiter_nav->init_target_m(wp_dest_ned_m.xy());
+        loiter_nav->init_target();
 #if AP_RANGEFINDER_ENABLED
-            if (copter.rangefinder_alt_ok() && wp_nav->rangefinder_used_and_healthy()) {
-                copter.surface_tracking.external_init();
-            }
-#endif
-        } else {
-            loiter_nav->init_target();
+        if (maintain_surface_tracking && copter.rangefinder_alt_ok() && wp_nav->rangefinder_used_and_healthy()) {
+            copter.surface_tracking.external_init();
         }
+#endif
         is_auto = false;
         gcs().send_text(MAV_SEVERITY_INFO, "%s: manual control", name());
     }

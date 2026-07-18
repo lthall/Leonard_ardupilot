@@ -18,17 +18,24 @@ bool ModeSmartRTL::enabled() const
 bool ModeSmartRTL::init(bool ignore_checks)
 {
     if (enabled() && g2.smart_rtl.is_active()) {
-        // initialise waypoint and spline controller
-        wp_nav->wp_and_spline_init_m();
+        // set the speed, acceleration and correction limits used by the braking phase,
+        // replacing whatever the previous mode left behind; wp_and_spline_init_m()
+        // reconfigures them when the return starts
+        pos_control->NE_set_max_speed_accel_m(wp_nav->get_default_speed_NE_ms(), wp_nav->get_wp_acceleration_mss());
+        pos_control->NE_set_correction_speed_accel_m(wp_nav->get_default_speed_NE_ms(), wp_nav->get_wp_acceleration_mss());
+        pos_control->D_set_max_speed_accel_m(wp_nav->get_default_speed_down_ms(), wp_nav->get_default_speed_up_ms(), wp_nav->get_accel_D_mss());
+        pos_control->D_set_correction_speed_accel_m(wp_nav->get_default_speed_down_ms(), wp_nav->get_default_speed_up_ms(), wp_nav->get_accel_D_mss());
 
-        // set current target to a reasonable stopping point
-        Vector3p stopping_point_ned_m;
-        pos_control->get_stopping_point_NE_m(stopping_point_ned_m.xy());
-        pos_control->get_stopping_point_D_m(stopping_point_ned_m.z);
-        wp_nav->set_wp_destination_NED_m(stopping_point_ned_m);
+        // stopping_point_run() initialises the position controller for the braking
+        // phase; the waypoint controller is initialised in run() once the stopping
+        // point is known
 
-        // initialise yaw to obey user parameter
-        auto_yaw.set_mode_to_default(true);
+        // brake to a stop before starting the return
+        waiting_to_start = true;
+
+        // hold the current heading while braking; the user-parameter yaw behaviour is
+        // engaged in run() once the stopping point is known
+        auto_yaw.set_mode(AutoYaw::Mode::HOLD);
 
         // wait for cleanup of return path
         smart_rtl_state = SubMode::WAIT_FOR_PATH_CLEANUP;
@@ -54,6 +61,27 @@ void ModeSmartRTL::exit()
 
 void ModeSmartRTL::run()
 {
+    // Brake to a stop before starting the return. stopping_point_run() flies the
+    // vehicle and returns true once the exact stopping point is known and the desired
+    // state is at rest; the vehicle then holds that point while the path is cleaned up.
+    if (waiting_to_start) {
+        if (!stopping_point_run()) {
+            return;
+        }
+
+        // initialise the waypoint controller holding the stopping point (the desired
+        // state is at rest at the current desired position)
+        wp_nav->wp_and_spline_init_m();
+
+        // initialise yaw to obey user parameter
+        auto_yaw.set_mode_to_default(true);
+        waiting_to_start = false;
+
+        // stopping_point_run() has already run the position and attitude controllers
+        // this loop; the return continues from the next loop
+        return;
+    }
+
     switch (smart_rtl_state) {
         case SubMode::WAIT_FOR_PATH_CLEANUP:
             wait_cleanup_run();

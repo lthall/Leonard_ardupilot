@@ -85,8 +85,24 @@ bool ModeRTL::init(bool ignore_checks)
             return false;
         }
     }
-    // initialise waypoint and spline controller
-    wp_nav->wp_and_spline_init_m(speed_ms.get());
+    // set the speed, acceleration and correction limits used by the braking phase,
+    // replacing whatever the previous mode left behind; wp_and_spline_init_m()
+    // reconfigures them when the return path starts
+    pos_control->NE_set_max_speed_accel_m(wp_nav->get_default_speed_NE_ms(), wp_nav->get_wp_acceleration_mss());
+    pos_control->NE_set_correction_speed_accel_m(wp_nav->get_default_speed_NE_ms(), wp_nav->get_wp_acceleration_mss());
+    pos_control->D_set_max_speed_accel_m(wp_nav->get_default_speed_down_ms(), wp_nav->get_default_speed_up_ms(), wp_nav->get_accel_D_mss());
+    pos_control->D_set_correction_speed_accel_m(wp_nav->get_default_speed_down_ms(), wp_nav->get_default_speed_up_ms(), wp_nav->get_accel_D_mss());
+
+    // stopping_point_run() initialises the position controller for the braking phase;
+    // the waypoint controller is initialised in run() once the stopping point is known
+
+    // hold the current heading while braking; climb_start() and return_start() set
+    // the RTL yaw behaviour once the return path starts
+    auto_yaw.set_mode(AutoYaw::Mode::HOLD);
+
+    // brake to a stop before building the return path
+    waiting_to_start = true;
+
     _state = SubMode::STARTING;
     _state_complete = true; // see run() method below
     terrain_following_allowed = !copter.failsafe.terrain;
@@ -111,6 +127,15 @@ void ModeRTL::restart_without_terrain()
     LOGGER_WRITE_ERROR(LogErrorSubsystem::NAVIGATION, LogErrorCode::RESTARTED_RTL);
 #endif
     terrain_following_allowed = false;
+
+    // hold the current heading while braking; climb_start() and return_start() set
+    // the RTL yaw behaviour once the return path is rebuilt
+    auto_yaw.set_mode(AutoYaw::Mode::HOLD);
+
+    // brake to a stop before rebuilding the return path; without this the mid-leg
+    // set_wp_destination re-initialises the waypoint controller from a moving desired state
+    waiting_to_start = true;
+
     _state = SubMode::STARTING;
     _state_complete = true;
     gcs().send_text(MAV_SEVERITY_CRITICAL,"Restarting RTL - Terrain data missing");
@@ -132,6 +157,24 @@ ModeRTL::RTLAltType ModeRTL::get_alt_type() const
 void ModeRTL::run(bool disarm_on_land)
 {
     if (!motors->armed()) {
+        return;
+    }
+
+    // Brake to a stop before building the return path. stopping_point_run() flies the
+    // vehicle and returns true once the exact stopping point is known and the desired
+    // state is at rest; the return path is built from that point.
+    if (waiting_to_start) {
+        if (!stopping_point_run()) {
+            return;
+        }
+
+        // initialise the waypoint controller from the stopping point (the desired
+        // state is at rest at the current desired position)
+        wp_nav->wp_and_spline_init_m(speed_ms.get());
+        waiting_to_start = false;
+
+        // stopping_point_run() has already run the position and attitude controllers
+        // this loop; the return path starts from the next loop
         return;
     }
 
