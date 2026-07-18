@@ -684,6 +684,188 @@ float stopping_distance(float velocity, float p, float accel_max)
     return inv_sqrt_controller(velocity, p, accel_max);
 }
 
+// Computes the exact stopping distance of the discrete shape_vel_accel() recursion when
+// commanding zero velocity and acceleration.
+// With a zero velocity input, shape_vel_accel() reduces to a saturated proportional
+// controller on velocity, accel_target = -k_v * vel with k_v = jerk_max / accel_brake,
+// followed by the jerk limit, where accel_brake is the acceleration limit opposing the
+// velocity (selected exactly as shape_vel_accel() selects its gain). This is exact
+// because the sqrt branch of sqrt_controller() is entirely removed by the acceleration
+// constraint: at the linear region boundary its output equals the acceleration limit and
+// it grows monotonically beyond. The jerk limit in shape_accel() lands exactly on its
+// target once the target is within one jerk step, jerk_max * dt.
+// One loop ahead the velocity advances to vel_next = vel + accel * dt. If accel is within
+// one jerk step of the decay curve -k_v * vel_next, and |vel_next| is inside the linear
+// region sq(accel_brake) / jerk_max (so tracking the curve never again saturates the
+// acceleration or jerk limits), the acceleration snaps onto the curve and the remainder
+// of the discrete trajectory is an exact geometric decay with per-step ratio
+// (1 - k_v * dt), summing to vel_next * (1 / k_v - dt / 2). The stopping distance is then
+// exact, with no tolerance:
+//   stopping_dist = vel * dt + accel * dt² / 2 + vel_next * (accel_brake / jerk_max - dt / 2)
+// Returns true and writes stopping_dist when the state satisfies these conditions
+// (k_v * dt <= 1 is also required so the discrete decay is monotonic and the
+// sqrt_controller() dt limit is inactive; it only fails for pathological limits).
+// Returns false otherwise, without raising an internal error: invalid limits already
+// raise one in the companion shaping call.
+bool stopping_distance_jerk_limited(float vel, float accel,
+                                    float accel_min, float accel_max,
+                                    float jerk_max, float& stopping_dist)
+{
+    // sanity check accel_min, accel_max and jerk_max.
+    if (!is_negative(accel_min) || !is_positive(accel_max) || !is_positive(jerk_max)) {
+        return false;
+    }
+
+    // The direction of motion decides the braking limit, matching the gain selection in
+    // shape_vel_accel() for vel_error = -vel. A stationary state uses the acceleration
+    // direction because that is where the motion is about to go.
+    float dir = vel;
+    if (is_zero(dir)) {
+        dir = accel;
+    }
+
+    // Mirror the state so the motion is non-negative; the braking limit opposes the motion.
+    float v = vel;
+    float a = accel;
+    float sign = 1.0;
+    float accel_brake;
+    if (is_positive(-dir)) {
+        v = -v;
+        a = -a;
+        sign = -1.0;
+        accel_brake = accel_max;
+    } else {
+        accel_brake = -accel_min;
+    }
+
+    const float k_v = jerk_max / accel_brake;
+    const float vel_linear = sq(accel_brake) / jerk_max;
+
+    float t_land;       // time at which the acceleration lands on the decay curve
+    float vel_land;     // velocity on landing
+    float dist_slew;    // distance covered during the constant-jerk slew
+
+    if (a >= -k_v * v) {
+        // Above the decay curve: slew down at -jerk_max.
+        // The velocity peak must stay inside the linear region so the target is not clipped.
+        if (v + sq(MAX(a, 0.0f)) / (2.0 * jerk_max) > vel_linear) {
+            return false;
+        }
+
+        // land on the curve: a - jerk_max * t = -k_v * (v + a * t - jerk_max * t² / 2)
+        const float qa = 0.5 * k_v * jerk_max;
+        const float qb = jerk_max - k_v * a;
+        const float qc = -(a + k_v * v);
+        t_land = (-qb + safe_sqrt(sq(qb) - 4.0 * qa * qc)) / (2.0 * qa);
+        vel_land = v + a * t_land - 0.5 * jerk_max * sq(t_land);
+        dist_slew = v * t_land + 0.5 * a * sq(t_land) - jerk_max * t_land * sq(t_land) / 6.0;
+    } else {
+        // Below the decay curve (braking harder than the curve): slew up at +jerk_max.
+        if (v > vel_linear) {
+            return false;
+        }
+
+        // land on the curve: a + jerk_max * t = -k_v * (v + a * t + jerk_max * t² / 2)
+        const float qa = 0.5 * k_v * jerk_max;
+        const float qb = jerk_max + k_v * a;
+        const float qc = a + k_v * v;
+        t_land = (-qb + safe_sqrt(sq(qb) - 4.0 * qa * qc)) / (2.0 * qa);
+
+        // reject if the velocity crosses zero before landing (the braking limit would
+        // switch and the trajectory overshoots the stopping point)
+        const float cross_disc = sq(a) - 2.0 * jerk_max * v;
+        if (is_positive(cross_disc)) {
+            const float t_cross = (-a - safe_sqrt(cross_disc)) / jerk_max;
+            if (!is_negative(t_cross) && t_cross < t_land) {
+                return false;
+            }
+        }
+
+        vel_land = v + a * t_land + 0.5 * jerk_max * sq(t_land);
+
+        // the landing velocity must be inside the linear region
+        if (vel_land > vel_linear) {
+            return false;
+        }
+        dist_slew = v * t_land + 0.5 * a * sq(t_land) + jerk_max * t_land * sq(t_land) / 6.0;
+    }
+
+    // exponential decay along the curve for the remainder
+    stopping_dist = sign * (dist_slew + vel_land / k_v);
+    return true;
+}
+
+// 2D form of stopping_distance_jerk_limited() matching shape_vel_accel_xy(): a single
+// acceleration magnitude limit applies. The problem is solved per axis in the frame of
+// the motion direction: the along axis carries the velocity and the along component of
+// the acceleration, and the lateral axis carries the lateral acceleration starting from
+// rest. Inside the unsaturated zone the target law -k_v * vel is linear and decouples
+// per axis; the one remaining coupling is the shared vector jerk limit while the
+// acceleration is off the decay curve, which is not modelled. The result is exact for
+// on-curve and single-axis states and a bounded approximation otherwise (worst near 45
+// degree acceleration directions: about 0.2 m at |accel| = accel_max / 2 with default
+// copter limits, shrinking with jerk).
+bool stopping_distance_jerk_limited_xy(const Vector2f& vel, const Vector2f& accel,
+                                       float accel_max, float jerk_max,
+                                       Vector2f& stopping_dist)
+{
+    // sanity check accel_max and jerk_max.
+    if (!is_positive(accel_max) || !is_positive(jerk_max)) {
+        return false;
+    }
+
+    // The direction of motion defines the along axis. A stationary state uses the
+    // acceleration direction because that is where the motion is about to go.
+    Vector2f dir = vel;
+    if (dir.is_zero()) {
+        dir = accel;
+    }
+    if (dir.is_zero()) {
+        // stationary with zero acceleration: already at the stopping point
+        stopping_dist.zero();
+        return true;
+    }
+    const Vector2f dir_unit = dir.normalized();
+    const Vector2f lat_unit { -dir_unit.y, dir_unit.x };
+
+    // along-axis state (vel_along = |vel|, or zero when stationary) and the lateral
+    // acceleration; the lateral velocity is zero by construction
+    const float vel_along = vel.dot(dir_unit);
+    const float accel_along = accel.dot(dir_unit);
+    const float accel_lat = accel.dot(lat_unit);
+
+    const float k_v = jerk_max / accel_max;
+    const float vel_linear = sq(accel_max) / jerk_max;
+
+    // Joint containment: the vector velocity magnitude must stay inside the linear
+    // region. The per-axis velocity peaks are exact: the along axis peaks at
+    // vel + max(accel, 0)² / (2 * jerk) above the decay curve and is monotonically
+    // decreasing during the slew below it; the lateral axis starts from rest and peaks
+    // at accel_lat² / (2 * jerk). Combining the peaks is conservative because they do
+    // not occur at the same time.
+    float peak_along = vel_along;
+    if (accel_along >= -k_v * vel_along) {
+        peak_along += sq(MAX(accel_along, 0.0f)) / (2.0 * jerk_max);
+    }
+    const float peak_lat = sq(accel_lat) / (2.0 * jerk_max);
+    if (sq(peak_along) + sq(peak_lat) > sq(vel_linear)) {
+        return false;
+    }
+
+    // solve each axis as an independent zone problem
+    float dist_along;
+    if (!stopping_distance_jerk_limited(vel_along, accel_along, -accel_max, accel_max, jerk_max, dist_along)) {
+        return false;
+    }
+    float dist_lat;
+    if (!stopping_distance_jerk_limited(0.0, accel_lat, -accel_max, accel_max, jerk_max, dist_lat)) {
+        return false;
+    }
+
+    stopping_dist = dir_unit * dist_along + lat_unit * dist_lat;
+    return true;
+}
+
 // Return the largest M >= 0 that can scale a 3D direction without exceeding
 // independent axis limits:
 //

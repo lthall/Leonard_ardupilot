@@ -187,6 +187,39 @@ float sqrt_controller_accel(float error, float rate_cmd, float rate_state, float
 // - Output: stopping distance required to decelerate cleanly.
 float stopping_distance(float velocity, float p, float accel_max);
 
+// Computes the continuous-time stopping distance of shape_vel_accel() commanding zero
+// velocity and acceleration, valid while the state remains inside the unsaturated zone.
+// With a zero velocity input, shape_vel_accel() reduces to a saturated proportional
+// controller on velocity, accel_target = -k_v * vel with k_v = jerk_max / accel_brake,
+// followed by the jerk limit, where accel_brake is the acceleration limit opposing the
+// motion (selected exactly as shape_vel_accel() selects its gain). Inside the zone the
+// target is never clipped and the remaining trajectory is a single constant-jerk slew
+// until the acceleration lands on the decay curve -k_v * vel, then an exponential decay
+// with remaining distance vel / k_v. Both pieces are closed form, so the stopping
+// distance is exact for the continuous-time system; the discrete control loop tracks it
+// to O(dt) (roughly a centimetre at 400 Hz).
+// Returns true and writes stopping_dist when the limits are valid, the trajectory stays
+// inside the linear region |vel| <= sq(accel_brake) / jerk_max until it lands on the
+// decay curve, and the velocity does not change sign before landing (the braking limit
+// would switch); returns false otherwise.
+bool stopping_distance_jerk_limited(float vel, float accel,
+                                    float accel_min, float accel_max,
+                                    float jerk_max, float& stopping_dist);
+
+// 2D form of stopping_distance_jerk_limited() matching shape_vel_accel_xy(): a single
+// acceleration magnitude limit applies. The problem is solved per axis in the frame of
+// the motion direction: the along axis carries the velocity and the along component of
+// the acceleration, and the lateral axis carries the lateral acceleration starting from
+// rest. Inside the unsaturated zone the target law -k_v * vel is linear and decouples
+// per axis; the one remaining coupling is the shared vector jerk limit while the
+// acceleration is off the decay curve, which is not modelled. The result is exact for
+// on-curve and single-axis states and a bounded approximation otherwise (worst near 45
+// degree acceleration directions: about 0.2 m at |accel| = accel_max / 2 with default
+// copter limits, shrinking with jerk).
+bool stopping_distance_jerk_limited_xy(const Vector2f& vel, const Vector2f& accel,
+                                       float accel_max, float jerk_max,
+                                       Vector2f& stopping_dist);
+
 // Return the largest M >= 0 that can scale a 3D direction without exceeding
 // independent axis limits:
 //
