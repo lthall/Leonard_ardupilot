@@ -687,7 +687,11 @@ bool Mode::stopping_point_run()
 {
     // if not armed set throttle to zero and exit immediately
     if (is_disarmed_or_landed()) {
-        make_safe_ground_handling();
+        // do not spool down tradheli when on the ground with motor interlock enabled.
+        // This runs on the mission start path immediately before an auto takeoff, so
+        // spooling down here would force the rotor to run up again before the vehicle
+        // can climb.
+        make_safe_ground_handling(copter.is_tradheli() && motors->get_interlock());
         // no braking is required on the ground; the desired state starts at rest
         return true;
     }
