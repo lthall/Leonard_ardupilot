@@ -168,9 +168,11 @@ void ModeRTL::run(bool disarm_on_land)
     switch (_state) {
 
     case SubMode::STARTING:
-        // should not be reached:
-        _state = SubMode::INITIAL_CLIMB;
-        FALLTHROUGH;
+        // only reached after an in-cycle restart_without_terrain(); hold on the
+        // current target this loop and let the transition switch rebuild next loop
+        climb_return_run();
+        _state_complete = true;
+        break;
 
     case SubMode::INITIAL_CLIMB:
     case SubMode::RETURN_HOME:
@@ -225,7 +227,7 @@ void ModeRTL::return_start()
     auto_yaw.set_mode_to_default(true);
 }
 
-// rtl_climb_return_run - implements the initial climb, return home and descent portions of RTL which all rely on the wp controller
+// rtl_climb_return_run - runs the initial climb and return home portions of RTL, both of which rely on the wp controller
 //      called by rtl_run at 100hz or more
 void ModeRTL::climb_return_run()
 {
@@ -252,7 +254,7 @@ void ModeRTL::climb_return_run()
     _state_complete = wp_nav->reached_wp_destination();
 }
 
-// loiterathome_start - initialise return to home
+// loiterathome_start - initialise loiter at home
 void ModeRTL::loiterathome_start()
 {
     _state = SubMode::LOITER_AT_HOME;
@@ -267,7 +269,7 @@ void ModeRTL::loiterathome_start()
     }
 }
 
-// rtl_climb_return_descent_run - implements the initial climb, return home and descent portions of RTL which all rely on the wp controller
+// loiterathome_run - runs the loiter-at-home stage of RTL
 //      called by rtl_run at 100hz or more
 void ModeRTL::loiterathome_run()
 {
@@ -323,7 +325,7 @@ void ModeRTL::descent_start()
 #endif
 }
 
-// rtl_descent_run - implements the final descent to the RTL_ALT_M
+// rtl_descent_run - implements the final descent to RTL_ALT_FINAL_M
 //      called by rtl_run at 100hz or more
 void ModeRTL::descent_run()
 {

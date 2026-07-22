@@ -1539,7 +1539,7 @@ public:
         FINAL_DESCENT,
         LAND
     };
-    SubMode state() { return _state; }
+    SubMode state() const { return _state; }
 
     // this should probably not be exposed
     bool state_complete() const { return _state_complete; }
@@ -1600,7 +1600,7 @@ private:
     AP_Float alt_final_m;
     AP_Float climb_min_m;
 
-    SubMode _state = SubMode::INITIAL_CLIMB;  // records state of rtl (initial climb, returning home, etc)
+    SubMode _state = SubMode::STARTING;  // records state of rtl (initial climb, returning home, etc)
     bool _state_complete = false; // set to true if the current state is completed
 
     struct {
