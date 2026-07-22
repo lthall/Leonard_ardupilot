@@ -448,6 +448,10 @@
  # define RTL_LOITER_TIME           5000    // Time (in milliseconds) to loiter above home before beginning final descent
 #endif
 
+#ifndef RTL_LOITER_YAW_TIMEOUT
+ # define RTL_LOITER_YAW_TIMEOUT    10000   // max ms to wait for heading to settle at home before descending anyway
+#endif
+
 // error if old RTL parameter default definitions are used
 #ifdef RTL_ALT_FINAL
   #error "RTL_ALT_FINAL definition replaced with RTL_ALT_FINAL_M_DEFAULT"

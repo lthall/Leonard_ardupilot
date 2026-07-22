@@ -293,11 +293,14 @@ void ModeRTL::loiterathome_run()
     attitude_control->input_thrust_vector_heading(pos_control->get_thrust_vector(), auto_yaw.get_heading());
 
     // check if we've completed this stage of RTL
-    if ((millis() - _loiter_start_time) >= (uint32_t)g.rtl_loiter_time.get()) {
+    const uint32_t loiter_elapsed_ms = millis() - _loiter_start_time;
+    if (loiter_elapsed_ms >= (uint32_t)g.rtl_loiter_time.get()) {
         if (auto_yaw.mode() == AutoYaw::Mode::RESET_TO_ARMED_YAW) {
-            // check if heading is within 2 degrees of heading when vehicle was armed
-            // todo: Use the target heading instead of the actual heading to allow landing even if yaw control is lost.
-            if (fabsf(wrap_PI(ahrs.get_yaw_rad() - copter.initial_armed_bearing_rad)) <= radians(2.0)) {
+            // wait for the heading to settle within 2 degrees of the armed bearing,
+            // but time out so degraded yaw control cannot stall the landing
+            const bool yaw_settled = fabsf(wrap_PI(ahrs.get_yaw_rad() - copter.initial_armed_bearing_rad)) <= radians(2.0);
+            const bool yaw_timed_out = loiter_elapsed_ms >= (uint32_t)g.rtl_loiter_time.get() + RTL_LOITER_YAW_TIMEOUT;
+            if (yaw_settled || yaw_timed_out) {
                 _state_complete = true;
             }
         } else {
