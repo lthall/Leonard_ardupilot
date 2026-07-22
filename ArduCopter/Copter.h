@@ -904,6 +904,7 @@ private:
     void Log_Write_Rate();
     void Log_Write_EKF_POS();
     void Log_Write_PIDS();
+    void Log_Write_RTL_SubMode(ModeRTL::SubMode submode);
     void Log_Write_Data(LogDataID id, int32_t value);
     void Log_Write_Data(LogDataID id, uint32_t value);
     void Log_Write_Data(LogDataID id, int16_t value);

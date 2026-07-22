@@ -200,6 +200,10 @@ void ModeRTL::set_submode(SubMode submode)
     _state_complete = false;
     _stage_start_ms = millis();
 
+#if HAL_LOGGING_ENABLED
+    copter.Log_Write_RTL_SubMode(submode);
+#endif
+
     switch (submode) {
     case SubMode::STARTING:
         // path (re)build handled by advance_state(); nothing to init here

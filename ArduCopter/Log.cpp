@@ -356,6 +356,13 @@ struct PACKED log_Rate_Thread_Dt {
     float dtMin;
 };
 
+// RTL state machine sub-mode transition
+struct PACKED log_RTL {
+    LOG_PACKET_HEADER;
+    uint64_t time_us;
+    uint8_t  sub_mode;
+};
+
 // Write a Guided mode position target
 // pos_target_ned_m is lat, lon, alt OR offset from ekf origin in m
 // terrain should be 0 if pos_target_ned_m.z is alt-above-ekf-origin, 1 if alt-above-terrain
@@ -399,6 +406,17 @@ void Copter::Log_Write_Guided_Attitude_Target(ModeGuided::SubMode submode, float
         yaw_rate_degs   : degrees(ang_vel_rads.z),  // rad/s to deg/s
         thrust          : thrust,
         climb_rate_ms   : climb_rate_ms
+    };
+    logger.WriteBlock(&pkt, sizeof(pkt));
+}
+
+// Write an RTL state-machine transition
+void Copter::Log_Write_RTL_SubMode(ModeRTL::SubMode submode)
+{
+    const log_RTL pkt {
+        LOG_PACKET_HEADER_INIT(LOG_RTL_MSG),
+        time_us  : AP_HAL::micros64(),
+        sub_mode : (uint8_t)submode,
     };
     logger.WriteBlock(&pkt, sizeof(pkt));
 }
@@ -571,6 +589,14 @@ const struct LogStructure Copter::log_structure[] = {
 
     { LOG_RATE_THREAD_DT_MSG, sizeof(log_Rate_Thread_Dt),
       "RTDT", "Qffff", "TimeUS,dt,dtAvg,dtMax,dtMin", "sssss", "F----" , true },
+
+// @LoggerMessage: RTL
+// @Description: RTL state machine sub-mode transition
+// @Field: TimeUS: Time since system startup
+// @Field: SubMode: RTL sub-mode entered (0:Starting,1:InitialClimb,2:ReturnHome,3:LoiterAtHome,4:FinalDescent,5:Land)
+
+    { LOG_RTL_MSG, sizeof(log_RTL),
+      "RTL", "QB", "TimeUS,SubMode", "s-", "F-" , true },
 
 };
 
