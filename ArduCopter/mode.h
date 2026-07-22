@@ -1597,7 +1597,8 @@ private:
     void loiterathome_start();
     void loiterathome_run();
     void build_path();
-    void compute_return_target();
+    float compute_return_target();
+    void constrain_target_alt(Location& loc, float curr_alt_m);
 
     // RTL parameters
     AP_Float altitude_m;
@@ -1622,6 +1623,9 @@ private:
         RANGEFINDER = 1,
         TERRAINDATABASE = 2
     };
+
+    // resolve the return-journey alt frame, set the return target's alt+frame, and update curr_alt_m
+    ReturnTargetAltType get_return_target_alt_type(float& curr_alt_m, float pos_offset_u_m);
 
     // time the current stage was entered (set by set_submode); used by the loiter timer
     uint32_t _stage_start_ms;

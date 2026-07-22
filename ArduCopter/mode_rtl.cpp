@@ -478,11 +478,17 @@ void ModeRTL::build_path()
     rtl_path.origin_point = get_stopping_point();
     rtl_path.origin_point.change_alt_frame(Location::AltFrame::ABOVE_HOME);
 
-    // compute return target
-    compute_return_target();
+    // compute return target at its desired (unclamped) altitude
+    const float curr_alt_m = compute_return_target();
 
-    // climb target is above our origin point at the return altitude
+    // climb target is above our origin point at the desired return altitude
     rtl_path.climb_target = Location(rtl_path.origin_point.lat, rtl_path.origin_point.lng, rtl_path.return_target.alt, rtl_path.return_target.get_alt_frame());
+
+    // clamp each target to the alt fence at its own location (terrain height can differ) then
+    // ensure neither descends.  return_target is clamped only after climb_target has captured
+    // the desired altitude.
+    constrain_target_alt(rtl_path.return_target, curr_alt_m);
+    constrain_target_alt(rtl_path.climb_target, curr_alt_m);
 
     // descent target is below return target at rtl_alt_final_m
     rtl_path.descent_target = Location(rtl_path.return_target.lat, rtl_path.return_target.lng, alt_final_m.get() * 100, Location::AltFrame::ABOVE_HOME);
@@ -496,7 +502,8 @@ void ModeRTL::build_path()
 
 // compute the return target - home or rally point
 //   return target's altitude is updated to a higher altitude that the vehicle can safely return at (frame may also be set)
-void ModeRTL::compute_return_target()
+//   returns curr_alt_m, the current-altitude reference used for the no-descend limit
+float ModeRTL::compute_return_target()
 {
     // set return target to nearest rally point or home position
 #if HAL_RALLY_ENABLED
@@ -512,6 +519,36 @@ void ModeRTL::compute_return_target()
     // curr_alt_m is current altitude, with any offset removed, above home or above terrain depending upon use_terrain
     float curr_alt_m = copter.current_loc.alt * 0.01 - pos_offset_u_m;
 
+    // resolve the return-journey altitude frame and update curr_alt_m to match
+    const ReturnTargetAltType alt_type = get_return_target_alt_type(curr_alt_m, pos_offset_u_m);
+
+    // set new target altitude to return target altitude
+    // Note: this is alt-above-home or terrain-alt depending upon rtl_alt_type
+    // Note: ignore negative altitudes which could happen if user enters negative altitude for rally point or terrain is higher at rally point compared to home
+    float target_alt_m = MAX(rtl_path.return_target.alt, 0) * 0.01;
+
+    // increase target to maximum of current altitude + climb_min and rtl altitude
+    const float min_rtl_alt_m = MAX(RTL_ALT_MIN_M, curr_alt_m + MAX(0.0f, climb_min_m.get()));
+    target_alt_m = MAX(target_alt_m, MAX(altitude_m.get(), min_rtl_alt_m));
+
+    // reduce climb if close to return target
+    float rtl_return_dist_m = rtl_path.return_target.get_distance(rtl_path.origin_point);
+    // don't allow really shallow slopes
+    if (g.rtl_cone_slope >= RTL_MIN_CONE_SLOPE) {
+        target_alt_m = MIN(target_alt_m, MAX(rtl_return_dist_m * g.rtl_cone_slope, min_rtl_alt_m));
+    }
+
+    // set returned target alt to new target_alt_m (don't change altitude type)
+    rtl_path.return_target.set_alt_m(target_alt_m, (alt_type == ReturnTargetAltType::RELATIVE) ? Location::AltFrame::ABOVE_HOME : Location::AltFrame::ABOVE_TERRAIN);
+
+    return curr_alt_m;
+}
+
+// resolve the return-journey altitude frame (above-home, above-terrain via rangefinder, or
+// above-terrain via the terrain database), set the return target's altitude/frame accordingly,
+// and update curr_alt_m to the matching reference.  Returns the resolved altitude type.
+ModeRTL::ReturnTargetAltType ModeRTL::get_return_target_alt_type(float& curr_alt_m, float pos_offset_u_m)
+{
     // determine altitude type of return journey (alt-above-home, alt-above-terrain using range finder or alt-above-terrain using terrain database)
     ReturnTargetAltType alt_type = ReturnTargetAltType::RELATIVE;
     if (terrain_following_allowed && (get_alt_type() == RTLAltType::TERRAIN)) {
@@ -573,45 +610,30 @@ void ModeRTL::compute_return_target()
         }
     }
 
-    // set new target altitude to return target altitude
-    // Note: this is alt-above-home or terrain-alt depending upon rtl_alt_type
-    // Note: ignore negative altitudes which could happen if user enters negative altitude for rally point or terrain is higher at rally point compared to home
-    float target_alt_m = MAX(rtl_path.return_target.alt, 0) * 0.01;
+    return alt_type;
+}
 
-    // increase target to maximum of current altitude + climb_min and rtl altitude
-    const float min_rtl_alt_m = MAX(RTL_ALT_MIN_M, curr_alt_m + MAX(0.0f, climb_min_m.get()));
-    target_alt_m = MAX(target_alt_m, MAX(altitude_m.get(), min_rtl_alt_m));
-
-    // reduce climb if close to return target
-    float rtl_return_dist_m = rtl_path.return_target.get_distance(rtl_path.origin_point);
-    // don't allow really shallow slopes
-    if (g.rtl_cone_slope >= RTL_MIN_CONE_SLOPE) {
-        target_alt_m = MIN(target_alt_m, MAX(rtl_return_dist_m * g.rtl_cone_slope, min_rtl_alt_m));
-    }
-
-    // set returned target alt to new target_alt_m (don't change altitude type)
-    rtl_path.return_target.set_alt_m(target_alt_m, (alt_type == ReturnTargetAltType::RELATIVE) ? Location::AltFrame::ABOVE_HOME : Location::AltFrame::ABOVE_TERRAIN);
-
+// clamp a target location's altitude to the alt-max fence (evaluated at that location) and then to
+// no lower than curr_alt_m so RTL never commands a descent
+void ModeRTL::constrain_target_alt(Location& loc, float curr_alt_m)
+{
 #if AP_FENCE_ENABLED
     // ensure not above fence altitude if alt fence is enabled
-    // Note: because the rtl_path.climb_target's altitude is simply copied from the return_target's altitude,
-    //       if terrain altitudes are being used, the code below which reduces the return_target's altitude can lead to
-    //       the vehicle not climbing at all as RTL begins.  This can be overly conservative and it might be better
-    //       to apply the fence alt limit independently on the origin_point and return_target
     if ((copter.fence.get_enabled_fences() & AC_FENCE_TYPE_ALT_MAX) != 0) {
-        // get return target in max alt frame so it can be compared to fence's alt
-        if (rtl_path.return_target.get_alt_m(copter.fence.get_alt_max_frame(), target_alt_m)) {
-            float fence_alt_m = copter.fence.get_safe_alt_max_m();
-            if (target_alt_m > fence_alt_m) {
+        // get the target in the fence's max alt frame so it can be compared to the fence alt
+        float alt_in_fence_frame_m;
+        if (loc.get_alt_m(copter.fence.get_alt_max_frame(), alt_in_fence_frame_m)) {
+            const float fence_alt_m = copter.fence.get_safe_alt_max_m();
+            if (alt_in_fence_frame_m > fence_alt_m) {
                 // reduce target alt to the fence alt
-                rtl_path.return_target.alt -= (target_alt_m - fence_alt_m) * 100.0;
+                loc.alt -= (alt_in_fence_frame_m - fence_alt_m) * 100.0;
             }
         }
     }
 #endif
 
     // ensure we do not descend
-    rtl_path.return_target.alt = MAX(rtl_path.return_target.alt, curr_alt_m * 100.0);
+    loc.alt = MAX(loc.alt, curr_alt_m * 100.0);
 }
 
 bool ModeRTL::get_wp(Location& destination) const
