@@ -13916,6 +13916,49 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
             )
         self.wait_disarmed()
 
+    def SMART_RTL_ALT_FINAL_M(self):
+        '''SmartRTL with RTL_ALT_FINAL_M set must descend to that altitude and hold'''
+        target_alt = 10
+        self.set_parameter('RTL_ALT_FINAL_M', target_alt)
+
+        self.progress("arm the vehicle and takeoff in Guided")
+        self.takeoff(20, mode='GUIDED')
+        self.progress("fly a short path so SmartRTL has points to follow")
+        self.fly_guided_move_local(30, 0, 20)
+
+        self.progress("SmartRTL home; expecting descent to %um and hold" % target_alt)
+        self.change_mode('SMART_RTL')
+
+        # Expecting to return and hold RTL_ALT_FINAL_M above home
+        tstart = self.get_sim_time()
+        reachedHome = False
+        while self.get_sim_time_cached() < tstart + 120:
+            m = self.assert_receive_message('GLOBAL_POSITION_INT')
+            alt = m.relative_alt / 1000.0 # mm -> m
+            home_distance = self.distance_to_home(use_cached_home=True)
+            home = math.sqrt((alt-target_alt)**2 + home_distance**2) < 2
+            if not self.armed():
+                raise NotAchievedException(
+                    "Disarmed while waiting for hold at %um; SmartRTL ignored RTL_ALT_FINAL_M and landed" %
+                    target_alt)
+            if home and not reachedHome:
+                reachedHome = True
+                self.progress("Reached home - holding")
+                self.delay_sim_time(20, reason="SmartRTL hold at home")
+                continue
+
+            if reachedHome:
+                if not home:
+                    raise NotAchievedException("Should still be at home")
+                break
+
+        if not reachedHome:
+            raise NotAchievedException("Never settled at RTL_ALT_FINAL_M above home")
+
+        self.progress("Hold at home successful - landing")
+        self.change_mode("LAND")
+        self.wait_landed_and_disarmed()
+
     def get_ground_effect_duration_from_current_onboard_log(self, bit, ignore_multi=False):
         '''returns a duration in seconds we were expecting to interact with
         the ground.  Will die if there's more than one such block of
@@ -18621,6 +18664,7 @@ return update, 1000
             self.AP_Avoidance,
             self.RTL_ALT_FINAL_M,
             self.SMART_RTL,
+            self.SMART_RTL_ALT_FINAL_M,
             self.MAV_CMD_DO_SET_HOME_bad_location,
             self.SMART_RTL_EnterLeave,
             self.SMART_RTL_Repeat,
