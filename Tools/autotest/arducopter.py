@@ -13916,6 +13916,78 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
             )
         self.wait_disarmed()
 
+    def SMART_RTL_ALT_FINAL_M(self):
+        '''SmartRTL with RTL_ALT_FINAL_M set must descend to that altitude and hold'''
+        target_alt = 10
+        self.set_parameter('RTL_ALT_FINAL_M', target_alt)
+
+        self.progress("arm the vehicle and takeoff in Guided")
+        self.takeoff(20, mode='GUIDED')
+        self.progress("fly a short path so SmartRTL has points to follow")
+        self.fly_guided_move_local(30, 0, 20)
+
+        self.progress("SmartRTL home; expecting descent to %um and hold" % target_alt)
+        self.change_mode('SMART_RTL')
+
+        # Expecting to return and hold RTL_ALT_FINAL_M above home
+        tstart = self.get_sim_time()
+        reachedHome = False
+        while self.get_sim_time_cached() < tstart + 120:
+            m = self.assert_receive_message('GLOBAL_POSITION_INT')
+            alt = m.relative_alt / 1000.0 # mm -> m
+            home_distance = self.distance_to_home(use_cached_home=True)
+            home = math.sqrt((alt-target_alt)**2 + home_distance**2) < 2
+            if not self.armed():
+                raise NotAchievedException(
+                    "Disarmed while waiting for hold at %um; SmartRTL ignored RTL_ALT_FINAL_M and landed" %
+                    target_alt)
+            if home and not reachedHome:
+                reachedHome = True
+                self.progress("Reached home - holding")
+                self.delay_sim_time(20, reason="SmartRTL hold at home")
+                continue
+
+            if reachedHome:
+                if not home:
+                    raise NotAchievedException("Should still be at home")
+                break
+
+        if not reachedHome:
+            raise NotAchievedException("Never settled at RTL_ALT_FINAL_M above home")
+
+        self.progress("Hold at home successful - landing")
+        self.change_mode("LAND")
+        self.wait_landed_and_disarmed()
+
+    def Auto_RTL_ALT_FINAL_M(self):
+        '''Auto mission must continue past RETURN_TO_LAUNCH when RTL_ALT_FINAL_M > 0'''
+        target_alt = 10
+        self.set_parameter('RTL_ALT_FINAL_M', target_alt)
+        self.set_parameter('AUTO_OPTIONS', 3)
+        self.upload_simple_relhome_mission([
+            #                                       N   E   U
+            (mavutil.mavlink.MAV_CMD_NAV_TAKEOFF,   0,  0, 20),
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 80,  0, 20),
+            (mavutil.mavlink.MAV_CMD_NAV_RETURN_TO_LAUNCH, 0, 0, 0),
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,  0, 80, 20),
+        ])
+        self.change_mode('AUTO')
+        self.wait_ready_to_arm()
+        self.arm_vehicle()
+
+        self.progress("Waiting for the mission to reach the RETURN_TO_LAUNCH item")
+        self.wait_current_waypoint(3, timeout=120)
+
+        self.progress("Waiting for hold at RTL_ALT_FINAL_M")
+        self.wait_altitude(target_alt-1, target_alt+1, relative=True, timeout=120)
+
+        self.progress("Mission must advance past RETURN_TO_LAUNCH")
+        self.wait_current_waypoint(4, timeout=60)
+
+        self.progress("Mission advanced - landing")
+        self.change_mode("LAND")
+        self.wait_landed_and_disarmed()
+
     def get_ground_effect_duration_from_current_onboard_log(self, bit, ignore_multi=False):
         '''returns a duration in seconds we were expecting to interact with
         the ground.  Will die if there's more than one such block of
@@ -18620,6 +18692,7 @@ return update, 1000
             self.EKFYawResetLogged,
             self.AP_Avoidance,
             self.RTL_ALT_FINAL_M,
+            self.Auto_RTL_ALT_FINAL_M,
             self.SMART_RTL,
             self.MAV_CMD_DO_SET_HOME_bad_location,
             self.SMART_RTL_EnterLeave,
