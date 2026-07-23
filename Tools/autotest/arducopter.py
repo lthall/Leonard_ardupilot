@@ -13959,6 +13959,35 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
         self.change_mode("LAND")
         self.wait_landed_and_disarmed()
 
+    def Auto_RTL_ALT_FINAL_M(self):
+        '''Auto mission must continue past RETURN_TO_LAUNCH when RTL_ALT_FINAL_M > 0'''
+        target_alt = 10
+        self.set_parameter('RTL_ALT_FINAL_M', target_alt)
+        self.set_parameter('AUTO_OPTIONS', 3)
+        self.upload_simple_relhome_mission([
+            #                                       N   E   U
+            (mavutil.mavlink.MAV_CMD_NAV_TAKEOFF,   0,  0, 20),
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 80,  0, 20),
+            (mavutil.mavlink.MAV_CMD_NAV_RETURN_TO_LAUNCH, 0, 0, 0),
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,  0, 80, 20),
+        ])
+        self.change_mode('AUTO')
+        self.wait_ready_to_arm()
+        self.arm_vehicle()
+
+        self.progress("Waiting for the mission to reach the RETURN_TO_LAUNCH item")
+        self.wait_current_waypoint(3, timeout=120)
+
+        self.progress("Waiting for hold at RTL_ALT_FINAL_M")
+        self.wait_altitude(target_alt-1, target_alt+1, relative=True, timeout=120)
+
+        self.progress("Mission must advance past RETURN_TO_LAUNCH")
+        self.wait_current_waypoint(4, timeout=60)
+
+        self.progress("Mission advanced - landing")
+        self.change_mode("LAND")
+        self.wait_landed_and_disarmed()
+
     def get_ground_effect_duration_from_current_onboard_log(self, bit, ignore_multi=False):
         '''returns a duration in seconds we were expecting to interact with
         the ground.  Will die if there's more than one such block of
@@ -18663,6 +18692,7 @@ return update, 1000
             self.EKFYawResetLogged,
             self.AP_Avoidance,
             self.RTL_ALT_FINAL_M,
+            self.Auto_RTL_ALT_FINAL_M,
             self.SMART_RTL,
             self.SMART_RTL_ALT_FINAL_M,
             self.MAV_CMD_DO_SET_HOME_bad_location,
