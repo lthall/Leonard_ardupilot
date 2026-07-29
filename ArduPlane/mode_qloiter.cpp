@@ -6,6 +6,10 @@
 bool ModeQLoiter::_enter()
 {
     // initialise loiter
+    if (AP_HAL::millis() - quadplane.last_att_control_ms > 100) {
+        attitude_control->reset_target_and_rate(true);
+        attitude_control->reset_rate_controller_I_terms();
+    }
     loiter_nav->clear_pilot_desired_acceleration();
     loiter_nav->init_target();
 
@@ -143,10 +147,9 @@ void ModeQLoiter::run()
     target += systemid.get_attitude_offset_deg();
 #endif
 
-    // call attitude controller with conservative smoothing gain of 4.0f
-    attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw_cd(target.x*100,
-                                                                  target.y*100,
-                                                                  target.z*100);
+    // call attitude controller
+    attitude_control->input_thrust_vector_rate_heading_rads(loiter_nav->get_thrust_vector(), 
+                                                            quadplane.get_desired_yaw_rate_cds() * 0.01, false);
 
     if (plane.control_mode == &plane.mode_qland) {
         if (poscontrol.get_state() < QuadPlane::QPOS_LAND_FINAL && quadplane.check_land_final()) {
