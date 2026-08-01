@@ -441,6 +441,7 @@ def start_SITL(binary,
                enable_fgview=False,
                supplementary=False,
                stdout_prefix=None,
+               wait_for_startup=True,
                ):
     """Launch a SITL instance."""
 
@@ -633,7 +634,14 @@ def start_SITL(binary,
         time.sleep(1)
         # TODO: have a SITL-compiled ardupilot able to have its
         # console on an output fd.
-    else:
+    elif wait_for_startup:
+        # Not every vehicle prints this.  "Waiting for connection ...." (UARTDriver.cpp)
+        # comes only from a TCP listener told to wait, so a serial0 of "mcast:" never
+        # prints it; what actually satisfies this on a Copter is the UNRELATED "Waiting
+        # for internal clock bits to be set" from the simulated LP5562 LED.  A Rover
+        # prints neither and would sit here for the full 300s and then fail, despite
+        # having started perfectly -- such callers pass wait_for_startup=False and prove
+        # the instance is up some other way, typically a heartbeat on a shared bus.
         child.expect('Waiting for ', timeout=300)
     return child
 
