@@ -139,6 +139,11 @@ public:
         ObjectBuffer<struct mavlink_msg> *rx_buffer;
         uint32_t *accept_msg_ids;
         uint16_t accept_msg_ids_size;
+        // the receive queue is silently lossy: it is single-consumer, drained only as often as the
+        // owning script runs, and a script cannot observe an overrun from Lua. Count the discards
+        // so an overrun is diagnosable instead of presenting as unexplained missing messages.
+        uint32_t rx_dropped;
+        uint32_t rx_dropped_reported;   // value of rx_dropped when we last told the GCS
         HAL_Semaphore sem;
     } mavlink_data;
 

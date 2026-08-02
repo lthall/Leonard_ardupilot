@@ -487,7 +487,10 @@ void AP_Scripting::handle_message(const mavlink_message_t &msg, const mavlink_ch
             return;
         }
         if (mavlink_data.accept_msg_ids[i] == msg.msgid) {
-            mavlink_data.rx_buffer->push(data);
+            if (!mavlink_data.rx_buffer->push(data)) {
+                // queue full: this message is gone. Count it -- the script cannot see this.
+                mavlink_data.rx_dropped++;
+            }
             return;
         }
     }
@@ -514,6 +517,14 @@ bool AP_Scripting::is_handling_command(uint16_t cmd_id)
 void AP_Scripting::update() {
 
     save_checksum();
+
+    // report MAVLink receive queue overruns. Reported only when the count moves, so a healthy
+    // system is silent and a script that is losing messages says so instead of failing quietly.
+    if (mavlink_data.rx_dropped != mavlink_data.rx_dropped_reported) {
+        mavlink_data.rx_dropped_reported = mavlink_data.rx_dropped;
+        GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Scripting: MAVLink rx queue full, %u dropped",
+                      (unsigned)mavlink_data.rx_dropped);
+    }
 
 }
 
