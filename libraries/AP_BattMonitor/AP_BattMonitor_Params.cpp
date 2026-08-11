@@ -202,6 +202,26 @@ const AP_Param::GroupInfo AP_BattMonitor_Params::var_info[] = {
     AP_GROUPINFO("ESC_INDEX", 22, AP_BattMonitor_Params, _esc_telem_outbound_index, 0),
 #endif
 
+#ifndef HAL_BUILD_AP_PERIPH
+    // @Param: OVER_AMP
+    // @DisplayName: Current level used to trigger an over current failsafe
+    // @Description: The current that triggers an over current failsafe. Set to 0 to disable. If the battery current rises above this current continuously for more than the period specified by the @PREFIX@OVER_TMR parameter then the vehicle will perform the failsafe specified by the @PREFIX@FS_CRT_ACT parameter. Requires a monitor that measures current.
+    // @Units: A
+    // @Range: 0 500
+    // @Increment: 0.1
+    // @User: Standard
+    AP_GROUPINFO("OVER_AMP", 23, AP_BattMonitor_Params, _over_current, 100.0f),
+
+    // @Param: OVER_TMR
+    // @DisplayName: Timeout in seconds before an over current event will be triggered
+    // @Description: This is the timeout in seconds before an over current event will be triggered. Raising this allows the vehicle to draw a high current briefly, for example during an aggressive climb, without triggering the failsafe. A value of zero disables over current failsafes.
+    // @Units: s
+    // @Increment: 1
+    // @Range: 0 120
+    // @User: Advanced
+    AP_GROUPINFO("OVER_TMR", 24, AP_BattMonitor_Params, _over_current_timeout, 4),
+#endif // HAL_BUILD_AP_PERIPH
+
     AP_GROUPEND
 
 };
