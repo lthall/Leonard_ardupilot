@@ -432,8 +432,9 @@ void AC_Avoid::adjust_velocity_z(float kP, float accel_cmss, float& climb_rate_c
     // calculate distance below fence
     AC_Fence *fence = AP::fence();
     if ((_enabled & AC_AVOID_STOP_AT_FENCE) > 0 && fence) {
-        // calculate distance from vehicle to safe altitude
-        if ((fence->get_enabled_fences() & AC_FENCE_TYPE_ALT_MIN) > 0) {
+        // calculate distance from vehicle to safe altitude.  the floor also honours FENCE_AMIN_RAD
+        // so that we do not hold the vehicle off the ground when landing at home
+        if ((fence->get_enabled_fences() & AC_FENCE_TYPE_ALT_MIN) > 0 && fence->outside_alt_min_radius()) {
             float veh_alt_m;
             if (fence->get_alt_in_alt_min_frame_m(veh_alt_m)) {
                 // fence.get_safe_alt_min_m() is UP, veh_alt_m is UP:
