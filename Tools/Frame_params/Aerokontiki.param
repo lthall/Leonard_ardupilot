@@ -1,0 +1,16 @@
+#NOTE: Aerokontiki payload-delivery copter params for ArduPilot Copter 4.7.0
+# Minimum altitude fence. The floor is only enforced beyond FENCE_AMIN_RAD of home so the
+# vehicle can still take off from and land at home.
+FENCE_ENABLE,1
+FENCE_TYPE,8
+FENCE_ALT_MIN,15
+FENCE_AMIN_RAD,30
+# Gripper. DELAYGRAB holds the gripper open for this long after being commanded to close so
+# the payload line can run clear before the jaws shut.
+GRIP_ENABLE,1
+GRIP_TYPE,1
+GRIP_DELAYGRAB,2
+# Battery over current failsafe. OVER_AMP must be set to suit the airframe; the code default of
+# 100A is a placeholder only.
+BATT_OVER_AMP,100
+BATT_OVER_TMR,4
