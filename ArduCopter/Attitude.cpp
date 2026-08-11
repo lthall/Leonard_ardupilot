@@ -108,6 +108,29 @@ float Copter::get_pilot_desired_climb_rate_ms()
         desired_rate_ms = 0.0f;
     }
 
+#if AP_FENCE_ENABLED
+    // override the pilot and climb if we are below the minimum altitude limit.  FENCE_AMIN_RAD is
+    // the master switch for this protection, and it only applies beyond that distance from home so
+    // the pilot can still land at home.
+    // this deliberately reads the fence parameters rather than asking whether the min alt fence is
+    // enabled.  the fence only enables its floor once the vehicle has climbed above it, so gating
+    // on that would mean a low takeoff flies straight through the limit instead of climbing it.
+    // this must never demand a climb while landed or disarmed: a positive climb demand on the
+    // ground spools the motors up and triggers the take-off state machine, and it also fails the
+    // arming throttle check
+    float curr_alt_u_m;
+    if (!ap.land_complete && is_positive(fence.get_alt_min_radius_m()) &&
+        fence.outside_alt_min_radius() && is_positive(fence.get_safe_alt_min_m()) &&
+        fence.get_alt_in_alt_min_frame_m(curr_alt_u_m)) {
+        // clamp the target to the max alt fence so a misconfigured floor above the ceiling cannot
+        // drive us into it.  this assumes both fences share an altitude frame, which they do
+        // unless FENCE_ALT_MIN_TP and FENCE_ALT_MAX_TP have been set differently
+        if (curr_alt_u_m < constrain_float(fence.get_safe_alt_min_m(), 0.0, fence.get_safe_alt_max_m())) {
+            desired_rate_ms = g2.pilot_speed_up_ms;
+        }
+    }
+#endif
+
     return desired_rate_ms;
 }
 
