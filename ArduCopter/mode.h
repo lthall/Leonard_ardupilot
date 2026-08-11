@@ -1589,6 +1589,9 @@ private:
     void loiterathome_run();
     void build_path();
     void compute_return_target();
+#if AP_GRIPPER_ENABLED
+    void gripper_update();
+#endif
 
     // RTL parameters
     AP_Float altitude_m;

@@ -137,6 +137,10 @@ void ModeRTL::run(bool disarm_on_land)
 
     // check if we need to move to next state
     if (_state_complete) {
+#if AP_GRIPPER_ENABLED
+        // operate the gripper for the state we are leaving
+        gripper_update();
+#endif
         switch (_state) {
         case SubMode::STARTING:
             build_path();
@@ -190,6 +194,39 @@ void ModeRTL::run(bool disarm_on_land)
         break;
     }
 }
+
+#if AP_GRIPPER_ENABLED
+// release the payload on the way home and close the gripper again before landing.  called from
+// run() each time a state completes, including on entry to RTL where the STARTING state is
+// already complete, so the release happens as soon as RTL is entered
+void ModeRTL::gripper_update()
+{
+    if (!AP::gripper().valid()) {
+        return;
+    }
+
+    switch (_state) {
+    case SubMode::STARTING:
+        FALLTHROUGH;
+    case SubMode::INITIAL_CLIMB:
+        FALLTHROUGH;
+    case SubMode::RETURN_HOME:
+        if (AP::gripper().grabbed()) {
+            AP::gripper().release();
+        }
+        break;
+    case SubMode::LOITER_AT_HOME:
+        FALLTHROUGH;
+    case SubMode::FINAL_DESCENT:
+        FALLTHROUGH;
+    case SubMode::LAND:
+        if (AP::gripper().released()) {
+            AP::gripper().grab();
+        }
+        break;
+    }
+}
+#endif  // AP_GRIPPER_ENABLED
 
 // rtl_climb_start - initialise climb to RTL altitude
 void ModeRTL::climb_start()
