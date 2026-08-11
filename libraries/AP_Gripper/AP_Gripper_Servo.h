@@ -53,6 +53,10 @@ protected:
 private:
 
     bool has_state_pwm(const uint16_t pwm) const;
+
+    // true while a grab has been commanded but the servo has not been moved yet because
+    // GRIP_DELAYGRAB has not expired
+    bool _grab_pending = false;
 };
 
 #endif  // AP_GRIPPER_SERVO_ENABLED

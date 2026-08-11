@@ -13,6 +13,7 @@ extern const AP_HAL::HAL& hal;
 #define GRIPPER_NEUTRAL_PWM_DEFAULT     1500
 #define GRIPPER_REGRAB_DEFAULT          0           // default EPM re-grab interval (in seconds) to ensure cargo is securely held
 #define GRIPPER_AUTOCLOSE_DEFAULT       0.0         // default automatic close time (in seconds)
+#define GRIPPER_DELAYGRAB_DEFAULT       0.0         // default delay before the gripper closes (in seconds)
 
 const AP_Param::GroupInfo AP_Gripper::var_info[] = {
     // @Param: ENABLE
@@ -75,6 +76,14 @@ const AP_Param::GroupInfo AP_Gripper::var_info[] = {
     // @Range: 0.25 255
     // @Units: s
     AP_GROUPINFO("AUTOCLOSE",  7, AP_Gripper, config.autoclose_time, GRIPPER_AUTOCLOSE_DEFAULT),
+
+    // @Param: DELAYGRAB
+    // @DisplayName: Gripper delay close time
+    // @Description: Time in seconds that the gripper waits after being commanded to grab before it closes, 0 to disable. Only supported by the servo gripper type.
+    // @User: Advanced
+    // @Range: 0 255
+    // @Units: s
+    AP_GROUPINFO("DELAYGRAB",  8, AP_Gripper, config.delaygrab_time, GRIPPER_DELAYGRAB_DEFAULT),
 
     AP_GROUPEND
 };

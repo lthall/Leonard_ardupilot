@@ -36,8 +36,12 @@ void AP_Gripper_Servo::grab()
     // flag we are active and grabbing cargo
     config.state = AP_Gripper::STATE_GRABBING;
 
-    // move the servo to the grab position
-    SRV_Channels::set_output_pwm(SRV_Channel::k_gripper, config.grab_pwm);
+    // move the servo to the grab position.  if a close delay has been set the servo is left where
+    // it is and update_gripper() moves it once the delay has expired
+    _grab_pending = is_positive(config.delaygrab_time);
+    if (!_grab_pending) {
+        SRV_Channels::set_output_pwm(SRV_Channel::k_gripper, config.grab_pwm);
+    }
     _last_grab_or_release = AP_HAL::millis();
     GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Gripper load grabbing");
     LOGGER_WRITE_EVENT(LogEvent::GRIPPER_GRAB);
@@ -62,6 +66,7 @@ void AP_Gripper_Servo::release()
     config.state = AP_Gripper::STATE_RELEASING;
 
     // move the servo to the release position
+    _grab_pending = false;
     SRV_Channels::set_output_pwm(SRV_Channel::k_gripper, config.release_pwm);
     _last_grab_or_release = AP_HAL::millis();
     GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Gripper load releasing");
@@ -102,9 +107,22 @@ bool AP_Gripper_Servo::grabbed() const
 void AP_Gripper_Servo::update_gripper()
 {
     // Check for successful grabbed or released
-    if (config.state == AP_Gripper::STATE_GRABBING && has_state_pwm(config.grab_pwm)) {
-        config.state = AP_Gripper::STATE_GRABBED;
-        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Gripper load grabbed");
+    if (config.state == AP_Gripper::STATE_GRABBING) {
+        if (_grab_pending) {
+            // move the servo to the grab position once the close delay has expired.  the delay is
+            // re-read each iteration so that zeroing GRIP_DELAYGRAB mid-delay closes the gripper
+            // rather than leaving it stuck in the grabbing state
+            if (!is_positive(config.delaygrab_time) ||
+                (AP_HAL::millis() - _last_grab_or_release > uint32_t(config.delaygrab_time * 1000.0))) {
+                SRV_Channels::set_output_pwm(SRV_Channel::k_gripper, config.grab_pwm);
+                // re-stamp the timer so has_state_pwm() still allows the servo its travel time
+                _last_grab_or_release = AP_HAL::millis();
+                _grab_pending = false;
+            }
+        } else if (has_state_pwm(config.grab_pwm)) {
+            config.state = AP_Gripper::STATE_GRABBED;
+            GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Gripper load grabbed");
+        }
     } else if (config.state == AP_Gripper::STATE_RELEASING && has_state_pwm(config.release_pwm)) {
         config.state = AP_Gripper::STATE_RELEASED;
         GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Gripper load released");
