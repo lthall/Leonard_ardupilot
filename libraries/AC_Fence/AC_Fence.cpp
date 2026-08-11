@@ -29,6 +29,7 @@ extern const AP_HAL::HAL& hal;
 // default boundaries
 #define AC_FENCE_ALT_MAX_DEFAULT                    100.0f  // default max altitude is 100m
 #define AC_FENCE_ALT_MIN_DEFAULT                    -10.0f  // default maximum depth in meters
+#define AC_FENCE_ALT_MIN_RADIUS_DEFAULT             0.0f    // default distance from home beyond which the min altitude fence is enforced, 0 disables the feature
 #define AC_FENCE_CIRCLE_RADIUS_DEFAULT              300.0f  // default circular fence radius is 300m
 #define AC_FENCE_ALT_MAX_BACKUP_DISTANCE            20.0f   // after fence is broken we recreate the fence 20m further up
 #define AC_FENCE_ALT_MIN_BACKUP_DISTANCE            20.0f   // after fence is broken we recreate the fence 20m further down
@@ -178,6 +179,15 @@ const AP_Param::GroupInfo AC_Fence::var_info[] = {
     // @User: Advanced
     // @Values: 0:Above sea level, 1:Above Home, 2: Above Origin, 3: Above Terrain
     AP_GROUPINFO_FRAME("ALT_MIN_TP", 15, AC_Fence, _alt_min_type, float(Location::AltFrame::ABOVE_HOME), AP_PARAM_FRAME_COPTER | AP_PARAM_FRAME_SUB | AP_PARAM_FRAME_TRICOPTER | AP_PARAM_FRAME_HELI | AP_PARAM_FRAME_PLANE),
+
+    // @Param{Copter}: AMIN_RAD
+    // @DisplayName: Fence Minimum Altitude Radius
+    // @Description: Horizontal distance from home beyond which the minimum altitude limit is enforced. Within this distance the vehicle may descend below FENCE_ALT_MIN so that it can take off and land at home. Setting this to a non-zero value stops the pilot descending below FENCE_ALT_MIN beyond this distance from home, and climbs the vehicle back to that altitude if it flies out past this radius while lower. That protection uses FENCE_ALT_MIN and FENCE_MARGIN directly and applies whether or not the minimum altitude fence is selected in FENCE_TYPE. Set to 0 to disable it and enforce the minimum altitude fence everywhere instead.
+    // @Units: m
+    // @Range: 0 100
+    // @Increment: 1
+    // @User: Standard
+    AP_GROUPINFO_FRAME("AMIN_RAD", 16, AC_Fence, _alt_min_radius_m, AC_FENCE_ALT_MIN_RADIUS_DEFAULT, AP_PARAM_FRAME_COPTER | AP_PARAM_FRAME_TRICOPTER | AP_PARAM_FRAME_HELI),
 
     AP_GROUPEND
 };
@@ -684,6 +694,27 @@ bool AC_Fence::check_fence_alt_max()
     return false;
 }
 
+/// outside_alt_min_radius - returns true if the vehicle is far enough from home for the minimum
+/// altitude limit to apply.  always true when no radius has been configured
+bool AC_Fence::outside_alt_min_radius() const
+{
+    if (!is_positive(_alt_min_radius_m)) {
+        // no radius configured so the limit always applies
+        return true;
+    }
+
+    Vector2f curr_pos_NE_m;
+    if (!AP::ahrs().get_relative_position_NE_home(curr_pos_NE_m)) {
+        // position relative to home is unavailable, so we must assume the vehicle may need to
+        // land.  unlike the fence boundary checks, an unavailable measurement here must not
+        // enforce the floor: holding the vehicle off the ground would block the landing
+        return false;
+    }
+
+    // inside AMIN_RAD of home the limit does not apply so the vehicle can take off and land
+    return curr_pos_NE_m.length_squared() >= sq(_alt_min_radius_m.get());
+}
+
 /// returns true if we have freshly breached the minimum altitude
 /// fence; also may set up a fallback fence which, if breached, will
 /// cause the altitude fence to be freshly breached
@@ -707,8 +738,12 @@ bool AC_Fence::check_fence_alt_min()
     // update safe alt min, failure to get home will have already breached above
     update_safe_alt_min();
 
+    // the floor is only enforced beyond AMIN_RAD from home.  when it is not enforced we fall
+    // through to the code below which clears any breach that was latched further out
+    const bool floor_active = outside_alt_min_radius();
+
     // check if we are under the altitude fence
-    if (_curr_alt_u_m <= _alt_min_m) {
+    if (floor_active && _curr_alt_u_m <= _alt_min_m) {
 
 
         // check for a new breach or a breach of the backup fence
@@ -725,7 +760,7 @@ bool AC_Fence::check_fence_alt_min()
         }
         // old breach
         return false;
-    } else if (_curr_alt_u_m <= get_safe_alt_min_m()) {
+    } else if (floor_active && _curr_alt_u_m <= get_safe_alt_min_m()) {
         record_margin_breach(AC_FENCE_TYPE_ALT_MIN);
     } else {
         clear_margin_breach(AC_FENCE_TYPE_ALT_MIN);

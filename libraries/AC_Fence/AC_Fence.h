@@ -178,6 +178,16 @@ public:
         frame = (uint8_t)_alt_min_type.get();
     }
 
+    /// get_alt_min_radius_m - returns the distance from home beyond which the min alt fence is enforced
+    float get_alt_min_radius_m() const { return _alt_min_radius_m.get(); }
+
+    /// outside_alt_min_radius - returns true if the vehicle is far enough from home for the
+    /// minimum altitude limit to apply.  Within AMIN_RAD of home the limit is ignored so that the
+    /// vehicle can take off from and land at home.  An unavailable position relative to home also
+    /// reads as inside the radius so that the vehicle can always land.  Does not consider whether
+    /// the fence is enabled
+    bool outside_alt_min_radius() const;
+
     /// get_radius_m - returns the fence radius in meters
     float get_radius_m() const { return _circle_radius_m.get(); }
 
@@ -291,6 +301,7 @@ private:
     AP_Enum<Action> _action;            // recovery action specified by user
     AP_Float        _alt_max_m;         // altitude upper limit in meters
     AP_Float        _alt_min_m;         // altitude lower limit in meters
+    AP_Float        _alt_min_radius_m;  // distance from home in meters beyond which the altitude lower limit is enforced
     AP_Float        _circle_radius_m;   // circle fence radius in meters
     AP_Float        _margin_m;          // distance in meters that autopilot's should maintain from the fence to avoid a breach
     AP_Float        _margin_ne_m;       // distance in meters that autopilot's should maintain from the horizontal fence to avoid a breach
