@@ -48,6 +48,7 @@ void SCurve::init()
     snap_max = 0.0f;
     jerk_max = 0.0f;
     accel_max = 0.0f;
+    accel_c_max = 0.0f;
     vel_max = 0.0f;
     time = 0.0f;
     num_segs = SEG_INIT;
@@ -105,8 +106,9 @@ void SCurve::calculate_track(const Vector3p &origin, const Vector3p &destination
         arc.center_ne = chord * 0.5f + Vector2f(-chord.y, chord.x) * (center_side * turn_dir * center_offset / chord_length);
         arc.length_ne = arc.radius_ne * fabsf(arc.angle_rad);
         seg_length = safe_sqrt(sq(seg_delta.z) + sq(arc.length_ne));
-        accel_c = is_positive(accel_c) ? accel_c : accel_xy;
-        speed_xy = MIN(speed_xy, safe_sqrt(accel_c * arc.radius_ne));
+        // limit horizontal speed so centripetal acceleration stays within the corner acceleration limit
+        accel_c_max = is_positive(accel_c) ? accel_c : accel_xy;
+        speed_xy = MIN(speed_xy, safe_sqrt(accel_c_max * arc.radius_ne));
     }
     if (is_zero(seg_length)) {
         seg_delta.zero();
@@ -159,6 +161,11 @@ void SCurve::set_speed_max(float speed_xy, float speed_up, float speed_down)
     // return immediately if zero length path
     if (num_segs != segments_max) {
         return;
+    }
+
+    if (is_arc_segment) {
+        // limit horizontal speed so centripetal acceleration stays within the corner acceleration limit
+        speed_xy = MIN(speed_xy, safe_sqrt(accel_c_max * arc.radius_ne));
     }
 
     // segment accelerations can not be changed after segment creation.
