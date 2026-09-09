@@ -3189,6 +3189,13 @@ MAV_RESULT GCS_MAVLINK::handle_command_do_aux_function(const mavlink_command_int
 
 MAV_RESULT GCS_MAVLINK::handle_command_set_message_interval(const mavlink_command_int_t &packet)
 {
+    if (option_enabled(Option::NO_SET_MSG_INTERVAL)) {
+        // this channel's message rates are owned locally (eg. an inter-vehicle link whose
+        // bandwidth is budgeted on board).  Note this acts on the channel the command
+        // ARRIVED on, so a command relayed to us by another vehicle is refused here.
+        // Deliberately DENIED rather than silently ignored, so the sender sees it fail.
+        return MAV_RESULT_DENIED;
+    }
     if (!is_zero(packet.param3)) {
         return MAV_RESULT_DENIED;
     }
