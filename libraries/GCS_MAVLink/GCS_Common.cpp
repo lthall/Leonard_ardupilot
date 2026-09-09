@@ -3254,6 +3254,29 @@ MAV_RESULT GCS_MAVLINK::set_message_interval(uint32_t msg_id, int32_t interval_u
 /*
   this function is reserved for use by scripting
  */
+/*
+  as set_message_interval() above, but addressing the link by its MAVLink instance
+  rather than by serial port number.  This is the identifier the MAVn_ parameters use,
+  so a caller that also configures MAVn_OPTIONS or the MAVn_ stream rates works from
+  one number and cannot mismatch them.  It is also the only form that can name a
+  registered port -- a CAN or network link has no SERIALn_ parameters to be found by.
+
+  mav_instance is 1-based to match the parameter names: 1 is MAV1_/channel 0.
+
+  this function is reserved for use by scripting
+ */
+MAV_RESULT GCS::set_message_interval_chan(uint8_t mav_instance, uint32_t msg_id, int32_t interval_us)
+{
+    if (mav_instance == 0 || mav_instance > num_gcs()) {
+        return MAV_RESULT_FAILED;
+    }
+    GCS_MAVLINK *link = chan(mav_instance - 1);
+    if (link == nullptr) {
+        return MAV_RESULT_FAILED;
+    }
+    return link->set_message_interval(msg_id, interval_us);
+}
+
 MAV_RESULT GCS::set_message_interval(uint8_t port_num, uint32_t msg_id, int32_t interval_us)
 {
     uint8_t channel = get_channel_from_port_number(port_num);
