@@ -216,6 +216,13 @@ bool MAVLink_routing::forward(GCS_MAVLINK &in_link,
             // this is bad
             continue;
         }
+        if (out_link->option_enabled(GCS_MAVLINK::Option::NO_FORWARD_TO)) {
+            // this link's bandwidth is reserved; never spend it relaying another link's
+            // traffic.  One-way: packets FROM it are still forwarded normally.  Note this
+            // is a stricter block than is_private() below, which still lets an exactly
+            // targeted packet through.
+            continue;
+        }
         if (out_link->is_private() &&
             (target_system != routes[i].sysid ||
              target_component != routes[i].compid)) {
