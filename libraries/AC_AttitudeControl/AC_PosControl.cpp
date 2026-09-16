@@ -365,7 +365,9 @@ AC_PosControl::AC_PosControl(AP_AHRS_View& ahrs, const AP_Motors& motors, AC_Att
     _accel_max_ne_mss(POSCONTROL_ACCEL_NE_MSS),
     _accel_max_d_mss(POSCONTROL_ACCEL_D_MSS),
     _jerk_max_ne_msss(POSCONTROL_JERK_NE_MSSS),
-    _jerk_max_d_msss(POSCONTROL_JERK_D_MSSS)
+    _jerk_max_d_msss(POSCONTROL_JERK_D_MSSS),
+    _input_jerk_max_ne_msss(POSCONTROL_JERK_NE_MSSS),
+    _input_jerk_max_d_msss(POSCONTROL_JERK_D_MSSS)
 {
     AP_Param::setup_object_defaults(this, var_info);
 
@@ -392,7 +394,7 @@ void AC_PosControl::input_pos_NED_m(const Vector3p& pos_ned_m, float pos_terrain
     // calculated increased maximum acceleration and jerk if over speed
     const float overspeed_gain = calculate_overspeed_gain();
     const float accel_max_d_mss = _accel_max_d_mss * overspeed_gain;
-    const float jerk_max_d_msss = _jerk_max_d_msss * overspeed_gain;
+    const float jerk_max_d_msss = _input_jerk_max_d_msss * overspeed_gain;
 
     update_pos_vel_accel_xy(_pos_desired_ned_m.xy(), _vel_desired_ned_ms.xy(), _accel_desired_ned_mss.xy(), _dt_s, _limit_vector_ned.xy(), _p_pos_ne_m.get_error(), _pid_vel_ne_m.get_error());
 
@@ -418,7 +420,7 @@ void AC_PosControl::input_pos_NED_m(const Vector3p& pos_ned_m, float pos_terrain
     Vector2f vel_ne_ms;
     Vector2f accel_ne_mss;
     shape_pos_vel_accel_xy(pos_ned_m.xy(), vel_ne_ms, accel_ne_mss, _pos_desired_ned_m.xy(), _vel_desired_ned_ms.xy(), _accel_desired_ned_mss.xy(),
-                           vel_max_ne_ms, _accel_max_ne_mss, _jerk_max_ne_msss, _dt_s, false);
+                           vel_max_ne_ms, _accel_max_ne_mss, _input_jerk_max_ne_msss, _dt_s, false);
 
     float pos_d_m = pos_ned_m.z;
     shape_pos_vel_accel(pos_d_m, 0, 0,
@@ -455,7 +457,7 @@ void AC_PosControl::NE_set_max_speed_accel_cm(float speed_ne_cms, float accel_ne
 // Sets maximum horizontal speed (m/s) and acceleration (m/s²) for NE-axis shaping.
 // These values constrain the kinematic trajectory used by the lateral controller.
 // All arguments should be positive.
-void AC_PosControl::NE_set_max_speed_accel_m(float speed_ne_ms, float accel_ne_mss)
+void AC_PosControl::NE_set_max_speed_accel_m(float speed_ne_ms, float accel_ne_mss, float jerk_msss)
 {
     _vel_max_ne_ms = fabsf(speed_ne_ms);
     _accel_max_ne_mss = fabsf(accel_ne_mss);
@@ -475,6 +477,12 @@ void AC_PosControl::NE_set_max_speed_accel_m(float speed_ne_ms, float accel_ne_m
     // limit maximum jerk to maximum possible average jerk based on angular acceleration
     if (is_positive(snap_max_mssss) && _attitude_control.get_bf_feedforward()) {
         _jerk_max_ne_msss = MIN(0.5 * safe_sqrt(_accel_max_ne_mss * snap_max_mssss), _jerk_max_ne_msss);
+    }
+
+    // reset the input shaping jerk limit, then apply the caller's request if one was given
+    _input_jerk_max_ne_msss = _jerk_max_ne_msss;
+    if (is_positive(jerk_msss)) {
+        _input_jerk_max_ne_msss = MIN(jerk_msss, _jerk_max_ne_msss);
     }
 }
 
@@ -592,7 +600,7 @@ void AC_PosControl::NE_init_controller()
 void AC_PosControl::input_accel_NE_m(const Vector2f& accel_ne_mss)
 {
     update_pos_vel_accel_xy(_pos_desired_ned_m.xy(), _vel_desired_ned_ms.xy(), _accel_desired_ned_mss.xy(), _dt_s, _limit_vector_ned.xy(), _p_pos_ne_m.get_error(), _pid_vel_ne_m.get_error());
-    shape_accel_xy(accel_ne_mss, _accel_desired_ned_mss.xy(), _jerk_max_ne_msss, _dt_s);
+    shape_accel_xy(accel_ne_mss, _accel_desired_ned_mss.xy(), _input_jerk_max_ne_msss, _dt_s);
 }
 
 // Sets desired NE-plane velocity and acceleration (cm/s, cm/s²) using jerk-limited shaping.
@@ -612,7 +620,7 @@ void AC_PosControl::input_vel_accel_NE_m(Vector2f& vel_ne_ms, const Vector2f& ac
     update_pos_vel_accel_xy(_pos_desired_ned_m.xy(), _vel_desired_ned_ms.xy(), _accel_desired_ned_mss.xy(), _dt_s, _limit_vector_ned.xy(), _p_pos_ne_m.get_error(), _pid_vel_ne_m.get_error());
 
     shape_vel_accel_xy(vel_ne_ms, accel_ne_mss, _vel_desired_ned_ms.xy(), _accel_desired_ned_mss.xy(),
-        _accel_max_ne_mss, _jerk_max_ne_msss, _dt_s, limit_output);
+        _accel_max_ne_mss, _input_jerk_max_ne_msss, _dt_s, limit_output);
 
     update_vel_accel_xy(vel_ne_ms, accel_ne_mss, _dt_s, Vector2f(), Vector2f());
 }
@@ -636,7 +644,7 @@ void AC_PosControl::input_pos_vel_accel_NE_m(Vector2p& pos_ne_m, Vector2f& vel_n
     update_pos_vel_accel_xy(_pos_desired_ned_m.xy(), _vel_desired_ned_ms.xy(), _accel_desired_ned_mss.xy(), _dt_s, _limit_vector_ned.xy(), _p_pos_ne_m.get_error(), _pid_vel_ne_m.get_error());
 
     shape_pos_vel_accel_xy(pos_ne_m, vel_ne_ms, accel_ne_mss, _pos_desired_ned_m.xy(), _vel_desired_ned_ms.xy(), _accel_desired_ned_mss.xy(),
-                           _vel_max_ne_ms, _accel_max_ne_mss, _jerk_max_ne_msss, _dt_s, limit_output);
+                           _vel_max_ne_ms, _accel_max_ne_mss, _input_jerk_max_ne_msss, _dt_s, limit_output);
 
     update_pos_vel_accel_xy(pos_ne_m, vel_ne_ms, accel_ne_mss, _dt_s, Vector2f(), Vector2f(), Vector2f());
 }
@@ -802,7 +810,7 @@ void AC_PosControl::D_set_max_speed_accel_cm(float decent_speed_max_cms, float c
 // Sets maximum climb/descent rate (m/s) and vertical acceleration (m/s²) for the U-axis.
 // These values are used for jerk-limited kinematic shaping of the vertical trajectory.
 // All values must be positive.
-void AC_PosControl::D_set_max_speed_accel_m(float decent_speed_max_ms, float climb_speed_max_ms, float accel_max_d_mss)
+void AC_PosControl::D_set_max_speed_accel_m(float decent_speed_max_ms, float climb_speed_max_ms, float accel_max_d_mss, float jerk_msss)
 {
     // sanity check and update
     if (!is_zero(decent_speed_max_ms)) {
@@ -822,6 +830,12 @@ void AC_PosControl::D_set_max_speed_accel_m(float decent_speed_max_ms, float cli
     }
     if (is_positive(_pid_accel_d_m.filt_E_hz())) {
         _jerk_max_d_msss = MIN(_jerk_max_d_msss, MIN(GRAVITY_MSS, _accel_max_d_mss) * (M_2PI * _pid_accel_d_m.filt_E_hz()) / 5.0);
+    }
+
+    // reset the input shaping jerk limit, then apply the caller's request if one was given
+    _input_jerk_max_d_msss = _jerk_max_d_msss;
+    if (is_positive(jerk_msss)) {
+        _input_jerk_max_d_msss = MIN(jerk_msss, _jerk_max_d_msss);
     }
 }
 
@@ -938,7 +952,7 @@ void AC_PosControl::D_init_controller()
 void AC_PosControl::input_accel_D_m(float accel_d_mss)
 {
     // calculated increased maximum jerk if over speed
-    float jerk_max_d_msss = _jerk_max_d_msss * calculate_overspeed_gain();
+    float jerk_max_d_msss = _input_jerk_max_d_msss * calculate_overspeed_gain();
 
     // adjust desired alt if motors have not hit their limits
     update_pos_vel_accel(_pos_desired_ned_m.z, _vel_desired_ned_ms.z, _accel_desired_ned_mss.z, _dt_s, _limit_vector_ned.z, _p_pos_d_m.get_error(), _pid_vel_d_m.get_error());
@@ -954,7 +968,7 @@ void AC_PosControl::input_vel_accel_D_m(float &vel_d_ms, float accel_d_mss, bool
     // calculated increased maximum acceleration and jerk if over speed
     const float overspeed_gain = calculate_overspeed_gain();
     const float accel_max_d_mss = _accel_max_d_mss * overspeed_gain;
-    const float jerk_max_d_msss = _jerk_max_d_msss * overspeed_gain;
+    const float jerk_max_d_msss = _input_jerk_max_d_msss * overspeed_gain;
 
     // adjust desired alt if motors have not hit their limits
     update_pos_vel_accel(_pos_desired_ned_m.z, _vel_desired_ned_ms.z, _accel_desired_ned_mss.z, _dt_s, _limit_vector_ned.z, _p_pos_d_m.get_error(), _pid_vel_d_m.get_error());
@@ -1008,7 +1022,7 @@ void AC_PosControl::input_pos_vel_accel_D_m(float &pos_d_m, float &vel_d_ms, flo
     // calculated increased maximum acceleration and jerk if over speed
     const float overspeed_gain = calculate_overspeed_gain();
     const float accel_max_d_mss = _accel_max_d_mss * overspeed_gain;
-    const float jerk_max_d_msss = _jerk_max_d_msss * overspeed_gain;
+    const float jerk_max_d_msss = _input_jerk_max_d_msss * overspeed_gain;
 
     // adjust desired altitude if motors have not hit their limits
     update_pos_vel_accel(_pos_desired_ned_m.z, _vel_desired_ned_ms.z, _accel_desired_ned_mss.z, _dt_s, _limit_vector_ned.z, _p_pos_d_m.get_error(), _pid_vel_d_m.get_error());
