@@ -13,6 +13,8 @@
 
 // maximum velocities and accelerations
 #define WPNAV_ACCELERATION_MS           2.5        // default horizontal acceleration limit for waypoint navigation (m/s²)
+#define WPNAV_JERK_MS                   1.0        // default horizontal jerk limit for waypoint navigation (m/s³)
+#define WPNAV_JERK_D_MSSS               5.0        // default vertical jerk limit for waypoint navigation (m/s³), matches POSCONTROL_JERK_D_MSSS so the vertical response is unchanged by default
 
 class AC_WPNav
 {
@@ -138,6 +140,14 @@ public:
     // Returns the horizontal acceleration in m/s² used during waypoint navigation.
     // Derived from the WP_ACC parameter. Falls back to a default if unset.
     float get_wp_acceleration_mss() const { return (is_positive(_wp_accel_mss)) ? _wp_accel_mss : WPNAV_ACCELERATION_MS; }
+
+    // Returns the horizontal jerk in m/s³ used during waypoint navigation.
+    // Derived from the WP_JERK parameter. Falls back to a default if unset.
+    float get_wp_jerk_msss() const { return (is_positive(_wp_jerk_msss)) ? _wp_jerk_msss : WPNAV_JERK_MS; }
+
+    // Returns the vertical jerk in m/s³ used during waypoint navigation.
+    // Derived from the WP_JERK_D parameter. Falls back to a default if unset.
+    float get_wp_jerk_D_msss() const { return (is_positive(_wp_jerk_d_msss)) ? _wp_jerk_d_msss : WPNAV_JERK_D_MSSS; }
 
     // Returns the maximum lateral acceleration in m/s² used during waypoint cornering.
     // Derived from WP_ACC_C or defaults to 2x WP_ACC if unset.
@@ -384,6 +394,7 @@ protected:
     AP_Float    _wp_accel_c_mss;    // maximum acceleration in m/s² for turns; defaults to 2x horizontal accel if unset
     AP_Float    _wp_accel_z_mss;    // maximum vertical acceleration in m/s² used during climb or descent
     AP_Float    _wp_jerk_msss;      // maximum jerk in m/s³ used for s-curve trajectory shaping
+    AP_Float    _wp_jerk_d_msss;    // maximum vertical jerk in m/s³ used by the vertical input shaping calls
     AP_Float    _terrain_margin_m;  // minimum altitude margin in meters when terrain following is active
 
     // WP_SPD param change checker

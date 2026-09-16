@@ -29,12 +29,20 @@ const AP_Param::GroupInfo AC_WPNav::var_info[] = {
     AP_GROUPINFO("RFND_USE",   10, AC_WPNav, _rangefinder_use, 1),
 
     // @Param: JERK
-    // @DisplayName: Waypoint Jerk
-    // @Description: Defines the horizontal jerk in m/s/s used during missions
+    // @DisplayName: Waypoint Horizontal Jerk
+    // @Description: Defines the horizontal jerk in m/s/s/s used during missions and other automatic navigation. Limited by the vehicle's attitude control capability.
     // @Units: m/s/s/s
-    // @Range: 1 20
+    // @Range: 0.5 20
     // @User: Standard
-    AP_GROUPINFO("JERK",   11, AC_WPNav, _wp_jerk_msss, 1.0f),
+    AP_GROUPINFO("JERK",   11, AC_WPNav, _wp_jerk_msss, WPNAV_JERK_MS),
+
+    // @Param: JERK_D
+    // @DisplayName: Waypoint Vertical Jerk
+    // @Description: Defines the vertical jerk in m/s/s/s used during landing, payload place and other automatic vertical manoeuvres. Waypoint mission legs use WP_JERK for all axes. Limited by PSC_D_JERK.
+    // @Units: m/s/s/s
+    // @Range: 0.5 50
+    // @User: Standard
+    AP_GROUPINFO("JERK_D", 13, AC_WPNav, _wp_jerk_d_msss, WPNAV_JERK_D_MSSS),
 
     // @Param: TER_MARGIN
     // @DisplayName: Waypoint Terrain following altitude margin
@@ -228,10 +236,13 @@ void AC_WPNav::wp_and_spline_init_m(float speed_ms, Vector3p stopping_point_ned_
     _wp_desired_speed_ne_ms = is_positive(speed_ms) ? speed_ms : get_default_speed_NE_ms();
     _wp_desired_speed_ne_ms = MAX(_wp_desired_speed_ne_ms, WP_SPD_MIN);
 
-    // initialise position controller speed and acceleration
-    _pos_control.NE_set_max_speed_accel_m(_wp_desired_speed_ne_ms, get_wp_acceleration_mss());
+    // initialise position controller speed, acceleration and jerk.  The jerk limits are
+    // not read by the S-curve path (which writes targets via set_pos_vel_accel_NED_m),
+    // but these setters reset them, so they are passed to stop a later input-shaped
+    // manoeuvre from silently inheriting the vehicle capability limit.
+    _pos_control.NE_set_max_speed_accel_m(_wp_desired_speed_ne_ms, get_wp_acceleration_mss(), get_wp_jerk_msss());
     _pos_control.NE_set_correction_speed_accel_m(_wp_desired_speed_ne_ms, get_wp_acceleration_mss());
-    _pos_control.D_set_max_speed_accel_m(get_default_speed_down_ms(), get_default_speed_up_ms(), get_accel_D_mss());
+    _pos_control.D_set_max_speed_accel_m(get_default_speed_down_ms(), get_default_speed_up_ms(), get_accel_D_mss(), get_wp_jerk_D_msss());
     _pos_control.D_set_correction_speed_accel_m(get_default_speed_down_ms(), get_default_speed_up_ms(), get_accel_D_mss());
 
     // calculate jerk limit if not explicitly set by parameter
@@ -285,8 +296,8 @@ void AC_WPNav::set_speed_NE_ms(float speed_ms)
         // set new desired horizontal speed for waypoint controller
         _wp_desired_speed_ne_ms = speed_ms;
 
-        // update horizontal shaping and correction constraints
-        _pos_control.NE_set_max_speed_accel_m(_wp_desired_speed_ne_ms, get_wp_acceleration_mss());
+        // update horizontal shaping and correction constraints, keeping the jerk limit applied
+        _pos_control.NE_set_max_speed_accel_m(_wp_desired_speed_ne_ms, get_wp_acceleration_mss(), get_wp_jerk_msss());
         _pos_control.NE_set_correction_speed_accel_m(_wp_desired_speed_ne_ms, get_wp_acceleration_mss());
 
         // update internal trajectory with new limits
@@ -298,8 +309,8 @@ void AC_WPNav::set_speed_NE_ms(float speed_ms)
 // Updates the vertical controller with the new ascent rate limit.
 void AC_WPNav::set_speed_up_ms(float speed_up_ms)
 {
-    // update vertical controller's max speed and accel limits (U axis)
-    _pos_control.D_set_max_speed_accel_m(_pos_control.get_max_speed_down_ms(), speed_up_ms, _pos_control.D_get_max_accel_mss());
+    // update vertical controller's max speed, accel and jerk limits (U axis)
+    _pos_control.D_set_max_speed_accel_m(_pos_control.get_max_speed_down_ms(), speed_up_ms, _pos_control.D_get_max_accel_mss(), get_wp_jerk_D_msss());
 
     // recompute the trajectory using updated limits
     update_track_with_speed_accel_limits();
@@ -309,8 +320,8 @@ void AC_WPNav::set_speed_up_ms(float speed_up_ms)
 // Updates the vertical controller with the new descent rate limit.
 void AC_WPNav::set_speed_down_ms(float speed_down_ms)
 {
-    // update vertical controller descent speed
-    _pos_control.D_set_max_speed_accel_m(speed_down_ms, _pos_control.get_max_speed_up_ms(), _pos_control.D_get_max_accel_mss());
+    // update vertical controller descent speed, keeping the jerk limit applied
+    _pos_control.D_set_max_speed_accel_m(speed_down_ms, _pos_control.get_max_speed_up_ms(), _pos_control.D_get_max_accel_mss(), get_wp_jerk_D_msss());
 
     // recompute the trajectory using updated limits
     update_track_with_speed_accel_limits();
