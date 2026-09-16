@@ -64,8 +64,8 @@ bool ModeLand::init(bool ignore_checks)
     // check if we have GPS and decide which LAND we're going to do
     control_position = copter.position_ok();
 
-    // set horizontal speed and acceleration limits
-    pos_control->NE_set_max_speed_accel_m(wp_nav->get_default_speed_NE_ms(), wp_nav->get_wp_acceleration_mss());
+    // set horizontal speed, acceleration and jerk limits
+    pos_control->NE_set_max_speed_accel_m(wp_nav->get_default_speed_NE_ms(), wp_nav->get_wp_acceleration_mss(), wp_nav->get_wp_jerk_msss());
     pos_control->NE_set_correction_speed_accel_m(wp_nav->get_default_speed_NE_ms(), wp_nav->get_wp_acceleration_mss());
 
     // initialise the horizontal position controller
@@ -73,8 +73,8 @@ bool ModeLand::init(bool ignore_checks)
         pos_control->NE_init_controller();
     }
 
-    // set vertical speed and acceleration limits
-    pos_control->D_set_max_speed_accel_m(wp_nav->get_default_speed_down_ms(), wp_nav->get_default_speed_up_ms(), wp_nav->get_accel_D_mss());
+    // set vertical speed, acceleration and jerk limits
+    pos_control->D_set_max_speed_accel_m(wp_nav->get_default_speed_down_ms(), wp_nav->get_default_speed_up_ms(), wp_nav->get_accel_D_mss(), wp_nav->get_wp_jerk_D_msss());
     pos_control->D_set_correction_speed_accel_m(wp_nav->get_default_speed_down_ms(), wp_nav->get_default_speed_up_ms(), wp_nav->get_accel_D_mss());
 
     // initialise the vertical position controller

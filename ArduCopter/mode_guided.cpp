@@ -251,12 +251,12 @@ void ModeGuided::wp_control_run()
 // initialise position controller
 void ModeGuided::pva_control_start()
 {
-    // initialise horizontal speed, acceleration
-    pos_control->NE_set_max_speed_accel_m(wp_nav->get_default_speed_NE_ms(), wp_nav->get_wp_acceleration_mss());
+    // initialise horizontal speed, acceleration and jerk
+    pos_control->NE_set_max_speed_accel_m(wp_nav->get_default_speed_NE_ms(), wp_nav->get_wp_acceleration_mss(), wp_nav->get_wp_jerk_msss());
     pos_control->NE_set_correction_speed_accel_m(wp_nav->get_default_speed_NE_ms(), wp_nav->get_wp_acceleration_mss());
 
-    // initialize vertical speeds and acceleration
-    pos_control->D_set_max_speed_accel_m(wp_nav->get_default_speed_down_ms(), wp_nav->get_default_speed_up_ms(), wp_nav->get_accel_D_mss());
+    // initialize vertical speeds, acceleration and jerk
+    pos_control->D_set_max_speed_accel_m(wp_nav->get_default_speed_down_ms(), wp_nav->get_default_speed_up_ms(), wp_nav->get_accel_D_mss(), wp_nav->get_wp_jerk_D_msss());
     pos_control->D_set_correction_speed_accel_m(wp_nav->get_default_speed_down_ms(), wp_nav->get_default_speed_up_ms(), wp_nav->get_accel_D_mss());
 
     // initialise velocity controller
@@ -317,8 +317,8 @@ bool ModeGuided::is_taking_off() const
 
 bool ModeGuided::set_speed_NE_ms(float speed_ne_ms)
 {
-    // initialise horizontal speed, acceleration
-    pos_control->NE_set_max_speed_accel_m(speed_ne_ms, wp_nav->get_wp_acceleration_mss());
+    // initialise horizontal speed, acceleration and jerk
+    pos_control->NE_set_max_speed_accel_m(speed_ne_ms, wp_nav->get_wp_acceleration_mss(), wp_nav->get_wp_jerk_msss());
     pos_control->NE_set_correction_speed_accel_m(speed_ne_ms, wp_nav->get_wp_acceleration_mss());
     return true;
 }
@@ -326,7 +326,7 @@ bool ModeGuided::set_speed_NE_ms(float speed_ne_ms)
 bool ModeGuided::set_speed_up_ms(float speed_up_ms)
 {
     // initialize vertical speeds and acceleration
-    pos_control->D_set_max_speed_accel_m(wp_nav->get_default_speed_down_ms(), speed_up_ms, wp_nav->get_accel_D_mss());
+    pos_control->D_set_max_speed_accel_m(wp_nav->get_default_speed_down_ms(), speed_up_ms, wp_nav->get_accel_D_mss(), wp_nav->get_wp_jerk_D_msss());
     pos_control->D_set_correction_speed_accel_m(wp_nav->get_default_speed_down_ms(), speed_up_ms, wp_nav->get_accel_D_mss());
     return true;
 }
@@ -334,7 +334,7 @@ bool ModeGuided::set_speed_up_ms(float speed_up_ms)
 bool ModeGuided::set_speed_down_ms(float speed_down_ms)
 {
     // initialize vertical speeds and acceleration
-    pos_control->D_set_max_speed_accel_m(speed_down_ms, wp_nav->get_default_speed_up_ms(), wp_nav->get_accel_D_mss());
+    pos_control->D_set_max_speed_accel_m(speed_down_ms, wp_nav->get_default_speed_up_ms(), wp_nav->get_accel_D_mss(), wp_nav->get_wp_jerk_D_msss());
     pos_control->D_set_correction_speed_accel_m(speed_down_ms, wp_nav->get_default_speed_up_ms(), wp_nav->get_accel_D_mss());
     return true;
 }
@@ -345,8 +345,8 @@ void ModeGuided::angle_control_start()
     // set guided_mode to velocity controller
     guided_mode = SubMode::Angle;
 
-    // set vertical speed and acceleration limits
-    pos_control->D_set_max_speed_accel_m(wp_nav->get_default_speed_down_ms(), wp_nav->get_default_speed_up_ms(), wp_nav->get_accel_D_mss());
+    // set vertical speed, acceleration and jerk limits
+    pos_control->D_set_max_speed_accel_m(wp_nav->get_default_speed_down_ms(), wp_nav->get_default_speed_up_ms(), wp_nav->get_accel_D_mss(), wp_nav->get_wp_jerk_D_msss());
     pos_control->D_set_correction_speed_accel_m(wp_nav->get_default_speed_down_ms(), wp_nav->get_default_speed_up_ms(), wp_nav->get_accel_D_mss());
 
     // initialise the vertical position controller
