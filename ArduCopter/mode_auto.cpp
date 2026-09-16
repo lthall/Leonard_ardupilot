@@ -510,8 +510,8 @@ bool ModeAuto::wp_start(const Location& dest_loc, float arc_rad)
 // land_start - initialises controller to implement a landing
 void ModeAuto::land_start()
 {
-    // set horizontal speed and acceleration limits
-    pos_control->NE_set_max_speed_accel_m(wp_nav->get_default_speed_NE_ms(), wp_nav->get_wp_acceleration_mss());
+    // set horizontal speed, acceleration and jerk limits
+    pos_control->NE_set_max_speed_accel_m(wp_nav->get_default_speed_NE_ms(), wp_nav->get_wp_acceleration_mss(), wp_nav->get_wp_jerk_msss());
     pos_control->NE_set_correction_speed_accel_m(wp_nav->get_default_speed_NE_ms(), wp_nav->get_wp_acceleration_mss());
 
     // initialise the vertical position controller
@@ -519,8 +519,8 @@ void ModeAuto::land_start()
         pos_control->NE_init_controller();
     }
 
-    // set vertical speed and acceleration limits
-    pos_control->D_set_max_speed_accel_m(wp_nav->get_default_speed_down_ms(), wp_nav->get_default_speed_up_ms(), wp_nav->get_accel_D_mss());
+    // set vertical speed, acceleration and jerk limits
+    pos_control->D_set_max_speed_accel_m(wp_nav->get_default_speed_down_ms(), wp_nav->get_default_speed_up_ms(), wp_nav->get_accel_D_mss(), wp_nav->get_wp_jerk_D_msss());
     pos_control->D_set_correction_speed_accel_m(wp_nav->get_default_speed_down_ms(), wp_nav->get_default_speed_up_ms(), wp_nav->get_accel_D_mss());
 
     // initialise the vertical position controller
@@ -703,8 +703,8 @@ void PayloadPlace::start_descent()
     auto *pos_control = copter.pos_control;
     auto *wp_nav = copter.wp_nav;
 
-    // set horizontal speed and acceleration limits
-    pos_control->NE_set_max_speed_accel_m(wp_nav->get_default_speed_NE_ms(), wp_nav->get_wp_acceleration_mss());
+    // set horizontal speed, acceleration and jerk limits
+    pos_control->NE_set_max_speed_accel_m(wp_nav->get_default_speed_NE_ms(), wp_nav->get_wp_acceleration_mss(), wp_nav->get_wp_jerk_msss());
     pos_control->NE_set_correction_speed_accel_m(wp_nav->get_default_speed_NE_ms(), wp_nav->get_wp_acceleration_mss());
 
     // initialise the vertical position controller
@@ -712,8 +712,8 @@ void PayloadPlace::start_descent()
         pos_control->NE_init_controller();
     }
 
-    // set vertical speed and acceleration limits
-    pos_control->D_set_max_speed_accel_m(wp_nav->get_default_speed_down_ms(), wp_nav->get_default_speed_up_ms(), wp_nav->get_accel_D_mss());
+    // set vertical speed, acceleration and jerk limits
+    pos_control->D_set_max_speed_accel_m(wp_nav->get_default_speed_down_ms(), wp_nav->get_default_speed_up_ms(), wp_nav->get_accel_D_mss(), wp_nav->get_wp_jerk_D_msss());
     pos_control->D_set_correction_speed_accel_m(wp_nav->get_default_speed_down_ms(), wp_nav->get_default_speed_up_ms(), wp_nav->get_accel_D_mss());
 
     // initialise the vertical position controller
@@ -1223,8 +1223,8 @@ void ModeAuto::loiter_to_alt_run()
     }
 
     if (!loiter_to_alt.loiter_start_done) {
-        // set horizontal speed and acceleration limits
-        pos_control->NE_set_max_speed_accel_m(wp_nav->get_default_speed_NE_ms(), wp_nav->get_wp_acceleration_mss());
+        // set horizontal speed, acceleration and jerk limits
+        pos_control->NE_set_max_speed_accel_m(wp_nav->get_default_speed_NE_ms(), wp_nav->get_wp_acceleration_mss(), wp_nav->get_wp_jerk_msss());
         pos_control->NE_set_correction_speed_accel_m(wp_nav->get_default_speed_NE_ms(), wp_nav->get_wp_acceleration_mss());
 
         if (!pos_control->NE_is_active()) {
@@ -1957,8 +1957,8 @@ void ModeAuto::do_loiter_to_alt(const AP_Mission::Mission_Command& cmd)
     loiter_to_alt.reached_alt = false;
     loiter_to_alt.alt_error_m = 0;
 
-    // set vertical speed and acceleration limits
-    pos_control->D_set_max_speed_accel_m(wp_nav->get_default_speed_down_ms(), wp_nav->get_default_speed_up_ms(), wp_nav->get_accel_D_mss());
+    // set vertical speed, acceleration and jerk limits
+    pos_control->D_set_max_speed_accel_m(wp_nav->get_default_speed_down_ms(), wp_nav->get_default_speed_up_ms(), wp_nav->get_accel_D_mss(), wp_nav->get_wp_jerk_D_msss());
     pos_control->D_set_correction_speed_accel_m(wp_nav->get_default_speed_down_ms(), wp_nav->get_default_speed_up_ms(), wp_nav->get_accel_D_mss());
 
     // set submode
