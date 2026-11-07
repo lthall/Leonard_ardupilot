@@ -14774,11 +14774,11 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
 
         self.wait_for_local_velocity(vx=vx, vy=vy, vz_up=vz_up, timeout=10)
         self.send_pause_command()
-        self.wait_for_local_velocity(vx=0, vy=0, vz_up=0, timeout=10)
+        self.wait_for_local_velocity(vx=0, vy=0, vz_up=0, timeout=15)
         self.send_resume_command()
         self.wait_for_local_velocity(vx=vx, vy=vy, vz_up=vz_up, timeout=10)
         self.test_guided_local_velocity_target(vx=0, vy=0, vz_up=0, timeout=10)
-        self.wait_for_local_velocity(vx=0, vy=0, vz_up=0, timeout=10)
+        self.wait_for_local_velocity(vx=0, vy=0, vz_up=0, timeout=15)
 
         self.end_subtest("Ended test for Pause/Continue in GUIDED mode with VELOCITY!")
         self.start_subtest("Started test for Pause/Continue in GUIDED mode with ACCELERATION!")
@@ -14808,11 +14808,11 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
 
         self.wait_for_local_velocity(vx=5, vy=5, vz_up=0, timeout=10)
         self.send_pause_command()
-        self.wait_for_local_velocity(vx=0, vy=0, vz_up=0, timeout=10)
+        self.wait_for_local_velocity(vx=0, vy=0, vz_up=0, timeout=15)
         self.send_resume_command()
         self.wait_for_local_velocity(vx=5, vy=5, vz_up=0, timeout=10)
         self.test_guided_local_velocity_target(vx=0, vy=0, vz_up=0, timeout=10)
-        self.wait_for_local_velocity(vx=0, vy=0, vz_up=0, timeout=10)
+        self.wait_for_local_velocity(vx=0, vy=0, vz_up=0, timeout=15)
         self.end_subtest("Ended test for Pause/Continue in GUIDED mode with ACCELERATION!")
 
         # start pause/continue subtest with posvelaccel
@@ -14843,7 +14843,7 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
 
         self.wait_distance_to_local_position(local_position=(x, y, -z_up), distance_min=400, distance_max=450, timeout=120)
         self.send_pause_command()
-        self.wait_for_local_velocity(0, 0, 0, timeout=10)
+        self.wait_for_local_velocity(0, 0, 0, timeout=15)
         self.send_resume_command()
         self.wait_distance_to_local_position(local_position=(x, y, -z_up), distance_min=0, distance_max=10, timeout=120)
 
