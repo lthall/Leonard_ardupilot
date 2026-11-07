@@ -6772,6 +6772,210 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
         self.wait_waypoint(num_wp-1, num_wp-1)
         self.do_RTL()
 
+    def payload_place_start(self, parameters=None, alt=20, max_descent=0, gripper=True, rangefinder=False):
+        '''fly a mission that takes off, does a payload place straight down from there and then
+        returns.  Statustexts are collected, and the caller must call context_pop'''
+        self.context_push()
+        self.context_collect('STATUSTEXT')
+        if gripper:
+            self.set_servo_gripper_parameters()
+        if rangefinder:
+            self.set_analog_rangefinder_parameters()
+        self.set_parameters({"AUTO_OPTIONS": 3, "PLDP_SPEED_DN": 1})
+        if parameters is not None:
+            self.set_parameters(parameters)
+        self.reboot_sitl()
+        self.upload_simple_relhome_mission([
+            (mavutil.mavlink.MAV_CMD_NAV_TAKEOFF, 0, 0, alt),
+            self.create_MISSION_ITEM_INT(
+                mavutil.mavlink.MAV_CMD_NAV_PAYLOAD_PLACE,
+                p1=max_descent,
+                frame=mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
+            ),
+            (mavutil.mavlink.MAV_CMD_NAV_RETURN_TO_LAUNCH, 0, 0, 0),
+        ])
+        self.change_mode('AUTO')
+        self.wait_ready_to_arm()
+        self.arm_vehicle()
+        self.wait_current_waypoint(2, timeout=120)
+
+    def payload_place_wait_text(self, text, timeout=120):
+        '''wait for a statustext, returning the altitude the vehicle was at when it arrived'''
+        tstart = self.get_sim_time()
+        while True:
+            alt = self.assert_receive_message('GLOBAL_POSITION_INT').relative_alt * 0.001
+            if self.statustext_in_collections(text):
+                self.progress("Got (%s) at %.1f m" % (text, alt))
+                return alt
+            if self.get_sim_time_cached() - tstart > timeout:
+                raise NotAchievedException("Did not get (%s)" % text)
+
+    def payload_place_assert_alt(self, what, alt, alt_min, alt_max):
+        if alt < alt_min or alt > alt_max:
+            raise NotAchievedException("%s at %.1f m, want %.1f to %.1f m" % (what, alt, alt_min, alt_max))
+
+    def payload_place_assert_servo(self, released):
+        '''check the gripper servo itself, not only what the vehicle says it did'''
+        if not self.get_parameter("GRIP_ENABLE"):
+            return
+        servo = self.assert_receive_message('SERVO_OUTPUT_RAW').servo8_raw
+        release_pwm = self.get_parameter("GRIP_RELEASE")
+        if (abs(servo - release_pwm) < 10) != released:
+            raise NotAchievedException("Gripper servo %u with release at %u, want released=%s" % (
+                servo, release_pwm, released))
+
+    def payload_place_finish(self, alt, gripper_released=True):
+        '''the vehicle must climb back to its starting altitude and carry on with the mission'''
+        released = self.statustext_in_collections("Releasing the gripper") is not None
+        if released != gripper_released:
+            raise NotAchievedException("Gripper released=%s, want %s" % (released, gripper_released))
+        self.payload_place_assert_servo(gripper_released)
+        self.wait_altitude(alt - 2, alt + 2, relative=True, timeout=120)
+        self.wait_current_waypoint(3, timeout=60)
+        self.wait_disarmed(timeout=180)
+        self.context_pop()
+
+    def PayloadPlaceMaxDescent(self):
+        '''a payload place must abort at its maximum descent, keeping the load'''
+        alt = 30
+        # one limit reached while the descent thrust is being measured and one after it
+        for max_descent in 1, 10:
+            self.start_subtest("Maximum descent of %u m" % max_descent)
+            self.payload_place_start(alt=alt, max_descent=max_descent)
+            # nothing touches the aircraft up here so only the limit can end this descent.  It
+            # has to stop from PLDP_SPEED_DN of 1 m/s once it gets there, which takes under 1 m
+            stopping_margin = 1
+            lowest_allowed = alt - max_descent - stopping_margin
+            tstart = self.get_sim_time()
+            while not self.statustext_in_collections("Reached maximum descent"):
+                if self.get_sim_time_cached() - tstart > 120:
+                    raise NotAchievedException("Did not abort at maximum descent")
+                rel_alt = self.assert_receive_message('GLOBAL_POSITION_INT').relative_alt * 0.001
+                if rel_alt < lowest_allowed:
+                    raise NotAchievedException("Descended to %.1f m, limit was %u m below %u m" % (
+                        rel_alt, max_descent, alt))
+            self.payload_place_finish(alt, gripper_released=False)
+
+    def PayloadPlaceTouchdown(self):
+        '''a payload place descends at PLDP_SPEED_DN and releases on the ground'''
+        self.payload_place_start()
+        # later logs start after the flight, so this has to be noted while it's the current one
+        flight_log = max(self.log_list(), key=os.path.getmtime)
+        self.wait_climbrate(-1.2, -0.8, minimum_duration=5, timeout=30)
+        alt = self.payload_place_wait_text("Releasing the gripper")
+        self.payload_place_assert_alt("Released", alt, -1, 2)
+        self.payload_place_finish(20)
+
+        # the placing thrust is logged for tuning PLDP_THRESH
+        dfreader = self.dfreader_for_path(flight_log)
+        if dfreader.recv_match(type='PLP') is None:
+            raise NotAchievedException("No PLP messages in log")
+
+    def PayloadPlaceLanded(self):
+        '''with thrust detection off, landing is what releases the payload'''
+        self.payload_place_start({"PLDP_THRESH": 0})
+        alt = self.payload_place_wait_text("PayloadPlace: landed")
+        self.payload_place_assert_alt("Landed", alt, -1, 2)
+        self.payload_place_wait_text("Releasing the gripper")
+        # thrust goes to zero on the ground, which must not be what released it
+        if self.statustext_in_collections("payload release thrust threshold"):
+            raise NotAchievedException("Released by thrust threshold rather than by landing")
+        self.payload_place_finish(20)
+
+    def PayloadPlaceThrustThreshold(self):
+        '''the payload is released as soon as thrust is below PLDP_THRESH of the descent thrust'''
+        # above 1 the descent thrust itself is below the threshold, which is a thrust drop that
+        # can be seen well clear of the ground.  It takes the time to reach descent speed, 2 s of
+        # measuring and 0.5 s of confirmation, so about 3 m of descent
+        self.payload_place_start({"PLDP_THRESH": 1.5})
+        alt = self.payload_place_wait_text("Releasing the gripper")
+        self.payload_place_assert_alt("Released", alt, 14, 20)
+        self.payload_place_finish(20)
+
+    def PayloadPlaceDelay(self):
+        '''the aircraft holds for PLDP_DELAY after release before climbing'''
+        delay = 8
+        self.payload_place_start({"PLDP_THRESH": 1.5, "PLDP_DELAY": delay})
+        release_alt = self.payload_place_wait_text("Releasing the gripper")
+        tstart = self.get_sim_time()
+        while True:
+            alt = self.assert_receive_message('GLOBAL_POSITION_INT').relative_alt * 0.001
+            elapsed = self.get_sim_time_cached() - tstart
+            if alt > release_alt + 1:
+                break
+            if elapsed > delay + 15:
+                raise NotAchievedException("Did not climb after delay")
+        self.progress("Climbed after %.1f s, PLDP_DELAY %u s" % (elapsed, delay))
+        # the delay runs from the start of the 0.5 s confirmation that comes before the release
+        if elapsed < delay - 0.5:
+            raise NotAchievedException("Climbed after %.1f s, PLDP_DELAY %u s" % (elapsed, delay))
+        self.payload_place_finish(20)
+
+    def PayloadPlaceManualRelease(self):
+        '''a pilot release during the descent ends the payload place'''
+        self.payload_place_start()
+        self.wait_altitude(15, 17, relative=True, timeout=60)
+        self.run_auxfunc(19, 0)
+        alt = self.payload_place_wait_text("Manual release")
+        self.payload_place_assert_alt("Manual release", alt, 13, 17)
+        self.payload_place_assert_servo(True)
+        # the descent has to end now rather than carrying on to the ground
+        tstart = self.get_sim_time()
+        while True:
+            rel_alt = self.assert_receive_message('GLOBAL_POSITION_INT').relative_alt * 0.001
+            if rel_alt < alt - 2:
+                raise NotAchievedException("Still descending after release: %.1f m" % rel_alt)
+            if rel_alt > 19:
+                break
+            if self.get_sim_time_cached() - tstart > 60:
+                raise NotAchievedException("Did not climb back after manual release")
+        self.wait_current_waypoint(3, timeout=60)
+        self.wait_disarmed(timeout=180)
+        self.context_pop()
+
+    def PayloadPlaceRangefinderDrop(self):
+        '''PLDP_RNG_DRP drops the payload on range alone, only within its band'''
+        drop_alt = 10
+        self.start_subtest("Drop after 1 s within PLDP_RNG_DRP")
+        # measuring has to finish first, so start high enough for that to be above the band
+        self.payload_place_start({"PLDP_RNG_DRP": drop_alt}, rangefinder=True)
+        alt = self.payload_place_wait_text("rangefinder trigger")
+        # 1 s at 1 m/s inside the band, which runs down to half of PLDP_RNG_DRP
+        self.payload_place_assert_alt("Rangefinder trigger", alt, drop_alt * 0.5, drop_alt - 0.5)
+        self.payload_place_finish(20)
+
+        self.start_subtest("No drop from below the band")
+        low_alt = 4
+        self.payload_place_start({"PLDP_RNG_DRP": drop_alt}, alt=low_alt, rangefinder=True)
+        alt = self.payload_place_wait_text("Releasing the gripper")
+        self.payload_place_assert_alt("Released", alt, -1, 2)
+        if self.statustext_in_collections("rangefinder trigger"):
+            raise NotAchievedException("Rangefinder trigger below PLDP_RNG_DRP band")
+        self.payload_place_finish(low_alt)
+
+    def PayloadPlaceRangefinderMax(self):
+        '''PLDP_RNG_MAX holds off a thrust release until the range is below it'''
+        max_alt = 10
+        self.payload_place_start({"PLDP_THRESH": 1.5, "PLDP_RNG_MAX": max_alt}, rangefinder=True)
+        alt = self.payload_place_wait_text("Releasing the gripper")
+        # released 0.5 s of confirmation at 1 m/s below PLDP_RNG_MAX
+        self.payload_place_assert_alt("Released", alt, max_alt - 2, max_alt)
+        self.payload_place_finish(20)
+
+    def PayloadPlaceRangefinderMaxNoRangefinder(self):
+        '''with PLDP_RNG_MAX set and no rangefinder the place is aborted, keeping the load'''
+        self.payload_place_start({"PLDP_THRESH": 1.5, "PLDP_RNG_MAX": 10})
+        alt = self.payload_place_wait_text("PLDP_RNG_MAX set and rangefinder not")
+        self.payload_place_assert_alt("Aborted", alt, 14, 20)
+        self.payload_place_finish(20, gripper_released=False)
+
+    def PayloadPlaceNoGripper(self):
+        '''a payload place still completes when no gripper is fitted'''
+        self.payload_place_start({"PLDP_THRESH": 1.5}, gripper=False)
+        alt = self.payload_place_wait_text("payload release thrust threshold")
+        self.payload_place_assert_alt("Thrust threshold", alt, 14, 20)
+        self.payload_place_finish(20, gripper_released=False)
+
     def PayloadPlaceMissionOpenGripper(self):
         '''test running the mission when the gripper is open'''
         self.set_analog_rangefinder_parameters()
@@ -15437,6 +15641,16 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
              self.LoiterToAlt,
              self.PayloadPlaceMission,
              self.PayloadPlaceMissionOpenGripper,
+            self.PayloadPlaceMaxDescent,
+            self.PayloadPlaceTouchdown,
+            self.PayloadPlaceLanded,
+            self.PayloadPlaceThrustThreshold,
+            self.PayloadPlaceDelay,
+            self.PayloadPlaceManualRelease,
+            self.PayloadPlaceRangefinderDrop,
+            self.PayloadPlaceRangefinderMax,
+            self.PayloadPlaceRangefinderMaxNoRangefinder,
+            self.PayloadPlaceNoGripper,
              self.PrecisionLoiterCompanion,
              self.Landing,
              self.PrecisionLanding,
