@@ -82,6 +82,10 @@ public:
     // Also updates internal velocity offsets and path shaping limits.
     void set_speed_NE_ms(float speed_ms);
 
+    // Sets the horizontal speed back to WP_SPD and follows later changes to WP_SPD,
+    // as when no speed is passed to wp_and_spline_init_m().
+    void set_speed_NE_to_default();
+
     // Pauses progression along the waypoint track.
     void set_pause() { _paused = true; }
 

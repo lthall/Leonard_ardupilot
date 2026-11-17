@@ -294,6 +294,15 @@ void AC_WPNav::set_speed_NE_ms(float speed_ms)
     }
 }
 
+// Sets the horizontal speed back to WP_SPD and follows later changes to WP_SPD,
+// as when no speed is passed to wp_and_spline_init_m().
+void AC_WPNav::set_speed_NE_to_default()
+{
+    _check_wp_speed_change = true;
+    _last_wp_speed_ms = _wp_speed_ms;
+    set_speed_NE_ms(get_default_speed_NE_ms());
+}
+
 // Sets the climb speed for waypoint navigation in m/s.
 // Updates the vertical controller with the new ascent rate limit.
 void AC_WPNav::set_speed_up_ms(float speed_up_ms)
