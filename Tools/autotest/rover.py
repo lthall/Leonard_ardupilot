@@ -731,6 +731,20 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
             self.assert_received_message_field_values('RELAY_STATUS', {
                 "on": 1,  # back to initial state
             })
+
+            self.start_subtest("test MAV_CMD_DO_REPEAT_RELAY with a half cycle over 65.535 seconds")
+            method(
+                mavutil.mavlink.MAV_CMD_DO_REPEAT_RELAY,
+                p1=0,  # relay 1
+                p2=1,  # count
+                p3=140,  # cycle time
+            )
+            self.wait_message_field_values('RELAY_STATUS', {"on": 0})
+            tstart = self.get_sim_time()
+            self.wait_message_field_values('RELAY_STATUS', {"on": 1}, timeout=100)
+            half_cycle = self.get_sim_time() - tstart
+            if abs(half_cycle - 70) > 2:
+                raise NotAchievedException("Expected a 70 s relay half cycle, got %f s" % half_cycle)
             self.context_pop()
 
             self.start_subtest("test MAV_CMD_DO_SET_SERVO")
@@ -781,6 +795,10 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
                 p4=-1,  # cycle time
                 want_result=mavutil.mavlink.MAV_RESULT_FAILED,
             )
+            self.delay_sim_time(1, reason="check the servo is not moved")
+            self.assert_received_message_field_values('SERVO_OUTPUT_RAW', {
+                "servo12_raw": trim,
+            })
 
         self.set_message_rate_hz("RELAY_STATUS", 0)
 
