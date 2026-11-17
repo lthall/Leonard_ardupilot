@@ -2036,12 +2036,14 @@ void ModeAuto::do_change_speed(const AP_Mission::Mission_Command& cmd)
         break;
     }
     case SPEED_TYPE_AIRSPEED:
-    case SPEED_TYPE_GROUNDSPEED: {
-        const float speed_ms = use_default ? copter.wp_nav->get_default_speed_NE_ms() : target_ms;
-        copter.wp_nav->set_speed_NE_ms(speed_ms);
+    case SPEED_TYPE_GROUNDSPEED:
+        if (use_default) {
+            copter.wp_nav->set_speed_NE_to_default();
+        } else {
+            copter.wp_nav->set_speed_NE_ms(target_ms);
+        }
         desired_speed_override_ms.xy = use_default ? 0 : target_ms;
         break;
-    }
     }
 }
 
