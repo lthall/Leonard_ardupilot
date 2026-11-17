@@ -85,13 +85,13 @@ bool AP_Mission::start_command_do_servorelayevents(const AP_Mission::Mission_Com
         return sre->do_repeat_servo(cmd.content.repeat_servo.channel,
                                     cmd.content.repeat_servo.pwm,
                                     cmd.content.repeat_servo.repeat_count,
-                                    cmd.content.repeat_servo.cycle_time * 1000.0f);
+                                    cmd.content.repeat_servo.cycle_time);
 
 #if AP_RELAY_ENABLED
     case MAV_CMD_DO_REPEAT_RELAY:
         return sre->do_repeat_relay(cmd.content.repeat_relay.num,
                                     cmd.content.repeat_relay.repeat_count,
-                                    cmd.content.repeat_relay.cycle_time * 1000.0f);
+                                    cmd.content.repeat_relay.cycle_time);
 #endif
 
     default:

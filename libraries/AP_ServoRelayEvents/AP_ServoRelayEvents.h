@@ -35,9 +35,9 @@ public:
 #if AP_RELAY_ENABLED
     bool do_set_relay(uint8_t relay_num, uint8_t state);
 #endif
-    bool do_repeat_servo(uint8_t channel, uint16_t servo_value, int16_t repeat, uint16_t delay_time_ms);
+    bool do_repeat_servo(uint8_t channel, uint16_t servo_value, int16_t repeat, float cycle_time_s);
 #if AP_RELAY_ENABLED
-    bool do_repeat_relay(uint8_t relay_num, int16_t count, uint32_t period_ms);
+    bool do_repeat_relay(uint8_t relay_num, int16_t count, float cycle_time_s);
 #endif
     void update_events(void);
 
@@ -59,10 +59,10 @@ private:
     uint32_t start_time_ms;
 
 	// how long to delay the next firing of event in millis
-    uint16_t delay_ms;
+    uint32_t delay_ms;
 
 	// how many times to cycle : -1 (or -2) = forever, 2 = do one cycle, 4 = do two cycles
-    int16_t repeat;
+    int32_t repeat;
 
     // RC channel for servos, relay number for relays
     uint8_t channel;

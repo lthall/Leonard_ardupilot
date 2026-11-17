@@ -21,7 +21,7 @@ MAV_RESULT GCS_MAVLINK::handle_servorelay_message(const mavlink_command_int_t &p
         break;
 
     case MAV_CMD_DO_REPEAT_SERVO:
-        if (handler->do_repeat_servo(packet.param1, packet.param2, packet.param3, packet.param4 * 1000)) {
+        if (handler->do_repeat_servo(packet.param1, packet.param2, packet.param3, packet.param4)) {
             result = MAV_RESULT_ACCEPTED;
         }
         break;
@@ -34,7 +34,7 @@ MAV_RESULT GCS_MAVLINK::handle_servorelay_message(const mavlink_command_int_t &p
         break;
 
     case MAV_CMD_DO_REPEAT_RELAY:
-        if (handler->do_repeat_relay(packet.param1, packet.param2, packet.param3 * 1000)) {
+        if (handler->do_repeat_relay(packet.param1, packet.param2, packet.param3)) {
             result = MAV_RESULT_ACCEPTED;
         }
         break;

@@ -29,6 +29,16 @@
 
 extern const AP_HAL::HAL& hal;
 
+// convert a full cycle time in seconds to a half cycle in milliseconds, false if the cycle time is invalid
+static bool half_cycle_ms_from_cycle_time(float cycle_time_s, uint32_t &half_cycle_ms)
+{
+    if (!isfinite(cycle_time_s) || is_negative(cycle_time_s)) {
+        return false;
+    }
+    half_cycle_ms = uint32_t(constrain_float(cycle_time_s * 500.0f, 0.0f, float(INT32_MAX)));
+    return true;
+}
+
 bool AP_ServoRelayEvents::do_set_servo(uint8_t _channel, uint16_t pwm)
 {
     SRV_Channel *c = SRV_Channels::srv_channel(_channel-1);
@@ -94,8 +104,12 @@ bool AP_ServoRelayEvents::do_set_relay(uint8_t relay_num, uint8_t state)
 #endif
 
 bool AP_ServoRelayEvents::do_repeat_servo(uint8_t _channel, uint16_t _servo_value, 
-                                          int16_t _repeat, uint16_t _delay_ms)
+                                          int16_t _repeat, float cycle_time_s)
 {
+    uint32_t half_cycle_ms;
+    if (!half_cycle_ms_from_cycle_time(cycle_time_s, half_cycle_ms)) {
+        return false;
+    }
     SRV_Channel *c = SRV_Channels::srv_channel(_channel-1);
     if (c == nullptr) {
         return false;
@@ -124,8 +138,9 @@ bool AP_ServoRelayEvents::do_repeat_servo(uint8_t _channel, uint16_t _servo_valu
     channel = _channel;
     type = EVENT_TYPE_SERVO;
 
-    start_time_ms  = 0;
-    delay_ms    = _delay_ms / 2;
+    delay_ms    = half_cycle_ms;
+    // the first event fires immediately
+    start_time_ms  = AP_HAL::millis() - delay_ms;
     repeat      = _repeat * 2;
     servo_value = _servo_value;
     update_events();
@@ -133,8 +148,12 @@ bool AP_ServoRelayEvents::do_repeat_servo(uint8_t _channel, uint16_t _servo_valu
 }
 
 #if AP_RELAY_ENABLED
-bool AP_ServoRelayEvents::do_repeat_relay(uint8_t relay_num, int16_t _repeat, uint32_t _delay_ms)
+bool AP_ServoRelayEvents::do_repeat_relay(uint8_t relay_num, int16_t _repeat, float cycle_time_s)
 {
+    uint32_t half_cycle_ms;
+    if (!half_cycle_ms_from_cycle_time(cycle_time_s, half_cycle_ms)) {
+        return false;
+    }
     AP_Relay *relay = AP::relay();
     if (relay == nullptr) {
         return false;
@@ -144,8 +163,9 @@ bool AP_ServoRelayEvents::do_repeat_relay(uint8_t relay_num, int16_t _repeat, ui
     }
     type = EVENT_TYPE_RELAY;
     channel = relay_num;
-    start_time_ms  = 0;
-    delay_ms        = _delay_ms/2; // half cycle time
+    delay_ms        = half_cycle_ms;
+    // the first event fires immediately
+    start_time_ms  = AP_HAL::millis() - delay_ms;
     repeat          = _repeat*2;  // number of full cycles
     update_events();
     return true;
