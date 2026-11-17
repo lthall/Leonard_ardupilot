@@ -9520,6 +9520,30 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
             minimum_duration=5,
         ).run()
 
+    def MissionGimbalPitchYawRate(self):
+        '''DO_GIMBAL_MANAGER_PITCHYAW mission item with NaN angles uses the rates'''
+        self.setup_servo_mount()
+        self.reboot_sitl()
+
+        self.start_flying_simple_relhome_mission([
+            (mavutil.mavlink.MAV_CMD_NAV_TAKEOFF, 0, 0, 10),
+            self.create_MISSION_ITEM_INT(mavutil.mavlink.MAV_CMD_DO_GIMBAL_MANAGER_PITCHYAW,
+                                         p1=math.nan, p2=math.nan, p3=-10, p4=0),
+            (mavutil.mavlink.MAV_CMD_NAV_LOITER_UNLIM, 5, 0, 10),
+        ])
+
+        downloaded = self.download_using_mission_protocol(mavutil.mavlink.MAV_MISSION_TYPE_MISSION)
+        item = downloaded[2]
+        if not (math.isnan(item.param1) and math.isnan(item.param2)):
+            raise NotAchievedException("Angles not downloaded as NaN (%s)" % str(item))
+        if item.param3 != -10 or item.param4 != 0:
+            raise NotAchievedException("Rates not preserved (%s)" % str(item))
+
+        self.wait_current_waypoint(3)
+        self.wait_mount_roll_pitch_yaw_deg(p=-20, tolerance=8, timeout=5)
+
+        self.do_RTL()
+
     def MountPOIFromAuxFunction(self):
         '''test we can lock onto a lat/lng/alt with the flick of a switch'''
         self.install_terrain_handlers_context()
@@ -21115,6 +21139,7 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
             self.VisionPosition,
             self.Mount,
             self.MountPOIFromAuxFunction,
+            self.MissionGimbalPitchYawRate,
             self.MaxBotixI2CXL,
             self.FenceRelativeToOriginMinAltHomeAbove,
             self.FenceRelativeToAMSLMaxAlt,
