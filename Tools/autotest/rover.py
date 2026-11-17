@@ -755,6 +755,33 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
                 self.wait_servo_channel_value(12, value)
             self.context_pop()
 
+            self.start_subtest("test MAV_CMD_DO_REPEAT_SERVO with a cycle time over 65.535 seconds")
+            trim = self.get_parameter("SERVO12_TRIM")
+            value = 1800
+            method(
+                mavutil.mavlink.MAV_CMD_DO_REPEAT_SERVO,
+                p1=12,  # servo12
+                p2=value,  # pwm
+                p3=1,  # count
+                p4=70,  # cycle time
+            )
+            self.wait_servo_channel_value(12, value)
+            tstart = self.get_sim_time()
+            self.wait_servo_channel_value(12, trim, timeout=60)
+            half_cycle = self.get_sim_time() - tstart
+            if abs(half_cycle - 35) > 2:
+                raise NotAchievedException("Expected a 35 s half cycle, got %f s" % half_cycle)
+
+            self.start_subtest("test MAV_CMD_DO_REPEAT_SERVO rejects a negative cycle time")
+            method(
+                mavutil.mavlink.MAV_CMD_DO_REPEAT_SERVO,
+                p1=12,  # servo12
+                p2=value,  # pwm
+                p3=1,  # count
+                p4=-1,  # cycle time
+                want_result=mavutil.mavlink.MAV_RESULT_FAILED,
+            )
+
         self.set_message_rate_hz("RELAY_STATUS", 0)
 
     def MAVProxy_SetModeUsingSwitch(self):
