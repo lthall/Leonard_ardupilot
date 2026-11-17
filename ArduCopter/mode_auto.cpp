@@ -2016,22 +2016,32 @@ void ModeAuto::do_yaw(const AP_Mission::Mission_Command& cmd)
 
 void ModeAuto::do_change_speed(const AP_Mission::Mission_Command& cmd)
 {
-    if (cmd.content.speed.target_ms > 0) {
-        switch (cmd.content.speed.speed_type) {
-        case SPEED_TYPE_CLIMB_SPEED:
-            copter.wp_nav->set_speed_up_ms(cmd.content.speed.target_ms);
-            desired_speed_override_ms.up = cmd.content.speed.target_ms;
-            break;
-        case SPEED_TYPE_DESCENT_SPEED:
-            copter.wp_nav->set_speed_down_ms(cmd.content.speed.target_ms);
-            desired_speed_override_ms.down = cmd.content.speed.target_ms;
-            break;
-        case SPEED_TYPE_AIRSPEED:
-        case SPEED_TYPE_GROUNDSPEED:
-            copter.wp_nav->set_speed_NE_ms(cmd.content.speed.target_ms);
-            desired_speed_override_ms.xy = cmd.content.speed.target_ms;
-            break;
-        }
+    const float target_ms = cmd.content.speed.target_ms;
+    const bool use_default = is_equal(target_ms, -2.0f);  // MAVLink: -2 returns to the default speed
+    if (!use_default && !is_positive(target_ms)) {
+        return;
+    }
+
+    switch (cmd.content.speed.speed_type) {
+    case SPEED_TYPE_CLIMB_SPEED: {
+        const float speed_ms = use_default ? copter.wp_nav->get_default_speed_up_ms() : target_ms;
+        copter.wp_nav->set_speed_up_ms(speed_ms);
+        desired_speed_override_ms.up = use_default ? 0 : target_ms;
+        break;
+    }
+    case SPEED_TYPE_DESCENT_SPEED: {
+        const float speed_ms = use_default ? copter.wp_nav->get_default_speed_down_ms() : target_ms;
+        copter.wp_nav->set_speed_down_ms(speed_ms);
+        desired_speed_override_ms.down = use_default ? 0 : target_ms;
+        break;
+    }
+    case SPEED_TYPE_AIRSPEED:
+    case SPEED_TYPE_GROUNDSPEED: {
+        const float speed_ms = use_default ? copter.wp_nav->get_default_speed_NE_ms() : target_ms;
+        copter.wp_nav->set_speed_NE_ms(speed_ms);
+        desired_speed_override_ms.xy = use_default ? 0 : target_ms;
+        break;
+    }
     }
 }
 
