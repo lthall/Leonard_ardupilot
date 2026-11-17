@@ -90,8 +90,7 @@ void Mode::_TakeOff::do_pilot_takeoff_ms(float pilot_climb_rate_ms)
             (is_positive(take_off_complete_alt_m - take_off_start_alt_m) && copter.pos_control->get_pos_estimate_U_m() - take_off_start_alt_m > 0.5 * (take_off_complete_alt_m - take_off_start_alt_m))) {
             // throttle > 90%
             // acceleration > 50% maximum acceleration
-            // velocity > 10% maximum velocity && commanded climb rate
-            // velocity > 50% maximum velocity
+            // velocity > pilot climb rate, constrained to 10% to 50% of maximum velocity
             // altitude change greater than half complete alt from start off alt
             copter.set_land_complete(false);
         }
@@ -173,7 +172,7 @@ void _AutoTakeoff::run()
             // throttle > 90%
             // acceleration > 50% maximum acceleration
             // velocity > 10% maximum velocity
-            // altitude change greater than half auto_takeoff_no_nav_alt_cm
+            // altitude change greater than WP_NAVALT_MIN
             copter.set_land_complete(false);
         }
         return;
