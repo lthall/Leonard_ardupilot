@@ -20296,6 +20296,26 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
 
         self.wait_disarmed()
 
+    def DO_CHANGE_SPEED_default(self):
+        '''DO_CHANGE_SPEED with a speed of -2 returns to the default speed'''
+        self.set_parameter("WP_SPD", 8)
+        self.start_flying_simple_relhome_mission([
+            (mavutil.mavlink.MAV_CMD_NAV_TAKEOFF, 0, 0, 20),
+            self.create_MISSION_ITEM_INT(mavutil.mavlink.MAV_CMD_DO_CHANGE_SPEED, p1=1, p2=3),
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 200, 0, 20),
+            self.create_MISSION_ITEM_INT(mavutil.mavlink.MAV_CMD_DO_CHANGE_SPEED, p1=1, p2=-2),
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 600, 0, 20),
+            (mavutil.mavlink.MAV_CMD_NAV_RETURN_TO_LAUNCH, 0, 0, 0),
+        ])
+
+        self.wait_current_waypoint(3)
+        self.wait_groundspeed(2.5, 3.5, minimum_duration=5, timeout=60)
+
+        self.wait_current_waypoint(5, timeout=120)
+        self.wait_groundspeed(7.5, 8.5, minimum_duration=5, timeout=60)
+
+        self.wait_disarmed(timeout=300)
+
     def AUTO_LAND_TO_BRAKE(self):
         '''ensure terrain altitude is taken into account when braking'''
         self.set_parameters({
@@ -21010,6 +21030,7 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
             self.PerfInfo,
             self.FETtecESC,
             self.DO_CHANGE_SPEED,
+            self.DO_CHANGE_SPEED_default,
             self.GPSForYaw,
             self.GPSForYawWindEstimation,
             self.GPSForYawCompassFallback,
