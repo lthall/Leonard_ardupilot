@@ -9527,20 +9527,37 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
 
         self.start_flying_simple_relhome_mission([
             (mavutil.mavlink.MAV_CMD_NAV_TAKEOFF, 0, 0, 10),
+            # no angles or rates: sets the RC targeting yaw lock
+            self.create_MISSION_ITEM_INT(mavutil.mavlink.MAV_CMD_DO_GIMBAL_MANAGER_PITCHYAW,
+                                         p1=math.nan, p2=math.nan, p3=math.nan, p4=math.nan,
+                                         x=mavutil.mavlink.GIMBAL_MANAGER_FLAGS_YAW_LOCK),
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 5, 0, 10),
             self.create_MISSION_ITEM_INT(mavutil.mavlink.MAV_CMD_DO_GIMBAL_MANAGER_PITCHYAW,
                                          p1=math.nan, p2=math.nan, p3=-10, p4=0),
-            (mavutil.mavlink.MAV_CMD_NAV_LOITER_UNLIM, 5, 0, 10),
+            (mavutil.mavlink.MAV_CMD_NAV_LOITER_UNLIM, 10, 0, 10),
         ])
 
         downloaded = self.download_using_mission_protocol(mavutil.mavlink.MAV_MISSION_TYPE_MISSION)
         item = downloaded[2]
+        if not all(math.isnan(p) for p in (item.param1, item.param2, item.param3, item.param4)):
+            raise NotAchievedException("Unset values not downloaded as NaN (%s)" % str(item))
+        item = downloaded[4]
         if not (math.isnan(item.param1) and math.isnan(item.param2)):
             raise NotAchievedException("Angles not downloaded as NaN (%s)" % str(item))
         if item.param3 != -10 or item.param4 != 0:
             raise NotAchievedException("Rates not preserved (%s)" % str(item))
 
+        if self.get_mount_roll_pitch_yaw_deg()[3]:
+            raise NotAchievedException("Mount yaw locked before the mission item")
         self.wait_current_waypoint(3)
-        self.wait_mount_roll_pitch_yaw_deg(p=-20, tolerance=8, timeout=5)
+        tstart = self.get_sim_time()
+        while not self.get_mount_roll_pitch_yaw_deg()[3]:
+            if self.get_sim_time_cached() - tstart > 2:
+                raise NotAchievedException("Mount yaw not locked by the mission item")
+
+        # the rate times out after 3 seconds, leaving the mount at about -30 degrees
+        self.wait_current_waypoint(5)
+        self.wait_mount_roll_pitch_yaw_deg(p=-30, tolerance=3, minimum_duration=2, timeout=10)
 
         self.do_RTL()
 
