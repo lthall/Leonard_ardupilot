@@ -20,7 +20,7 @@
 #endif
 #define AUTOTUNE_LEVEL_RATE_Y_RADS          radians(7.5)    // rate which qualifies as level for yaw
 #define AUTOTUNE_REQUIRED_LEVEL_TIME_MS     250         // time we require the aircraft to be level before starting next test
-#define AUTOTUNE_LEVEL_TIMEOUT_MS           2000        // time out for level
+#define AUTOTUNE_LEVEL_TIMEOUT_MS           2000        // level threshold relaxes over 2x this, level fails after 3x this
 #define AUTOTUNE_LEVEL_WARNING_INTERVAL_MS  5000        // level failure warning messages sent at this interval to users
 
 AC_AutoTune::AC_AutoTune()
@@ -339,7 +339,7 @@ bool AC_AutoTune::currently_level()
     }
 
     // slew threshold to ensure sufficient settling time for aircraft unable to obtain small thresholds
-    // relax threshold if we pass AUTOTUNE_LEVEL_TIMEOUT_MS
+    // threshold grows linearly from zero to 2x over 2 * AUTOTUNE_LEVEL_TIMEOUT_MS
     const float threshold_mul = constrain_float((float)(now_ms - level_start_time_ms) / (float)AUTOTUNE_LEVEL_TIMEOUT_MS, 0.0, 2.0);
 
     if (fabsf(ahrs_view->get_roll_rad() - desired_roll_rad) > threshold_mul * AUTOTUNE_LEVEL_ANGLE_RAD) {
