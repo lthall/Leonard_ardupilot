@@ -10,7 +10,7 @@
 #include <GCS_MAVLink/GCS.h>
 #include <AP_Vehicle/AP_Vehicle_Type.h>
 
-#define AUTOTUNE_PILOT_OVERRIDE_TIMEOUT_MS  500         // restart tuning if pilot has left sticks in middle for 2 seconds
+#define AUTOTUNE_PILOT_OVERRIDE_TIMEOUT_MS  500         // restart tuning if pilot has left sticks in middle for 0.5 seconds
 #if APM_BUILD_TYPE(APM_BUILD_ArduPlane)
  # define AUTOTUNE_LEVEL_ANGLE_RAD          radians(5.0)    // angle which qualifies as level (Plane uses more relaxed 5deg)
  # define AUTOTUNE_LEVEL_RATE_RP_RADS       radians(10.0)   // rate which qualifies as level for roll and pitch (Plane uses more relaxed 10deg/sec)
@@ -326,7 +326,7 @@ void AC_AutoTune::run()
 // return true if vehicle is close to level
 bool AC_AutoTune::currently_level()
 {
-    // abort AutoTune if we pass 2 * AUTOTUNE_LEVEL_TIMEOUT_MS
+    // abort AutoTune if we pass 3 * AUTOTUNE_LEVEL_TIMEOUT_MS
     const uint32_t now_ms = AP_HAL::millis();
     if (fabsf(attitude_control->get_rate_ef_target_rads().z) > 0.5 * attitude_control->get_slew_yaw_max_rads()) {
         // reset if the target yaw rate is above half the slew rate
