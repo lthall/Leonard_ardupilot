@@ -104,7 +104,7 @@ public:
     struct PACKED Repeat_Relay_Command {
         uint8_t num;            // relay number from 1 to 4
         int16_t repeat_count;   // number of times to trigger the relay
-        float cycle_time;       // cycle time in seconds (the time between peaks or the time the relay is on and off for each cycle?)
+        float cycle_time;       // full cycle time in seconds, the relay toggles every half cycle
     };
 
     // set servo command structure
@@ -118,7 +118,7 @@ public:
         uint8_t channel;        // servo channel
         uint16_t pwm;           // pwm value for servo
         int16_t repeat_count;   // number of times to move the servo (returns to trim in between)
-        float cycle_time;       // cycle time in seconds (the time between peaks or the time the servo is at the specified pwm value for each cycle?)
+        float cycle_time;       // full cycle time in seconds, half at the pwm value and half at trim
     };
 
     // mount control command structure

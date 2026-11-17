@@ -1340,7 +1340,7 @@ MAV_MISSION_RESULT AP_Mission::mavlink_int_to_mission_cmd(const mavlink_mission_
     case MAV_CMD_DO_REPEAT_RELAY:                       // MAV ID: 182
         cmd.content.repeat_relay.num = packet.param1;           // relay number
         cmd.content.repeat_relay.repeat_count = packet.param2;  // count
-        cmd.content.repeat_relay.cycle_time = packet.param3;    // time converted from seconds to milliseconds
+        cmd.content.repeat_relay.cycle_time = packet.param3;    // time in seconds
         break;
 
     case MAV_CMD_DO_SET_SERVO:                          // MAV ID: 183
@@ -1896,7 +1896,7 @@ bool AP_Mission::mission_cmd_to_mavlink_int(const AP_Mission::Mission_Command& c
         packet.param1 = cmd.content.repeat_servo.channel;       // channel
         packet.param2 = cmd.content.repeat_servo.pwm;           // PWM
         packet.param3 = cmd.content.repeat_servo.repeat_count;  // count
-        packet.param4 = cmd.content.repeat_servo.cycle_time;    // time in milliseconds converted to seconds
+        packet.param4 = cmd.content.repeat_servo.cycle_time;    // time in seconds
         break;
 
     case MAV_CMD_DO_RETURN_PATH_START:                  // MAV ID: 188
