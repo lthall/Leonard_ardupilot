@@ -20314,6 +20314,10 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
         self.wait_current_waypoint(5, timeout=120)
         self.wait_groundspeed(7.5, 8.5, minimum_duration=5, timeout=60)
 
+        # the default speed follows later changes to WP_SPD
+        self.set_parameter("WP_SPD", 6)
+        self.wait_groundspeed(5.5, 6.5, minimum_duration=5, timeout=30)
+
         self.wait_disarmed(timeout=300)
 
     def AUTO_LAND_TO_BRAKE(self):
