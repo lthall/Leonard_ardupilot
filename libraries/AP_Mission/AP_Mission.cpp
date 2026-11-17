@@ -1082,6 +1082,9 @@ MAV_MISSION_RESULT AP_Mission::sanity_check_params(const mavlink_mission_item_in
     case MAV_CMD_NAV_VTOL_LAND:
         nan_mask = ~((1 << 2) | (1 << 3)); // param 3 and 4 can be nan
         break;
+    case MAV_CMD_DO_GIMBAL_MANAGER_PITCHYAW:
+        nan_mask = ~((1 << 0) | (1 << 1) | (1 << 2) | (1 << 3)); // params 1 to 4 can be nan
+        break;
     default:
         nan_mask = 0xff;
         break;
@@ -1104,6 +1107,37 @@ MAV_MISSION_RESULT AP_Mission::sanity_check_params(const mavlink_mission_item_in
         return MAV_MISSION_INVALID_PARAM4;
     }
     return MAV_MISSION_ACCEPTED;
+}
+
+// DO_GIMBAL_MANAGER_PITCHYAW stores NaN as INT8_MIN or INT16_MIN. Angles outside the storage
+// range are stored the same way so they can never be used as an angle.
+static int8_t gimbal_pitch_angle_to_storage(float angle_deg)
+{
+    if (isnan(angle_deg) || angle_deg <= INT8_MIN || angle_deg > INT8_MAX) {
+        return INT8_MIN;
+    }
+    return int8_t(angle_deg);
+}
+
+static int16_t gimbal_yaw_angle_to_storage(float angle_deg)
+{
+    if (isnan(angle_deg) || angle_deg <= INT16_MIN || angle_deg > INT16_MAX) {
+        return INT16_MIN;
+    }
+    return int16_t(angle_deg);
+}
+
+static int8_t gimbal_rate_to_storage(float rate_degs)
+{
+    if (isnan(rate_degs)) {
+        return INT8_MIN;
+    }
+    return int8_t(constrain_float(rate_degs, -INT8_MAX, INT8_MAX));
+}
+
+static float gimbal_storage_to_float(int16_t value, int16_t unset)
+{
+    return (value == unset) ? NAN : value;
 }
 
 // mavlink_int_to_mission_cmd - converts mavlink message to an AP_Mission::Mission_Command object which can be stored to eeprom
@@ -1524,10 +1558,10 @@ MAV_MISSION_RESULT AP_Mission::mavlink_int_to_mission_cmd(const mavlink_mission_
         break;
 
     case MAV_CMD_DO_GIMBAL_MANAGER_PITCHYAW:
-        cmd.content.gimbal_manager_pitchyaw.pitch_angle_deg = packet.param1;
-        cmd.content.gimbal_manager_pitchyaw.yaw_angle_deg = packet.param2;
-        cmd.content.gimbal_manager_pitchyaw.pitch_rate_degs = packet.param3;
-        cmd.content.gimbal_manager_pitchyaw.yaw_rate_degs = packet.param4;
+        cmd.content.gimbal_manager_pitchyaw.pitch_angle_deg = gimbal_pitch_angle_to_storage(packet.param1);
+        cmd.content.gimbal_manager_pitchyaw.yaw_angle_deg = gimbal_yaw_angle_to_storage(packet.param2);
+        cmd.content.gimbal_manager_pitchyaw.pitch_rate_degs = gimbal_rate_to_storage(packet.param3);
+        cmd.content.gimbal_manager_pitchyaw.yaw_rate_degs = gimbal_rate_to_storage(packet.param4);
         cmd.content.gimbal_manager_pitchyaw.flags = packet.x;
         cmd.content.gimbal_manager_pitchyaw.gimbal_id = packet.z;
         break;
@@ -2070,10 +2104,10 @@ bool AP_Mission::mission_cmd_to_mavlink_int(const AP_Mission::Mission_Command& c
         break;
 
     case MAV_CMD_DO_GIMBAL_MANAGER_PITCHYAW:
-        packet.param1 = cmd.content.gimbal_manager_pitchyaw.pitch_angle_deg;
-        packet.param2 = cmd.content.gimbal_manager_pitchyaw.yaw_angle_deg;
-        packet.param3 = cmd.content.gimbal_manager_pitchyaw.pitch_rate_degs;
-        packet.param4 = cmd.content.gimbal_manager_pitchyaw.yaw_rate_degs;
+        packet.param1 = gimbal_storage_to_float(cmd.content.gimbal_manager_pitchyaw.pitch_angle_deg, INT8_MIN);
+        packet.param2 = gimbal_storage_to_float(cmd.content.gimbal_manager_pitchyaw.yaw_angle_deg, INT16_MIN);
+        packet.param3 = gimbal_storage_to_float(cmd.content.gimbal_manager_pitchyaw.pitch_rate_degs, INT8_MIN);
+        packet.param4 = gimbal_storage_to_float(cmd.content.gimbal_manager_pitchyaw.yaw_rate_degs, INT8_MIN);
         packet.x = cmd.content.gimbal_manager_pitchyaw.flags;
         packet.z = cmd.content.gimbal_manager_pitchyaw.gimbal_id;
         break;
