@@ -56,6 +56,20 @@ uint32_t Siyi::expected_message_length(Siyi::CommandID id) const
         return sizeof(ExternalAttitude);
     case CommandID::SET_CAMERA_IMAGE_TYPE:
         return sizeof(SetCameraImageType);
+    case CommandID::AUTO_FOCUS:
+        return sizeof(AutoFocus);
+    case CommandID::MANUAL_ZOOM_AND_AUTO_FOCUS:
+        return sizeof(ManualZoomAndAutoFocus);
+    case CommandID::MANUAL_FOCUS:
+        return sizeof(ManualFocus);
+    case CommandID::ABSOLUTE_ZOOM:
+        return sizeof(AbsoluteZoom);
+    case CommandID::SET_THERMAL_PALETTE:
+        return sizeof(SetThermalPalette);
+    case CommandID::SET_THERMAL_RAW_DATA:
+        return sizeof(SetThermalRawData);
+    case CommandID::SET_THERMAL_GAIN:
+        return sizeof(SetThermalGain);
     case CommandID::GET_TEMP_FULL_IMAGE:
         return sizeof(GetTempFullImageRequest);
     case CommandID::READ_RANGEFINDER:
@@ -102,6 +116,27 @@ void Siyi::handle_received_message()
         break;
     case CommandID::SET_CAMERA_IMAGE_TYPE:
         handle_message(msg.packed_setcameraimgetype);
+        break;
+    case CommandID::AUTO_FOCUS:
+        handle_message(msg.packed_autofocus);
+        break;
+    case CommandID::MANUAL_ZOOM_AND_AUTO_FOCUS:
+        handle_message(msg.packed_manualzoomandautofocus);
+        break;
+    case CommandID::MANUAL_FOCUS:
+        handle_message(msg.packed_manualfocus);
+        break;
+    case CommandID::ABSOLUTE_ZOOM:
+        handle_message(msg.packed_absolutezoom);
+        break;
+    case CommandID::SET_THERMAL_PALETTE:
+        handle_message(msg.packed_setthermalpalette);
+        break;
+    case CommandID::SET_THERMAL_RAW_DATA:
+        handle_message(msg.packed_setthermalrawdata);
+        break;
+    case CommandID::SET_THERMAL_GAIN:
+        handle_message(msg.packed_setthermalgain);
         break;
     case CommandID::PHOTO:
         handle_message(msg.packed_photo);

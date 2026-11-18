@@ -65,11 +65,11 @@ private:
     // observed angular rate (including biases)
     Vector3f gyro;
 
-    /* joint angles, in radians. in yaw/roll/pitch order. Relative to fwd.
-       So 0,0,0 points forward.
-       Pi/2,0,0 means pointing right
-       0, Pi/2, 0 means pointing fwd, but rolled 90 degrees to right
-       0, 0, -Pi/2, means pointing down
+    /* joint angles, in radians, in (roll, pitch, yaw) order as returned by
+       Matrix3f::to_euler312().  Relative to fwd, so 0,0,0 points forward.
+       0,0,Pi/2 means pointing right
+       Pi/2,0,0 means rolled 90 degrees to the right
+       0,-Pi/2,0 means pointing down
     */
     Vector3f joint_angles;
 
