@@ -73,24 +73,29 @@ void Siyi_ZT30::handle_message(const PackedMessage<GimbalAttitudeRequest> &reque
     Vector3f delta_angles;
     Vector3f delta_velocities;
     gimbal.get_deltas(delta_angles, delta_velocities, delta_time_us);
-    const Vector3<int16_t> rates_decidegrees(
-        (delta_angles.x * RAD_TO_DEG * 1e6 / delta_time_us),
-        delta_angles.y * RAD_TO_DEG * 1e6 / delta_time_us,
-        delta_angles.z * RAD_TO_DEG * 1e6 / delta_time_us
+    // delta_angles is the integrated body-frame gyro in (roll, pitch, yaw)
+    // order.  The message carries rates in decidegrees/sec.
+    const Vector3<int16_t> rate_decidegrees(
+        delta_angles.x * 10 * RAD_TO_DEG * 1e6 / delta_time_us,   // roll rate
+        delta_angles.y * 10 * RAD_TO_DEG * 1e6 / delta_time_us,   // pitch rate
+        delta_angles.z * 10 * RAD_TO_DEG * 1e6 / delta_time_us    // yaw rate
     );
 
     Vector3f joint_angles;
-    gimbal.get_joint_angles(joint_angles);
-    const Vector3<int16_t> joint_angles_decidegrees(
-        joint_angles.x * 10 * RAD_TO_DEG,
-        joint_angles.y * 10 * RAD_TO_DEG,
-        joint_angles.z * 10 * RAD_TO_DEG
+    gimbal.get_joint_angles(joint_angles);   // (roll, pitch, yaw), from to_euler312()
+    const Vector3<int16_t> angle_decidegrees(
+        joint_angles.x * 10 * RAD_TO_DEG,    // roll
+        joint_angles.y * 10 * RAD_TO_DEG,    // pitch
+        joint_angles.z * 10 * RAD_TO_DEG     // yaw
     );
 
+    // GimbalAttitude reports (yaw, pitch, roll).  Siyi reports yaw with the
+    // opposite sign to ArduPilot's convention (the driver negates it on
+    // receipt, see AP_Mount_Siyi), so negate yaw here to match real hardware.
     const PackedMessage<GimbalAttitude> response{
         GimbalAttitude{
-            joint_angles_decidegrees.x, joint_angles_decidegrees.y, joint_angles_decidegrees.z,
-            rates_decidegrees.x, rates_decidegrees.y, rates_decidegrees.z
+            int16_t(-angle_decidegrees.z), angle_decidegrees.y, angle_decidegrees.x,
+            int16_t(-rate_decidegrees.z),  rate_decidegrees.y,  rate_decidegrees.x
         },
     };
     write_to_autopilot((char*)&response, sizeof(response));
@@ -141,10 +146,18 @@ void Siyi_ZT30::handle_message(const PackedMessage<GimbalRotation> &request)
     const float max_demanded_yaw_rate_rad = 2*M_PI;
     const float max_demanded_pitch_rate_rad = 2*M_PI;
 
+    // the rate fields are signed (-100..+100) but arrive as raw bytes, so a
+    // negative rate would be misread as a large positive one if treated as
+    // unsigned.  Reinterpret them as signed before scaling.
+    const int8_t yaw_rate_pct = (int8_t)request.msg.yaw_rate_pct;
+    const int8_t pitch_rate_pct = (int8_t)request.msg.pitch_rate_pct;
+
+    // SIM_Gimbal consumes the demanded rate as a body-frame angular rate in
+    // (roll, pitch, yaw) order.  Siyi only drives pitch and yaw.
     const Vector3f demanded_rates{
-        max_demanded_yaw_rate_rad * request.msg.yaw_rate_pct * 0.01f,
-        max_demanded_pitch_rate_rad * request.msg.pitch_rate_pct * 0.01f,
-        0
+        0,
+        max_demanded_pitch_rate_rad * pitch_rate_pct * 0.01f,
+        max_demanded_yaw_rate_rad * yaw_rate_pct * 0.01f
     };
     gimbal.set_demanded_rates(demanded_rates);
 

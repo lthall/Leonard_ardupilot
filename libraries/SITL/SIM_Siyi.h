@@ -74,21 +74,24 @@ protected:
     enum class CommandID : uint8_t {
         ACQUIRE_FIRMWARE_VERSION = 0x01,
         HARDWARE_ID = 0x02,
-        // AUTO_FOCUS = 0x04,
-        // MANUAL_ZOOM_AND_AUTO_FOCUS = 0x05,
-        // MANUAL_FOCUS = 0x06,
+        AUTO_FOCUS = 0x04,
+        MANUAL_ZOOM_AND_AUTO_FOCUS = 0x05,
+        MANUAL_FOCUS = 0x06,
         GIMBAL_ROTATION = 0x07,
-        // CENTER = 0x08,
+        // CENTER = 0x08,  // sent by gimbal as a response only; never received here
         ACQUIRE_GIMBAL_CONFIG_INFO = 0x0A,
-        // FUNCTION_FEEDBACK_INFO = 0x0B,
+        // FUNCTION_FEEDBACK_INFO = 0x0B,  // sent by gimbal as a response only; never received here
         PHOTO = 0x0C,
         ACQUIRE_GIMBAL_ATTITUDE = 0x0D,
-        // ABSOLUTE_ZOOM = 0x0F,
+        ABSOLUTE_ZOOM = 0x0F,
         SET_CAMERA_IMAGE_TYPE = 0x11,
         GET_TEMP_FULL_IMAGE = 0x14,
         READ_RANGEFINDER = 0x15,
+        SET_THERMAL_PALETTE = 0x1B,
         EXTERNAL_ATTITUDE = 0x22,
         SET_TIME = 0x30,
+        SET_THERMAL_RAW_DATA = 0x34,
+        SET_THERMAL_GAIN = 0x38,
         POSITION_DATA = 0x3e,
     };
 
@@ -119,10 +122,59 @@ protected:
         AP_HAL::panic("Unhandled ExternalAttitude message");
     }
 
-    class PACKED SetCameraImageType : public BaseMessage { };
+    class PACKED SetCameraImageType : public BaseMessage {
+    public:
+        uint8_t image_type;
+    };
     virtual void handle_message(const PackedMessage<SetCameraImageType> &request) {
         AP_HAL::panic("Unhandled SetCameraImageType message");
     }
+
+    // focus and zoom commands.  The real camera does not acknowledge
+    // these, so the default handlers simply consume them.
+    class PACKED AutoFocus : public BaseMessage {
+    public:
+        uint8_t value;
+    };
+    virtual void handle_message(const PackedMessage<AutoFocus> &request) { }
+
+    class PACKED ManualZoomAndAutoFocus : public BaseMessage {
+    public:
+        uint8_t zoom;
+    };
+    virtual void handle_message(const PackedMessage<ManualZoomAndAutoFocus> &request) { }
+
+    class PACKED ManualFocus : public BaseMessage {
+    public:
+        uint8_t focus;
+    };
+    virtual void handle_message(const PackedMessage<ManualFocus> &request) { }
+
+    class PACKED AbsoluteZoom : public BaseMessage {
+    public:
+        uint8_t zoom_int;
+        uint8_t zoom_frac;
+    };
+    virtual void handle_message(const PackedMessage<AbsoluteZoom> &request) { }
+
+    // thermal camera settings.  Also unacknowledged by the real camera.
+    class PACKED SetThermalPalette : public BaseMessage {
+    public:
+        uint8_t palette;
+    };
+    virtual void handle_message(const PackedMessage<SetThermalPalette> &request) { }
+
+    class PACKED SetThermalRawData : public BaseMessage {
+    public:
+        uint8_t enable;
+    };
+    virtual void handle_message(const PackedMessage<SetThermalRawData> &request) { }
+
+    class PACKED SetThermalGain : public BaseMessage {
+    public:
+        uint8_t gain;
+    };
+    virtual void handle_message(const PackedMessage<SetThermalGain> &request) { }
 
     class PACKED Photo : public BaseMessage {
     public:
@@ -192,6 +244,13 @@ protected:
         PackedMessage<GimbalAttitudeRequest> packed_gimbalattituderequest;
         PackedMessage<ExternalAttitude> packed_externalattitude;
         PackedMessage<SetCameraImageType> packed_setcameraimgetype;
+        PackedMessage<AutoFocus> packed_autofocus;
+        PackedMessage<ManualZoomAndAutoFocus> packed_manualzoomandautofocus;
+        PackedMessage<ManualFocus> packed_manualfocus;
+        PackedMessage<AbsoluteZoom> packed_absolutezoom;
+        PackedMessage<SetThermalPalette> packed_setthermalpalette;
+        PackedMessage<SetThermalRawData> packed_setthermalrawdata;
+        PackedMessage<SetThermalGain> packed_setthermalgain;
         PackedMessage<Photo> packed_photo;
         PackedMessage<AcquireGimbalConfigInfo> packed_acquiregimbalconfiginfo;
         PackedMessage<GetTempFullImageRequest> packed_gettempfullimage;
