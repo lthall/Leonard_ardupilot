@@ -48,6 +48,9 @@ void MAVLinkGimbalv2::update_input()
         if (mavlink_frame_char_buffer(&mav.rxmsg, &mav.status,
                                       buf[i], &msg, &status) == MAVLINK_FRAMING_OK) {
             handle_message(msg);
+            if (_seen_autopilot_heartbeat) {
+                handle_peripheral_message(msg);
+            }
         }
     }
 }
@@ -350,6 +353,10 @@ void MAVLinkGimbalv2::update(const Aircraft &aircraft)
     if (now_ms - _last_attitude_status_ms >= 100) {
         _last_attitude_status_ms = now_ms;
         send_attitude_status();
+    }
+
+    if (_seen_autopilot_heartbeat) {
+        update_peripherals(now_ms);
     }
 }
 
