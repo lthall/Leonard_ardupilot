@@ -43,6 +43,8 @@ void AVT_CM62::handle_peripheral_message(const mavlink_message_t &msg)
         mavlink_msg_command_long_decode(&msg, &cmd);
         camera_handle_command(msg, cmd.command, cmd.target_system, cmd.target_component,
                               cmd.param1, cmd.param2);
+        gimbal_handle_command(msg, cmd.command, cmd.target_system, cmd.target_component,
+                              cmd.param1, cmd.param2);
         break;
     }
     case MAVLINK_MSG_ID_COMMAND_INT: {
@@ -50,11 +52,39 @@ void AVT_CM62::handle_peripheral_message(const mavlink_message_t &msg)
         mavlink_msg_command_int_decode(&msg, &cmd);
         camera_handle_command(msg, cmd.command, cmd.target_system, cmd.target_component,
                               cmd.param1, cmd.param2);
+        gimbal_handle_command(msg, cmd.command, cmd.target_system, cmd.target_component,
+                              cmd.param1, cmd.param2);
         break;
     }
     default:
         break;
     }
+}
+
+void AVT_CM62::gimbal_handle_command(const mavlink_message_t &msg, uint16_t command,
+                                     uint8_t target_system, uint8_t target_component,
+                                     float p1, float p2)
+{
+    // the gimbal itself handles the standard gimbal messages; this is only
+    // AVT's custom commands, which arrive as DO_SET_PARAMETER
+    if (target_system != vehicle_system_id() || target_component != gimbal_compid() ||
+        command != MAV_CMD_DO_SET_PARAMETER) {
+        return;
+    }
+    MAV_RESULT result = MAV_RESULT_UNSUPPORTED;
+    if ((int)p1 == 1006) {
+        // object detection: 1 enables, 0 disables, -1 toggles
+        const int v = (int)p2;
+        if (v == 0 || v == 1 || v == -1) {
+            _object_detection = (v == -1) ? !_object_detection : (v == 1);
+            ::printf("AVT_CM62[%u]: object detection %s\n",
+                     (unsigned)_instance, _object_detection ? "on" : "off");
+            result = MAV_RESULT_ACCEPTED;
+        } else {
+            result = MAV_RESULT_DENIED;
+        }
+    }
+    send_command_ack(msg.sysid, msg.compid, MAV_CMD_DO_SET_PARAMETER, result);
 }
 
 void AVT_CM62::camera_handle_command(const mavlink_message_t &msg, uint16_t command,
@@ -148,6 +178,12 @@ void AVT_CM62::camera_handle_command(const mavlink_message_t &msg, uint16_t comm
         break;
     case MAV_CMD_VIDEO_STOP_CAPTURE:
         _recording = false;
+        break;
+
+    // accepted and acknowledged; there is no image to track in
+    case MAV_CMD_CAMERA_TRACK_POINT:
+    case MAV_CMD_CAMERA_TRACK_RECTANGLE:
+    case MAV_CMD_CAMERA_STOP_TRACKING:
         break;
 
     default:
