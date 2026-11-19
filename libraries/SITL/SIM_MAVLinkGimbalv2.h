@@ -48,6 +48,18 @@ protected:
     virtual float get_yaw_min_rad()   const = 0;
     virtual float get_yaw_max_rad()   const = 0;
 
+    // Further MAVLink components the payload presents on the same serial
+    // link, beside the gimbal device (an integrated camera, say).  Every
+    // message read from the autopilot is offered to the hook; the update hook
+    // runs each simulation step once the autopilot's heartbeat has given the
+    // vehicle's system id, so nothing is sent before there is one to send as.
+    virtual void handle_peripheral_message(const mavlink_message_t &msg) {}
+    virtual void update_peripherals(uint32_t now_ms) {}
+
+    uint8_t vehicle_system_id() const { return _vehicle_system_id; }
+    uint8_t gimbal_compid() const { return _compid; }
+    void send_mavlink_message(const mavlink_message_t &msg);
+
 protected:
     // physics model shared by all MAVLink gimbal simulators
     Gimbal _gimbal;
@@ -62,7 +74,6 @@ private:
     void send_attitude_status();
     void send_command_ack(uint8_t target_sysid, uint8_t target_compid,
                           MAV_CMD command, MAV_RESULT result);
-    void send_mavlink_message(const mavlink_message_t &msg);
 
     uint8_t _compid {MAV_COMP_ID_GIMBAL};
 
