@@ -59,6 +59,8 @@ protected:
     uint8_t vehicle_system_id() const { return _vehicle_system_id; }
     uint8_t gimbal_compid() const { return _compid; }
     void send_mavlink_message(const mavlink_message_t &msg);
+    void send_command_ack(uint8_t target_sysid, uint8_t target_compid,
+                          MAV_CMD command, MAV_RESULT result);
 
 protected:
     // physics model shared by all MAVLink gimbal simulators
@@ -72,8 +74,6 @@ private:
     void send_heartbeat();
     void send_gimbal_device_information();
     void send_attitude_status();
-    void send_command_ack(uint8_t target_sysid, uint8_t target_compid,
-                          MAV_CMD command, MAV_RESULT result);
 
     uint8_t _compid {MAV_COMP_ID_GIMBAL};
 

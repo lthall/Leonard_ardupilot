@@ -8,9 +8,10 @@
    station sends it (zoom, focus, photo, video) and streams CAMERA_SETTINGS
    and CAMERA_CAPTURE_STATUS so the ground station sees the result.
 
-   Not simulated: the IR camera the real payload also presents, and its EO/IR
-   swap (a vendor DO_SET_PARAMETER sent to the gimbal device), whose effect on
-   the wire has not been captured.
+   The gimbal device accepts AVT's object-detection custom command (a vendor
+   DO_SET_PARAMETER, param1 1006).  Not simulated: the IR camera the real
+   payload also presents, and its EO/IR swap (param1 1000), whose effect on the
+   wire has not been captured; the swap is refused as unsupported.
 
 ./Tools/autotest/sim_vehicle.py -v ArduCopter -A --serial5=sim:avt_cm62_gimbal
 
@@ -53,6 +54,12 @@ protected:
     void update_peripherals(uint32_t now_ms) override;
 
 private:
+    // AVT custom commands (DO_SET_PARAMETER to the gimbal device)
+    void gimbal_handle_command(const mavlink_message_t &msg, uint16_t command,
+                               uint8_t target_system, uint8_t target_component,
+                               float p1, float p2);
+    bool _object_detection;
+
     // the EO camera
     void camera_handle_command(const mavlink_message_t &msg, uint16_t command,
                                uint8_t target_system, uint8_t target_component,
