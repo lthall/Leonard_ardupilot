@@ -17,6 +17,7 @@ from pymavlink.rotmat import Vector3
 
 import vehicle_test_suite
 
+from vehicle_test_suite import AltFrame
 from vehicle_test_suite import AutoTestTimeoutException
 from vehicle_test_suite import NotAchievedException
 from vehicle_test_suite import OldpymavlinkException
@@ -6572,6 +6573,52 @@ class AutoTestPlane(vehicle_test_suite.TestSuite):
         self._MAV_CMD_DO_FLIGHTTERMINATION(self.run_cmd)
         self._MAV_CMD_DO_FLIGHTTERMINATION(self.run_cmd_int)
 
+    def ReturnPathTrack(self):
+        '''RTL rejoins a return path at the closest point and then follows the track'''
+        self.set_parameter("RTL_AUTOLAND", 4)
+        self.context_set_message_rate_hz('LOCAL_POSITION_NED', 10)
+
+        # the leg from item 4 to item 5 runs south along the north axis
+        self.start_flying_simple_relhome_mission([
+            (mavutil.mavlink.MAV_CMD_NAV_TAKEOFF, 0, 0, 50),        # 1
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 400, 400, 100),  # 2
+            self.create_MISSION_ITEM_INT(mavutil.mavlink.MAV_CMD_DO_RETURN_PATH_START),  # 3
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 2000, 0, 100),   # 4
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 200, 0, 100),    # 5
+        ])
+        self.wait_current_waypoint(2, timeout=120)
+
+        # beside the middle of the leg from item 4 to item 5:
+        self.change_mode('GUIDED')
+        loc = self.offset_location_ne(self.home_position_as_location(), 1100, 400)
+        loc.set_alt_m(100, AltFrame.ABOVE_HOME)
+        self.send_do_reposition(loc)
+        self.wait_location(loc, accuracy=200, height_accuracy=None, timeout=120)
+
+        self.change_mode('RTL')
+        self.wait_mode('AUTO')
+        # the rejoin point part way along the leg carries the leg start index
+        self.assert_current_waypoint(4)
+
+        # flying straight to item 5 would be about 200m east of the track
+        # at 700m north, so any east offset there is a cross track error
+        max_cross_track = 0
+        tstart = self.get_sim_time()
+        while True:
+            if self.get_sim_time_cached() - tstart > 180:
+                raise NotAchievedException("Did not fly the return path")
+            m = self.assert_receive_message('LOCAL_POSITION_NED')
+            if m.x < 300:
+                break
+            if m.x < 700:
+                max_cross_track = max(max_cross_track, abs(m.y))
+        self.progress(f"maximum cross track error {max_cross_track:.1f}m")
+        if max_cross_track > 20:
+            raise NotAchievedException(f"Did not follow the return path track (cross track {max_cross_track:.1f}m)")
+        self.assert_current_waypoint(5)
+
+        self.fly_home_land_and_disarm()
+
     def MAV_CMD_DO_LAND_START(self):
         '''test MAV_CMD_DO_LAND_START as mavlink command'''
         self.set_parameters({
@@ -8180,6 +8227,7 @@ class AutoTestPlane(vehicle_test_suite.TestSuite):
             self.MAV_CMD_DO_GO_AROUND,
             self.MAV_CMD_DO_FLIGHTTERMINATION,
             self.MAV_CMD_DO_LAND_START,
+            self.ReturnPathTrack,
             self.MAV_CMD_NAV_ALTITUDE_WAIT,
             self.InteractTest,
             self.CompassLearnInFlight,
