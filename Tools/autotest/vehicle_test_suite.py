@@ -9915,23 +9915,41 @@ Also, ignores heartbeats not from our target system'''
         here = self.assert_receive_message('GLOBAL_POSITION_INT')
         return self.get_distance_int(m, here)
 
+    def home_position_as_location(self) -> Location:
+        '''return home position as a (frame-aware) Location; home
+        altitude is AMSL'''
+        m = self.poll_home_position()
+        return Location(m.latitude*1.0e-7, m.longitude*1.0e-7, m.altitude*1.0e-3, AltFrame.ABSOLUTE)
+
     def home_position_as_mav_location(self):
         m = self.poll_home_position()
         return mavutil.location(m.latitude*1.0e-7, m.longitude*1.0e-7, m.altitude*1.0e-3, 0)
 
     def offset_location_ne(self, location, metres_north, metres_east):
-        '''return a new location offset from passed-in location'''
+        '''return a new location offset from passed-in location.  A
+        (frame-aware) Location comes back as a Location in the same
+        altitude frame; a mavutil.location comes back as one'''
         (target_lat, target_lng) = mavextra.gps_offset(location.lat,
                                                        location.lng,
                                                        metres_east,
                                                        metres_north)
+        if isinstance(location, Location):
+            ret = location.copy()
+            ret.lat = target_lat
+            ret.lng = target_lng
+            return ret
         return mavutil.location(target_lat,
                                 target_lng,
                                 location.alt,
                                 location.heading)
 
     def offset_location_up(self, location, metres_up):
-        '''return a new location offset from passed-in location'''
+        '''return a new location offset from passed-in location.  A
+        (frame-aware) Location keeps its altitude frame'''
+        if isinstance(location, Location):
+            ret = location.copy()
+            ret.offset_up_m(metres_up)
+            return ret
         return mavutil.location(
             location.lat,
             location.lng,
@@ -9946,6 +9964,11 @@ Also, ignores heartbeats not from our target system'''
             bearing,
             distance
         )
+        if isinstance(location, Location):
+            ret = location.copy()
+            ret.lat = target_lat
+            ret.lng = target_lng
+            return ret
         return mavutil.location(
             target_lat,
             target_lng,
