@@ -1302,6 +1302,41 @@ void ModeAuto::nav_attitude_time_run()
 #if AC_PAYLOAD_PLACE_ENABLED
 // PayloadPlace::run - places an object in auto mode
 //      called by run at 100hz or more
+// returns true if rangefinder returns valid range to trigger drop
+bool PayloadPlace::within_rangefinder_release_range() const
+{
+    auto &g2 = copter.g2;
+    if (!is_positive(g2.pldp_range_finder_drop_m)) {
+        // feature disabled
+        return false;
+    }
+    if (!copter.rangefinder_state.enabled) {
+        // no rangefinder!
+        return false;
+    }
+    if (!copter.rangefinder_alt_ok()) {
+        // no valid range from rangefinder
+        return false;
+    }
+    if (copter.rangefinder_state.glitch_count != 0) {
+        // do not accept reading when glitching is happening
+        return false;
+    }
+
+    const float rangefinder_range_m = copter.rangefinder_state.alt_m;
+    if (rangefinder_range_m > g2.pldp_range_finder_drop_m) {
+        // too high
+        return false;
+    }
+
+    if (rangefinder_range_m < 0.5 * g2.pldp_range_finder_drop_m) {
+        // too low
+        return false;
+    }
+
+    return true;
+}
+
 void PayloadPlace::run()
 {
     const char* prefix_str = "PayloadPlace:";
@@ -1384,32 +1419,28 @@ void PayloadPlace::run()
     // trigger a drop based purely on range finder altitude, independent of thrust
     // touchdown detection, once the aircraft has been within the drop band for
     // rangefinder_drop_check_duration_ms
-    if (copter.rangefinder_state.enabled && is_positive(g2.pldp_range_finder_drop_m)) {
-        if (!copter.rangefinder_alt_ok()
-                || copter.rangefinder_state.glitch_count != 0
-                || copter.rangefinder_state.alt_m > g2.pldp_range_finder_drop_m
-                || copter.rangefinder_state.alt_m < 0.5 * g2.pldp_range_finder_drop_m) {
+    switch (state) {
+    case State::FlyToLocation:
+    case State::Descent_Start:
+    case State::Descent_Measure:
+        rangefinder_drop_alt_time_ms = now_ms;
+        break;
+    case State::Descent_Test:
+        if (!within_rangefinder_release_range()) {
+            // reset timer
             rangefinder_drop_alt_time_ms = now_ms;
-        } else if (now_ms - rangefinder_drop_alt_time_ms >= rangefinder_drop_check_duration_ms) {
-            switch (state) {
-            case State::FlyToLocation:
-            case State::Descent_Start:
-            case State::Descent_Measure:
-                // do nothing on this loop
-                break;
-            case State::Descent_Test:
-                gcs().send_text(MAV_SEVERITY_INFO, "%s landed", prefix_str);
-                state = State::Release;
-                break;
-            case State::Release:
-            case State::Releasing:
-            case State::Delay:
-            case State::Ascent_Start:
-            case State::Ascent:
-            case State::Done:
-                break;
-            }
+        } else if (now_ms - rangefinder_drop_alt_time_ms > rangefinder_drop_check_duration_ms) {
+            gcs().send_text(MAV_SEVERITY_INFO, "%s rangefinder trigger", prefix_str);
+            state = State::Release;
         }
+        break;
+    case State::Release:
+    case State::Releasing:
+    case State::Delay:
+    case State::Ascent_Start:
+    case State::Ascent:
+    case State::Done:
+        break;
     }
 
     // abort the descent if the maximum descent distance is reached
