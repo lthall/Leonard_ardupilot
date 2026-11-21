@@ -1671,6 +1671,8 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
         self.wait_statustext("Battery 1 is critical", timeout=60)
         self.wait_mode("RTL")
         self.wait_landed_and_disarmed()
+        self.set_parameter('SIM_BATT_VOLTAGE', 12.5)
+        self.clear_battery_failsafe()
 
     def BatteryFailsafeTwoStageSmartRTLDoLandStart(self):
         '''Two stage battery failsafe: low SmartRTL then critical Auto DO_LAND_START'''
@@ -1694,6 +1696,8 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
         self.wait_mode("AUTO_RTL")
         self.wait_current_waypoint(3)
         self.wait_landed_and_disarmed()
+        self.set_parameter('SIM_BATT_VOLTAGE', 12.5)
+        self.clear_battery_failsafe()
         self.reboot_sitl()  # landed away from home
 
     def BatteryFailsafeOptionsContinueLanding(self):
