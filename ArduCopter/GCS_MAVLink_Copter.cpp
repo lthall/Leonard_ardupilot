@@ -1350,12 +1350,20 @@ void GCS_MAVLINK_Copter::send_follow_target() const
         if (!ahrs.get_origin(origin_loc)) {
             return;
         }
-        const Vector3f pos_target_NED_m = copter.pos_control->get_pos_desired_NED_m().tofloat();
+        // report the desired path plus the surface tracking terrain correction.
+        // The position offset is deliberately left out so a vehicle flying an
+        // offset from its desired path (e.g. a station in a formation) advertises
+        // the path itself for others to follow
+        const auto &pos_control = *copter.pos_control;
+        Vector3f pos_target_NED_m = pos_control.get_pos_desired_NED_m().tofloat();
+        pos_target_NED_m.z += pos_control.get_pos_terrain_D_m();
         loc = Location::from_ekf_offset_NED_m(pos_target_NED_m, Location::AltFrame::ABOVE_ORIGIN);
         // absolute altitude = origin altitude + (-NED.z)
         alt_m = origin_loc.alt * 0.01f - pos_target_NED_m.z;
-        vel_NED_ms = copter.pos_control->get_vel_desired_NED_ms();
-        acc_NED_mss = copter.pos_control->get_accel_desired_NED_mss();
+        vel_NED_ms = pos_control.get_vel_desired_NED_ms();
+        vel_NED_ms.z += pos_control.get_vel_terrain_D_ms();
+        acc_NED_mss = pos_control.get_accel_desired_NED_mss();
+        acc_NED_mss.z += pos_control.get_accel_terrain_D_mss();
     } else {
         if (!ahrs.get_location(loc)) {
             return;
