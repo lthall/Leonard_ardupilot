@@ -346,12 +346,16 @@ void AC_Loiter::calc_desired_velocity(bool avoidance_on)
 
     const float dt_s = _pos_control.get_dt_s();
 
+    // LOIT_SPEED_MS can be changed in flight, after sanity_check_params() has
+    // enforced the minimum, so enforce it here as well before dividing by it
+    const float speed_max_ne_ms = MAX(_speed_max_ne_ms, LOITER_SPEED_MIN_MS);
+
     // Apply speed limit from LOITER_SPEED and EKF constraint
-    float gnd_speed_limit_ms = MIN(_speed_max_ne_ms, ekfGndSpdLimit_ms);
+    float gnd_speed_limit_ms = MIN(speed_max_ne_ms, ekfGndSpdLimit_ms);
     gnd_speed_limit_ms = MAX(gnd_speed_limit_ms, LOITER_SPEED_MIN_MS);
 
     // Determine acceleration limit based on maximum allowed lean angle
-    float pilot_acceleration_max_mss = (gnd_speed_limit_ms / _speed_max_ne_ms) * angle_rad_to_accel_mss(get_angle_max_rad());
+    float pilot_acceleration_max_mss = (gnd_speed_limit_ms / speed_max_ne_ms) * angle_rad_to_accel_mss(get_angle_max_rad());
 
     // Check for invalid dt
     if (is_negative(dt_s)) {
