@@ -1047,6 +1047,14 @@ const AP_Param::GroupInfo ParametersG2::var_info2[] = {
     // @Range: 0 5
     // @User: Standard
     AP_GROUPINFO("PLDP_SPEED_DN", 4, ParametersG2, pldp_descent_speed_ms, 0.0),
+
+    // @Param: PLDP_RNG_DRP
+    // @DisplayName: Payload Place range finder drop altitude
+    // @Description: Payload Place range finder altitude in m that will trigger a drop, after 1 second, without touchdown detection. Set to zero to disable.
+    // @Units: m
+    // @Range: 0 100
+    // @User: Standard
+    AP_GROUPINFO("PLDP_RNG_DRP", 25, ParametersG2, pldp_range_finder_drop_m, 0.0),
 #endif  // AC_PAYLOAD_PLACE_ENABLED
 
     // @Param: SURFTRAK_TC
