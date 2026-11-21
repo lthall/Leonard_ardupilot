@@ -2971,6 +2971,15 @@ function gcs:send_named_string(name, value) end
 ---| '4' # Failed
 function gcs:set_message_interval(port_num, msg_id, interval_us) end
 
+-- set message interval for a given MAVLink instance (channel) and message id
+---@param mav_instance integer -- MAVLink instance number, as used by the MAVn_ parameters
+---@param msg_id uint32_t_ud|integer|number -- MAVLink message id
+---@param interval_us integer -- interval in micro seconds
+---@return integer
+---| '0' # Accepted
+---| '4' # Failed
+function gcs:set_message_interval_chan(mav_instance, msg_id, interval_us) end
+
 -- get the vehicle MAV_TYPE
 ---@return integer
 ---| '0' # MAV_TYPE_GENERIC=0, /* Generic micro air vehicle | */
