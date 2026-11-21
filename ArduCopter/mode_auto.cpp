@@ -1316,6 +1316,8 @@ void PayloadPlace::run()
 
     const uint32_t descent_thrust_cal_duration_ms = 2000; // milliseconds
     const uint32_t placed_check_duration_ms = 500; // how long we have to be below a throttle threshold before considering placed
+    const uint32_t rangefinder_drop_check_duration_ms = 1000; // how long we have to be below the range finder drop altitude before triggering a drop
+    float thrust_ref = 0.0;
 
     auto &g2 = copter.g2;
     auto *attitude_control = copter.attitude_control;
@@ -1337,7 +1339,8 @@ void PayloadPlace::run()
         case State::Descent_Start:
             // do nothing on this loop
             break;
-        case State::Descent:
+        case State::Descent_Measure:
+        case State::Descent_Test:
             gcs().send_text(MAV_SEVERITY_INFO, "%s landed", prefix_str);
             state = State::Release;
             break;
@@ -1362,7 +1365,8 @@ void PayloadPlace::run()
             descent_start_altitude_m = pos_control->get_pos_desired_U_m();
             state = State::Done;
             break;
-        case State::Descent:
+        case State::Descent_Measure:
+        case State::Descent_Test:
             gcs().send_text(MAV_SEVERITY_INFO, "%s Manual release", prefix_str);
             state = State::Release;
             break;
@@ -1377,6 +1381,59 @@ void PayloadPlace::run()
     }
 #endif
 
+    // trigger a drop based purely on range finder altitude, independent of thrust
+    // touchdown detection, once the aircraft has been within the drop band for
+    // rangefinder_drop_check_duration_ms
+    if (copter.rangefinder_state.enabled && is_positive(g2.pldp_range_finder_drop_m)) {
+        if (!copter.rangefinder_alt_ok()
+                || copter.rangefinder_state.glitch_count != 0
+                || copter.rangefinder_state.alt_m > g2.pldp_range_finder_drop_m
+                || copter.rangefinder_state.alt_m < 0.5 * g2.pldp_range_finder_drop_m) {
+            rangefinder_drop_alt_time_ms = now_ms;
+        } else if (now_ms - rangefinder_drop_alt_time_ms >= rangefinder_drop_check_duration_ms) {
+            switch (state) {
+            case State::FlyToLocation:
+            case State::Descent_Start:
+            case State::Descent_Measure:
+                // do nothing on this loop
+                break;
+            case State::Descent_Test:
+                gcs().send_text(MAV_SEVERITY_INFO, "%s landed", prefix_str);
+                state = State::Release;
+                break;
+            case State::Release:
+            case State::Releasing:
+            case State::Delay:
+            case State::Ascent_Start:
+            case State::Ascent:
+            case State::Done:
+                break;
+            }
+        }
+    }
+
+    // abort the descent if the maximum descent distance is reached
+    switch (state) {
+    case State::FlyToLocation:
+    case State::Descent_Start:
+        break;
+    case State::Descent_Measure:
+    case State::Descent_Test:
+        if (!is_zero(descent_max_m) &&
+            descent_start_altitude_m - pos_control->get_pos_desired_U_m() > descent_max_m) {
+            gcs().send_text(MAV_SEVERITY_WARNING, "%s Reached maximum descent", prefix_str);
+            state = State::Ascent_Start;
+        }
+        break;
+    case State::Release:
+    case State::Releasing:
+    case State::Delay:
+    case State::Ascent_Start:
+    case State::Ascent:
+    case State::Done:
+        break;
+    }
+
     switch (state) {
     case State::FlyToLocation:
         if (copter.wp_nav->reached_wp_destination()) {
@@ -1389,29 +1446,35 @@ void PayloadPlace::run()
         descent_start_altitude_m = pos_control->get_pos_desired_U_m();
         // limiting the decent rate to the limit set in wp_nav is not necessary but done for safety
         descent_speed_ms = MIN((is_positive(g2.pldp_descent_speed_ms)) ? g2.pldp_descent_speed_ms : copter.mode_land.get_land_speed_ms(), wp_nav->get_default_speed_down_ms());
-        descent_thrust_level = 1.0;
-        state = State::Descent;
+        descent_thrust_sum = thrust_level;
+        descent_thrust_sum_count = 1;
+        state = State::Descent_Measure;
         FALLTHROUGH;
 
-    case State::Descent:
-        // check maximum decent distance
-        if (!is_zero(descent_max_m) &&
-            descent_start_altitude_m - pos_control->get_pos_desired_U_m() > descent_max_m) {
-            state = State::Ascent_Start;
-            gcs().send_text(MAV_SEVERITY_WARNING, "%s Reached maximum descent", prefix_str);
-            break;
-        }
+    case State::Descent_Measure:
         // calibrate the decent thrust after aircraft has reached constant decent rate and release if threshold is reached
         if (pos_control->get_vel_desired_U_ms() > -0.95 * descent_speed_ms) {
             // decent rate has not reached descent_speed_ms
             descent_established_time_ms = now_ms;
+            descent_thrust_sum = thrust_level;
+            descent_thrust_sum_count = 1;
             break;
         } else if (now_ms - descent_established_time_ms < descent_thrust_cal_duration_ms) {
-            // record minimum thrust for descent_thrust_cal_duration_ms
-            descent_thrust_level = MIN(descent_thrust_level, thrust_level);
-            place_start_time_ms = now_ms;
+            // record average thrust for descent_thrust_cal_duration_ms
+            descent_thrust_sum += thrust_level;
+            descent_thrust_sum_count += 1;
             break;
-        } else if (thrust_level > g2.pldp_thrust_placed_fraction * descent_thrust_level) {
+        }
+        // set filter cutoff frequency to 1 / sample period
+        thrust_filt.set_cutoff_frequency(500.0 / placed_check_duration_ms);
+        thrust_filt.reset(descent_thrust_sum / descent_thrust_sum_count);
+        place_start_time_ms = now_ms;
+        state = State::Descent_Test;
+        FALLTHROUGH;
+
+    case State::Descent_Test:
+        thrust_ref = thrust_filt.apply(thrust_level, AP::scheduler().get_loop_period_s());
+        if (thrust_ref > g2.pldp_thrust_placed_fraction * descent_thrust_sum / descent_thrust_sum_count) {
             // thrust is above minimum threshold
             place_start_time_ms = now_ms;
             break;
@@ -1439,7 +1502,7 @@ void PayloadPlace::run()
 
         if (now_ms - place_start_time_ms > placed_check_duration_ms) {
             state = State::Release;
-            gcs().send_text(MAV_SEVERITY_INFO, "%s payload release thrust threshold: %f", prefix_str, static_cast<double>(g2.pldp_thrust_placed_fraction * descent_thrust_level));
+            gcs().send_text(MAV_SEVERITY_INFO, "%s payload release thrust threshold: %f", prefix_str, static_cast<double>(g2.pldp_thrust_placed_fraction * descent_thrust_sum / descent_thrust_sum_count));
         }
         break;
 
@@ -1500,12 +1563,46 @@ void PayloadPlace::run()
         break;
     }
 
+#if HAL_LOGGING_ENABLED
+    switch (state) {
+    case State::FlyToLocation:
+    case State::Descent_Start:
+        break;
+    case State::Descent_Measure:
+    case State::Descent_Test:
+// @LoggerMessage: PLP
+// @Description: Payload Place mode descent thrust measurements
+// @Field: TimeUS: Time since system startup
+// @Field: T: Current motor thrust output
+// @Field: TR: Filtered motor thrust used to detect payload placement
+// @Field: TA: Average motor thrust measured during descent
+        AP::logger().Write("PLP",
+                    "TimeUS,T,TR,TA",
+                    "s---",
+                    "F000",
+                    "Qfff",
+                    AP_HAL::micros64(),
+                    double(thrust_level),
+                    double(thrust_ref),
+                    double(descent_thrust_sum / descent_thrust_sum_count));
+        break;
+    case State::Release:
+    case State::Releasing:
+    case State::Delay:
+    case State::Ascent_Start:
+    case State::Ascent:
+    case State::Done:
+        break;
+    }
+#endif
+
     switch (state) {
     case State::FlyToLocation:
         // this should never happen
         return copter.mode_auto.wp_run();
     case State::Descent_Start:
-    case State::Descent:
+    case State::Descent_Measure:
+    case State::Descent_Test:
         copter.flightmode->land_run_horizontal_control();
         // update altitude target and call position controller
         pos_control->D_set_pos_target_from_climb_rate_ms(-descent_speed_ms, true);
@@ -2202,7 +2299,8 @@ bool PayloadPlace::verify()
     switch (state) {
     case State::FlyToLocation:
     case State::Descent_Start:
-    case State::Descent:
+    case State::Descent_Measure:
+    case State::Descent_Test:
     case State::Release:
     case State::Releasing:
     case State::Delay:

@@ -681,6 +681,7 @@ public:
     AP_Float pldp_range_finder_maximum_m;
     AP_Float pldp_delay_s;
     AP_Float pldp_descent_speed_ms;
+    AP_Float pldp_range_finder_drop_m;
 #endif  // AC_PAYLOAD_PLACE_ENABLED
 
     AP_Int8 att_enable;
