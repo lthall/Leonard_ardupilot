@@ -41,6 +41,7 @@ public:
     void run();
     void start_descent();
     bool verify();
+    bool within_rangefinder_release_range() const;
 
     enum class State : uint8_t {
         FlyToLocation,
