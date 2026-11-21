@@ -466,6 +466,9 @@ public:
     // Returns the current terrain correction velocity (Down-positive, m/s).
     float get_vel_terrain_D_ms() const { return _vel_terrain_d_ms; }
 
+    // Returns the current terrain correction acceleration (Down-positive, m/s²).
+    float get_accel_terrain_D_mss() const { return _accel_terrain_d_mss; }
+
 
     /// Offset
 
