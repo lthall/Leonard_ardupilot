@@ -692,6 +692,12 @@ class WaitAndMaintain(object):
 class WaitAndMaintainLocation(WaitAndMaintain):
     def __init__(self, test_suite, target, accuracy=5, height_accuracy=1, **kwargs):
         super(WaitAndMaintainLocation, self).__init__(test_suite, **kwargs)
+        if isinstance(target, Location) and height_accuracy is not None:
+            if not target.has_alt():
+                raise ValueError("lat/lng-only target Location requires height_accuracy=None")
+            # comparisons are made against AMSL current position, so
+            # convert the target up-front:
+            target = test_suite.change_alt_frame(target, AltFrame.ABSOLUTE)
         self.target = target
         self.height_accuracy = height_accuracy
         self.accuracy = accuracy
@@ -700,21 +706,34 @@ class WaitAndMaintainLocation(WaitAndMaintain):
         t = self.target
         if self.height_accuracy is not None:
             return ("Waiting for distance to Location (%.4f, %.4f, %.2f) (h_err<%f, v_err<%.2f " %
-                    (t.lat, t.lng, t.alt*0.01, self.accuracy, self.height_accuracy))
+                    (t.lat, t.lng, self.target_alt_m(), self.accuracy, self.height_accuracy))
         return ("Waiting for distance to Location (%.4f, %.4f) (h_err<%f" %
                 (t.lat, t.lng, self.accuracy))
 
     def get_target_value(self):
         return self.loc
 
+    def target_alt_m(self):
+        '''target altitude; metres AMSL for a (frame-aware) Location'''
+        if isinstance(self.target, Location):
+            return self.target.get_alt_m(AltFrame.ABSOLUTE)
+        return self.target.alt*0.01
+
+    def current_alt_m(self, value):
+        if isinstance(self.target, Location):
+            return value.get_alt_m(AltFrame.ABSOLUTE)
+        return value.alt*0.01
+
     def get_current_value(self):
+        if isinstance(self.target, Location):
+            return self.test_suite.get_location()
         return self.test_suite.mav.location()
 
     def horizontal_error(self, value):
         return self.test_suite.get_distance(value, self.target)
 
     def vertical_error(self, value):
-        return math.fabs(value.alt*0.01 - self.target.alt*0.01)
+        return math.fabs(self.current_alt_m(value) - self.target_alt_m())
 
     def validate_value(self, value):
         if self.horizontal_error(value) > self.accuracy:
@@ -736,7 +755,7 @@ class WaitAndMaintainLocation(WaitAndMaintain):
 
     def progress_text(self, current_value):
         if self.height_accuracy is not None:
-            return (f"Want=({self.target.lat:.7f},{self.target.lng:.7f},{self.target.alt:.2f}) Got=({current_value.lat:.7f},{current_value.lng:.7f},{current_value.alt:.2f}) dist={self.horizontal_error(current_value):.2f} vdist={self.vertical_error(current_value):.2f}")  # noqa
+            return (f"Want=({self.target.lat:.7f},{self.target.lng:.7f},{self.target_alt_m():.2f}) Got=({current_value.lat:.7f},{current_value.lng:.7f},{self.current_alt_m(current_value):.2f}) dist={self.horizontal_error(current_value):.2f} vdist={self.vertical_error(current_value):.2f}")  # noqa
 
         return (f"Want=({self.target.lat},{self.target.lng}) distance={self.horizontal_error(current_value)}")
 
@@ -8525,10 +8544,19 @@ class TestSuite(abc.ABC):
             raise NotAchievedException("Expected %s to be %u got %u" %
                                        (channel, value, m_value))
 
-    def send_do_reposition(self,
-                           loc,
-                           frame=mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT):
-        '''send a DO_REPOSITION command for a location'''
+    def send_do_reposition(self, loc, frame=None):
+        '''send a DO_REPOSITION command for a location.  For a
+        (frame-aware) Location the MAV_FRAME comes from the Location
+        itself and frame must be left None; a mavutil.location is sent
+        in frame, defaulting to MAV_FRAME_GLOBAL_RELATIVE_ALT'''
+        if isinstance(loc, Location):
+            if frame is not None:
+                raise ValueError("frame comes from the Location; do not pass one")
+            frame, alt = self.mav_frame_and_alt_m(loc)
+        else:
+            if frame is None:
+                frame = mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT
+            alt = loc.alt
         self.run_cmd_int(
             mavutil.mavlink.MAV_CMD_DO_REPOSITION,
             0,
@@ -8537,7 +8565,7 @@ class TestSuite(abc.ABC):
             0,
             int(loc.lat*1e7), # lat* 1e7
             int(loc.lng*1e7), # lon* 1e7
-            loc.alt,
+            alt,
             frame=frame
         )
 
@@ -9914,6 +9942,65 @@ Also, ignores heartbeats not from our target system'''
             m = self.poll_home_position(quiet=True)
         here = self.assert_receive_message('GLOBAL_POSITION_INT')
         return self.get_distance_int(m, here)
+
+    def get_terrain_height_at(self, loc, timeout: float = 10) -> float:
+        '''return terrain height (metres AMSL) at loc's lat/lng, via
+        TERRAIN_CHECK.  TERRAIN_REPORTs for other locations (e.g. those
+        emitted for the vehicle's current position) are ignored'''
+        lat_int = int(loc.lat * 1e7)
+        lng_int = int(loc.lng * 1e7)
+        tstart = self.get_sim_time()
+        while True:
+            if self.get_sim_time_cached() - tstart > timeout:
+                raise NotAchievedException("Did not get TERRAIN_REPORT for location")
+            self.mav.mav.terrain_check_send(lat_int, lng_int)
+            m = self.assert_receive_message('TERRAIN_REPORT')
+            # match reports to our request; 100 * 1e-7 degrees is ~1m
+            if abs(m.lat - lat_int) > 100 or abs(m.lon - lng_int) > 100:
+                continue
+            if m.spacing == 0:
+                raise NotAchievedException("No terrain data at location")
+            return m.terrain_height
+
+    def change_alt_frame(self, loc: Location, desired_frame: AltFrame) -> Location:
+        '''return a copy of loc with its altitude converted to
+        desired_frame.  Conversion goes via AMSL, polling home
+        position / global origin / terrain data from the vehicle as
+        required, much as the C++ Location::change_alt_frame leans on
+        the AHRS and terrain singletons'''
+        if not isinstance(loc, Location):
+            raise ValueError("change_alt_frame requires a Location")
+        src_frame = loc.alt_frame
+        if src_frame is None:
+            raise LocationAltFrameException("cannot convert altitude of lat/lng-only Location")
+        if src_frame == desired_frame:
+            return loc.copy()
+
+        def frame_zero_amsl_m(frame):
+            '''AMSL altitude of the given frame's zero point at loc'''
+            if frame == AltFrame.ABSOLUTE:
+                return 0.0
+            if frame == AltFrame.ABOVE_HOME:
+                return self.poll_home_position().altitude * 1.0e-3
+            if frame == AltFrame.ABOVE_ORIGIN:
+                return self.poll_message("GPS_GLOBAL_ORIGIN").altitude * 1.0e-3
+            if frame == AltFrame.ABOVE_TERRAIN:
+                return self.get_terrain_height_at(loc)
+            raise ValueError(f"Unknown frame {frame}")
+
+        alt_amsl_m = loc.get_alt_m(src_frame) + frame_zero_amsl_m(src_frame)
+        ret = loc.copy()
+        ret.set_alt_m(alt_amsl_m - frame_zero_amsl_m(desired_frame), desired_frame)
+        return ret
+
+    def mav_frame_and_alt_m(self, loc: Location):
+        '''return a (MAV_FRAME, alt_m) tuple for sending loc's altitude
+        over MAVLink in COMMAND_INT, mission items and elsewhere.
+        ABOVE_ORIGIN is converted to ABOVE_HOME as the MAVLink global
+        frames have no origin-relative variant'''
+        if loc.alt_frame == AltFrame.ABOVE_ORIGIN:
+            loc = self.change_alt_frame(loc, AltFrame.ABOVE_HOME)
+        return loc.mav_frame(), loc.get_alt_m(loc.alt_frame)
 
     def home_position_as_location(self) -> Location:
         '''return home position as a (frame-aware) Location; home

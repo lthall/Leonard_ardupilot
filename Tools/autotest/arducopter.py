@@ -9275,7 +9275,14 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
         self.progress("Ran brake  mode")
 
     def fly_guided_move_to(self, destination, timeout=30):
-        '''move to mavutil.location location; absolute altitude'''
+        '''move to a location; absolute altitude.  A (frame-aware)
+        Location is converted to AMSL; a mavutil.location's alt is
+        taken as AMSL'''
+        if isinstance(destination, Location):
+            destination = self.change_alt_frame(destination, AltFrame.ABSOLUTE)
+            alt = destination.get_alt_m(AltFrame.ABSOLUTE)
+        else:
+            alt = destination.alt
         tstart = self.get_sim_time()
         self.mav.mav.set_position_target_global_int_send(
             0, # timestamp
@@ -9285,7 +9292,7 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
             MAV_POS_TARGET_TYPE_MASK.POS_ONLY | MAV_POS_TARGET_TYPE_MASK.LAST_BYTE, # mask specifying use-only-lat-lon-alt
             int(destination.lat * 1e7), # lat
             int(destination.lng * 1e7), # lon
-            destination.alt, # alt
+            alt, # alt
             0, # vx
             0, # vy
             0, # vz
@@ -9298,7 +9305,11 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
         while True:
             if self.get_sim_time() - tstart > timeout:
                 raise NotAchievedException()
-            delta = self.get_distance(self.mav.location(), destination)
+            if isinstance(destination, Location):
+                here = self.get_location()
+            else:
+                here = self.mav.location()
+            delta = self.get_distance(here, destination)
             self.progress("delta=%f (want <1)" % delta)
             if delta < 1:
                 break
