@@ -203,6 +203,8 @@ static bool reason_overrides_fence_recovery(ModeReason reason)
     case ModeReason::EKF_FAILSAFE:
     case ModeReason::TERRAIN_FAILSAFE:
     case ModeReason::DEADRECKON_FAILSAFE:
+    case ModeReason::AVOIDANCE:
+    case ModeReason::TERMINATE:
     case ModeReason::FENCE_BREACHED:
         return true;
     default:
