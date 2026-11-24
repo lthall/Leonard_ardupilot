@@ -2734,12 +2734,16 @@ class TestSuite(abc.ABC):
         new = here
         if offset_ne is not None:
             new = self.offset_location_ne(new, offset_ne[0], offset_ne[1])
+        if isinstance(here, Location):
+            alt_amsl_m = here.get_alt_m(AltFrame.ABSOLUTE)
+        else:
+            alt_amsl_m = here.alt
         self.mav.mav.adsb_vehicle_send(
             37, # ICAO address
             int(new.lat * 1e7),
             int(new.lng * 1e7),
             mavutil.mavlink.ADSB_ALTITUDE_TYPE_PRESSURE_QNH,
-            int(here.alt*1000 + 10000), # 10m up
+            int(alt_amsl_m*1000 + 10000), # 10m up
             0, # heading in cdeg
             0, # horizontal velocity cm/s
             0, # vertical velocity cm/s
