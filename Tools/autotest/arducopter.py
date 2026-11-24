@@ -10825,7 +10825,7 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
         self.takeoff(10, mode="LOITER")
         self.context_push()
         self.context_set_speedup(1)
-        self.set_message_rate_hz('SYSTEM_TIME', 50)
+        self.context_set_message_rate_hz('SYSTEM_TIME', 50)
 
         windows = {}
         for msg_type in 'GLOBAL_POSITION_INT', 'FOLLOW_TARGET':
